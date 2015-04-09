@@ -6,6 +6,8 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
+#include <memory>
+#include <iostream>
 #include "ofApp.h"
 #include "Definitions.h"
 
@@ -24,13 +26,13 @@ void ofApp::setup()
     ofEnableDepthTest();
     
     // This sets the camera's distance from the object
-    this->camera.setDistance(100);
+    this->camera.setDistance(10);
     
     // Set the bounds of the simulation:
     AABB bounds(EigenVector3(-2.0f, 0.0f, -2.0f), EigenVector3(2.0f, 2.0f, 2.0f));
-    
+
     // Instantiate the simulator:
-    //this->simulation = std::make_shared<Simulation>(bounds, 100, 0.1f);
+    this->simulation = std::shared_ptr<Simulation>(new Simulation(bounds, 100, 0.1f));
 }
 
 void ofApp::update()
@@ -40,28 +42,12 @@ void ofApp::update()
 
 void ofApp::draw()
 {
-    this->camera.begin();
-    ofRotateX(ofRadToDeg(.5));
-    ofRotateY(ofRadToDeg(-.5));
-    
     ofBackground(0);
     
-    ofSetColor(255,0,0);
-    ofFill();
-    ofDrawBox(30);
-    ofNoFill();
-    ofSetColor(0);
-    ofDrawBox(30);
-    
-    ofPushMatrix();
-    ofTranslate(0,0,20);
-    ofSetColor(0,0,255);
-    ofFill();
-    ofDrawBox(5);
-    ofNoFill();
-    ofSetColor(0);
-    ofDrawBox(5);
-    ofPopMatrix();
+    this->camera.begin();
+ 
+        this->simulation->draw();
+
     this->camera.end();
 }
 

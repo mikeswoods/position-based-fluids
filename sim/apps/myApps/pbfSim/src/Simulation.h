@@ -54,6 +54,8 @@ class Simulation
         Simulation(AABB bounds, unsigned int numParticles, float massPerParticle);
         virtual ~Simulation();
     
+        const AABB& getBounds() const { return this->bounds; }
+    
         void reset();
         void update();
         void draw();

@@ -12,6 +12,8 @@
 	<dict>
 		<key>4B6503966D59BA118C97A8B4391F35949E80ACFF</key>
 		<string>github.com:mikeswoods/cis563-final-project.git</string>
+		<key>C7E391CFF5296CF602CBAAAAB6CD1964A75BF819</key>
+		<string>github.com:memo/ofxMSAOpenCL.git</string>
 	</dict>
 	<key>IDESourceControlProjectPath</key>
 	<string>sim/apps/myApps/pbfSim/pbfSim.xcodeproj</string>
@@ -19,6 +21,8 @@
 	<dict>
 		<key>4B6503966D59BA118C97A8B4391F35949E80ACFF</key>
 		<string>../../../../../..</string>
+		<key>C7E391CFF5296CF602CBAAAAB6CD1964A75BF819</key>
+		<string>../../../../../../sim/addons/ofxMSAOpenCL/</string>
 	</dict>
 	<key>IDESourceControlProjectURL</key>
 	<string>github.com:mikeswoods/cis563-final-project.git</string>
@@ -35,6 +39,14 @@
 			<string>4B6503966D59BA118C97A8B4391F35949E80ACFF</string>
 			<key>IDESourceControlWCCName</key>
 			<string>cis563-final-project</string>
+		</dict>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>C7E391CFF5296CF602CBAAAAB6CD1964A75BF819</string>
+			<key>IDESourceControlWCCName</key>
+			<string>ofxMSAOpenCL</string>
 		</dict>
 	</array>
 </dict>

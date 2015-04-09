@@ -1,4 +1,5 @@
 .DS_Store
+xcdebugger
 
 *.dia
 dgph
@@ -11,24 +12,16 @@ dgph
 *.o
 *.o-*
 *.obj
+*.a
 
 # Precompiled Headers
 *.gch
 *.pch
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
 # Fortran module files
 *.mod
 
 # Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
 
 # Executables
 *.exe

@@ -7,6 +7,7 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
+#include "ofMain.h"
 #include "Simulation.h"
 
 /******************************************************************************/
@@ -50,6 +51,7 @@ void Simulation::initialize()
     // Set the initial positions of the particles:
     // particleX ...
     
+    
     // All particle velocities are initially zero:
     this->particleV.setZero();
 }
@@ -76,7 +78,16 @@ void Simulation::update()
 
 void Simulation::draw()
 {
-    // Draw
+    // Draw the bounding box that will hold the particles:
+    auto p1 = this->bounds.getMinExtent();
+    auto p2 = this->bounds.getMaxExtent();
+    auto w  = p2[0] - p1[0];
+    auto h  = p2[1] - p1[1];
+    auto d  = p2[2] - p1[2];
+
+    ofNoFill();
+    ofSetColor(255, 255, 255);
+    ofDrawBox(p1[0], p1[1], p1[2], w, h, d);
 }
 
 /******************************************************************************/

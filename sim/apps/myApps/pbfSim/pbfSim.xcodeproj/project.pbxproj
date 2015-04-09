@@ -10,6 +10,12 @@
 		1CD33E884D9E3358252E82A1 /* ofxToggle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 907C5B5E104864A2D3A25745 /* ofxToggle.cpp */; };
 		279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B26971AD62D9500B6B554 /* AABB.cpp */; };
 		279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B269A1AD62D9500B6B554 /* Simulation.cpp */; };
+		27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */; };
+		27BB07281AD7148E009F3377 /* MSAOpenCLBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */; };
+		27BB07291AD7148E009F3377 /* MSAOpenCLImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07181AD7148E009F3377 /* MSAOpenCLImage.cpp */; };
+		27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071B1AD7148E009F3377 /* MSAOpenCLKernel.cpp */; };
+		27BB072B1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071D1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp */; };
+		27BB072C1AD7148E009F3377 /* MSAOpenCLProgram.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071F1AD7148E009F3377 /* MSAOpenCLProgram.cpp */; };
 		3B8120368B4FCCD80883BAF3 /* ofxAssimpAnimation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36068D6C1D6D412786A5C4C1 /* ofxAssimpAnimation.cpp */; };
 		483908258D00B98B4BE69F07 /* ofxLabel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D67A00EB899FAC09430597 /* ofxLabel.cpp */; };
 		483FA4F6D5FA6422C559B1F5 /* ofxAssimpMeshHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F67FE68E327BEFBD4B777571 /* ofxAssimpMeshHelper.cpp */; };
@@ -93,6 +99,22 @@
 		279B26991AD62D9500B6B554 /* Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Definitions.h; sourceTree = "<group>"; };
 		279B269A1AD62D9500B6B554 /* Simulation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Simulation.cpp; sourceTree = "<group>"; };
 		279B269B1AD62D9500B6B554 /* Simulation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Simulation.h; sourceTree = "<group>"; };
+		27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCL.cpp; sourceTree = "<group>"; };
+		27BB07141AD7148E009F3377 /* MSAOpenCL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCL.h; sourceTree = "<group>"; };
+		27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLBuffer.cpp; sourceTree = "<group>"; };
+		27BB07161AD7148E009F3377 /* MSAOpenCLBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLBuffer.h; sourceTree = "<group>"; };
+		27BB07171AD7148E009F3377 /* MSAOpenCLBufferManagedT.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLBufferManagedT.h; sourceTree = "<group>"; };
+		27BB07181AD7148E009F3377 /* MSAOpenCLImage.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLImage.cpp; sourceTree = "<group>"; };
+		27BB07191AD7148E009F3377 /* MSAOpenCLImage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLImage.h; sourceTree = "<group>"; };
+		27BB071A1AD7148E009F3377 /* MSAOpenCLImagePingPong.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLImagePingPong.h; sourceTree = "<group>"; };
+		27BB071B1AD7148E009F3377 /* MSAOpenCLKernel.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLKernel.cpp; sourceTree = "<group>"; };
+		27BB071C1AD7148E009F3377 /* MSAOpenCLKernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLKernel.h; sourceTree = "<group>"; };
+		27BB071D1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLMemoryObject.cpp; sourceTree = "<group>"; };
+		27BB071E1AD7148E009F3377 /* MSAOpenCLMemoryObject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLMemoryObject.h; sourceTree = "<group>"; };
+		27BB071F1AD7148E009F3377 /* MSAOpenCLProgram.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLProgram.cpp; sourceTree = "<group>"; };
+		27BB07201AD7148E009F3377 /* MSAOpenCLProgram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLProgram.h; sourceTree = "<group>"; };
+		27BB07211AD7148E009F3377 /* MSAOpenCLTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLTypes.h; sourceTree = "<group>"; };
+		27BB07261AD7148E009F3377 /* nvidia-cuda-opencl-include.props */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "nvidia-cuda-opencl-include.props"; sourceTree = "<group>"; };
 		2834D88A62CD23F3DE2C47D1 /* ofxButton.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxButton.h; path = ../../../addons/ofxGui/src/ofxButton.h; sourceTree = SOURCE_ROOT; };
 		28904A3F685CCE2D22B588E9 /* aiVector2D.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = aiVector2D.h; path = ../../../addons/ofxAssimpModelLoader/libs/assimp/include/aiVector2D.h; sourceTree = SOURCE_ROOT; };
 		36068D6C1D6D412786A5C4C1 /* ofxAssimpAnimation.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxAssimpAnimation.cpp; path = ../../../addons/ofxAssimpModelLoader/src/ofxAssimpAnimation.cpp; sourceTree = SOURCE_ROOT; };
@@ -198,6 +220,71 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		27BB07111AD7148E009F3377 /* ofxMSAOpenCL */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07121AD7148E009F3377 /* src */,
+				27BB07221AD7148E009F3377 /* libs */,
+			);
+			name = ofxMSAOpenCL;
+			sourceTree = "<group>";
+		};
+		27BB07121AD7148E009F3377 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */,
+				27BB07141AD7148E009F3377 /* MSAOpenCL.h */,
+				27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */,
+				27BB07161AD7148E009F3377 /* MSAOpenCLBuffer.h */,
+				27BB07171AD7148E009F3377 /* MSAOpenCLBufferManagedT.h */,
+				27BB07181AD7148E009F3377 /* MSAOpenCLImage.cpp */,
+				27BB07191AD7148E009F3377 /* MSAOpenCLImage.h */,
+				27BB071A1AD7148E009F3377 /* MSAOpenCLImagePingPong.h */,
+				27BB071B1AD7148E009F3377 /* MSAOpenCLKernel.cpp */,
+				27BB071C1AD7148E009F3377 /* MSAOpenCLKernel.h */,
+				27BB071D1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp */,
+				27BB071E1AD7148E009F3377 /* MSAOpenCLMemoryObject.h */,
+				27BB071F1AD7148E009F3377 /* MSAOpenCLProgram.cpp */,
+				27BB07201AD7148E009F3377 /* MSAOpenCLProgram.h */,
+				27BB07211AD7148E009F3377 /* MSAOpenCLTypes.h */,
+			);
+			name = src;
+			path = ../../../addons/ofxMSAOpenCL/src;
+			sourceTree = "<group>";
+		};
+		27BB07221AD7148E009F3377 /* libs */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07231AD7148E009F3377 /* OpenCL */,
+			);
+			name = libs;
+			path = ../../../addons/ofxMSAOpenCL/libs;
+			sourceTree = "<group>";
+		};
+		27BB07231AD7148E009F3377 /* OpenCL */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07241AD7148E009F3377 /* lib */,
+			);
+			path = OpenCL;
+			sourceTree = "<group>";
+		};
+		27BB07241AD7148E009F3377 /* lib */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07251AD7148E009F3377 /* vs */,
+			);
+			path = lib;
+			sourceTree = "<group>";
+		};
+		27BB07251AD7148E009F3377 /* vs */ = {
+			isa = PBXGroup;
+			children = (
+				27BB07261AD7148E009F3377 /* nvidia-cuda-opencl-include.props */,
+			);
+			path = vs;
+			sourceTree = "<group>";
+		};
 		2C8F245ACBE61E28646C17F2 /* ofxAssimpModelLoader */ = {
 			isa = PBXGroup;
 			children = (
@@ -283,6 +370,7 @@
 		BB4B014C10F69532006C3DED /* addons */ = {
 			isa = PBXGroup;
 			children = (
+				27BB07111AD7148E009F3377 /* ofxMSAOpenCL */,
 				9F66160B6D853AA730F370C2 /* ofx3DModelLoader */,
 				2C8F245ACBE61E28646C17F2 /* ofxAssimpModelLoader */,
 				480A780D8D0308AE4A368801 /* ofxGui */,
@@ -528,8 +616,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */,
+				27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */,
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
 				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
+				27BB072B1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp in Sources */,
 				4E322024174AFB49A3BEA152 /* model3DS.cpp in Sources */,
 				279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */,
 				C2B7714E50909A7BCAE5A51C /* texture3DS.cpp in Sources */,
@@ -541,9 +632,12 @@
 				279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */,
 				856AA354D08AB4B323081444 /* ofxBaseGui.cpp in Sources */,
 				5CBB2AB3A60F65431D7B555D /* ofxButton.cpp in Sources */,
+				27BB07281AD7148E009F3377 /* MSAOpenCLBuffer.cpp in Sources */,
 				B266578FC55D23BFEBC042E7 /* ofxGuiGroup.cpp in Sources */,
 				483908258D00B98B4BE69F07 /* ofxLabel.cpp in Sources */,
+				27BB072C1AD7148E009F3377 /* MSAOpenCLProgram.cpp in Sources */,
 				F285EB3169F1566CA3D93C20 /* ofxPanel.cpp in Sources */,
+				27BB07291AD7148E009F3377 /* MSAOpenCLImage.cpp in Sources */,
 				837220E80EB56CD44AD27F2A /* ofxSlider.cpp in Sources */,
 				B56FE57CC35806596D38118C /* ofxSliderGroup.cpp in Sources */,
 				1CD33E884D9E3358252E82A1 /* ofxToggle.cpp in Sources */,
@@ -742,6 +836,7 @@
 					"$(LIBRARY_SEARCH_PATHS_QUOTED_FOR_TARGET_52)",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)Debug";
+				USER_HEADER_SEARCH_PATHS = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -827,6 +922,7 @@
 					"$(LIBRARY_SEARCH_PATHS_QUOTED_FOR_TARGET_51)",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

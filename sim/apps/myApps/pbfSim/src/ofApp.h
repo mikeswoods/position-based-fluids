@@ -11,7 +11,7 @@ class ofApp : public ofBaseApp
 {
     protected:
         ofEasyCam camera;
-        //std::shared_ptr<Simulation> simulation;
+        std::shared_ptr<Simulation> simulation;
     
 	public:
 		void setup();
