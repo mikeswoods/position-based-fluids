@@ -1,6 +1,7 @@
 .DS_Store
 
 *.dia
+dgph
 *.xcsettings
 *.xcuserstate
 
