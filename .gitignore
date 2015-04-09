@@ -1,9 +1,14 @@
 .DS_Store
 
+*.dia
+*.xcsettings
+*.xcuserstate
+
 # Compiled Object files
 *.slo
 *.lo
 *.o
+*.o-*
 *.obj
 
 # Precompiled Headers
