@@ -1,9 +1,18 @@
 #pragma once
 
 #include "ofMain.h"
+#include "Simulation.h"
 
-class ofApp : public ofBaseApp{
-
+/*******************************************************************************
+ * OpenFrameworks base class
+ ******************************************************************************/
+ 
+class ofApp : public ofBaseApp
+{
+    protected:
+        ofEasyCam camera;
+        //std::shared_ptr<Simulation> simulation;
+    
 	public:
 		void setup();
 		void update();
