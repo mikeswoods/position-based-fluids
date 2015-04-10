@@ -9,6 +9,11 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
+// If you need to print out, use printf
+// see https://www.khronos.org/registry/cl/sdk/1.2/docs/man/xhtml/printfFunction.html
+// If you're using XCode, make sure the console/Debug area display is toggled
+// in order to see output
+
 /**
  * This needs to be re-defined here, so we have an inline definition of a
  * Particle. Since the original definition sits in Simulation.h, it's in
