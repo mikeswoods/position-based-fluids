@@ -2,7 +2,7 @@
  * AABB.h
  * - A Simple axis-aligned bounding box implementation
  *
- * CIS563: Physcially Based Animation final project
+ * CIS563: Physically Based Animation final project
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
