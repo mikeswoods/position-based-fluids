@@ -4,6 +4,7 @@
 //========================================================================
 int main( )
 {
+    ofSetCurrentRenderer(ofGLProgrammableRenderer::TYPE);
     ofSetupOpenGL(1024, 768, OF_WINDOW);
 
 	// this kicks off the running of my app

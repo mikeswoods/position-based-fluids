@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1CD33E884D9E3358252E82A1 /* ofxToggle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 907C5B5E104864A2D3A25745 /* ofxToggle.cpp */; };
+		270A4D9E1AD7370900E21F51 /* OpenCL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 270A4D9D1AD7370900E21F51 /* OpenCL.framework */; };
 		279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B26971AD62D9500B6B554 /* AABB.cpp */; };
 		279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B269A1AD62D9500B6B554 /* Simulation.cpp */; };
 		27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */; };
@@ -94,6 +95,7 @@
 		1D59890E3C752D42722D2AFA /* model3DS.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = model3DS.cpp; path = ../../../addons/ofx3DModelLoader/src/3DS/model3DS.cpp; sourceTree = SOURCE_ROOT; };
 		1EAED5CFFEF5186B86807891 /* aiAssert.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = aiAssert.h; path = ../../../addons/ofxAssimpModelLoader/libs/assimp/include/aiAssert.h; sourceTree = SOURCE_ROOT; };
 		1F75A6D2A65723A63E2341DB /* Vector3DS.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = Vector3DS.h; path = ../../../addons/ofx3DModelLoader/src/3DS/Vector3DS.h; sourceTree = SOURCE_ROOT; };
+		270A4D9D1AD7370900E21F51 /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
 		279B26971AD62D9500B6B554 /* AABB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AABB.cpp; sourceTree = "<group>"; };
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
 		279B26991AD62D9500B6B554 /* Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Definitions.h; sourceTree = "<group>"; };
@@ -198,6 +200,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				270A4D9E1AD7370900E21F51 /* OpenCL.framework in Frameworks */,
 				E7F985F815E0DEA3003869B5 /* Accelerate.framework in Frameworks */,
 				E7E077E815D3B6510020DFD4 /* QTKit.framework in Frameworks */,
 				E4EB6799138ADC1D00A09F29 /* GLUT.framework in Frameworks */,
@@ -435,6 +438,7 @@
 		E4B69B4A0A3A1720003C02F2 = {
 			isa = PBXGroup;
 			children = (
+				270A4D9D1AD7370900E21F51 /* OpenCL.framework */,
 				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
 				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
 				E4B69E1C0A3A1BDC003C02F2 /* src */,

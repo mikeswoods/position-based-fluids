@@ -81,13 +81,16 @@ void Simulation::draw()
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
+    auto x  = (p1[0] + p2[0]) * 0.5f;
+    auto y  = (p1[1] + p2[1]) * 0.5f;
+    auto z  = (p1[2] + p2[2]) * 0.5f;
     auto w  = p2[0] - p1[0];
     auto h  = p2[1] - p1[1];
     auto d  = p2[2] - p1[2];
 
     ofNoFill();
     ofSetColor(255, 255, 255);
-    ofDrawBox(p1[0], p1[1], p1[2], w, h, d);
+    ofDrawBox(x, y, z, w, h, d);
 }
 
 /******************************************************************************/

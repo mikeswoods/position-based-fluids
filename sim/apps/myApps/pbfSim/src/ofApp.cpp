@@ -19,6 +19,7 @@ using namespace std;
 
 void ofApp::setup()
 {
+	ofSetLogLevel(OF_LOG_VERBOSE);
     ofSetVerticalSync(true);
     
     // This uses depth information for occlusion
@@ -26,10 +27,13 @@ void ofApp::setup()
     ofEnableDepthTest();
     
     // This sets the camera's distance from the object
-    this->camera.setDistance(10);
+    this->camera.setDistance(25);
+    
+    //
+    this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
-    AABB bounds(EigenVector3(-2.0f, 0.0f, -2.0f), EigenVector3(2.0f, 2.0f, 2.0f));
+    AABB bounds(EigenVector3(-5.0f, -5.0f, -5.0f), EigenVector3(5.0f, 5.0f, 5.0f));
 
     // Instantiate the simulator:
     this->simulation = std::shared_ptr<Simulation>(new Simulation(bounds, 100, 0.1f));

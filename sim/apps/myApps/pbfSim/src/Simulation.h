@@ -10,6 +10,15 @@
 #include <iostream>
 #include "Definitions.h"
 #include "AABB.h"
+#include "MSAOpenCL.h"
+
+/******************************************************************************/
+
+typedef struct {
+    float3 x;
+    float3 v;
+    float mass;
+} Particle;
 
 /**
  * This class encompasses the current statue of the 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include "MSAOpenCL.h"
 #include "Simulation.h"
 
 /*******************************************************************************
@@ -11,6 +12,7 @@ class ofApp : public ofBaseApp
 {
     protected:
         ofEasyCam camera;
+        msa::OpenCL openCL;
         std::shared_ptr<Simulation> simulation;
     
 	public:
