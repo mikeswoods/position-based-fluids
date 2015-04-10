@@ -29,38 +29,42 @@ typedef struct {
  */
 class Simulation
 {
+    private:
+        void loadKernels();
+    
     protected:
+        // OpenCL manager
+        msa::OpenCL& openCL;
+    
         // Bounding volume
         AABB bounds;
+    
+        // Timestep size:
+        float dt;
 
         // Total number of particles in the system
         unsigned int numParticles;
     
         // Just as the name describes
         float massPerParticle;
+
+        // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
+        // particle example
+        msa::OpenCLBufferManagedT<Particle>	particles;
     
-        // A sparse (3k) x (3k) matrix encoding the mass of the i-th particle
-        // at the (i,i)-th entry in the matrix
-        SparseMatrix particleMass;
-
-        // A sparse (3k) x (3k) matrix encoding the inverse mass of the i-th
-        // particle at the (i,i)-th entry in the matrix
-        SparseMatrix invParticleMass;
-
-        // A k x 3 matrix, where the i-th block encodes the (x,y,z) components
-        // of the position of the i-th particle
-        VectorX particleX;
-
-        // A k x 3 matrix, where the i-th block encodes the (x,y,z) components
-        // of the velocity of the i-th particle
-        VectorX particleV;
-
         void initialize();
-        void integratePBD(VectorX& x, VectorX& v, float dt, unsigned int ns);
+
         void computeExternalForce();
+    
+        void drawBounds() const;
+        void drawParticles();
 
     public:
-        Simulation(AABB bounds, unsigned int numParticles, float massPerParticle);
+        Simulation(msa::OpenCL& openCL
+                  ,AABB bounds
+                  ,float dt
+                  ,unsigned int numParticles
+                  ,float massPerParticle);
         virtual ~Simulation();
     
         const AABB& getBounds() const { return this->bounds; }

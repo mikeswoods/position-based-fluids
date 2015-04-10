@@ -23,8 +23,23 @@ ostream& operator<<(ostream& os, EigenVector3 v)
 
 /******************************************************************************/
 
-Simulation::Simulation(AABB _bounds, unsigned int _numParticles, float _massPerParticle) :
+/**
+ * Constructs a new simulation instance
+ *
+ * @param [in] _openCL OpenCL manager instance
+ * @param [in] _bounds Defines the boundaries of the simulation in world space
+ * @param [in] _dt The time step (usually 0.1)
+ * @param [in] _numParticles The number of particles in the simulation
+ * @param [in] _massPerParticle The mass per particle
+ */
+Simulation::Simulation(msa::OpenCL& _openCL
+                      ,AABB _bounds
+                      ,float _dt
+                      ,unsigned int _numParticles
+                      ,float _massPerParticle) :
+    openCL(_openCL),
     bounds(_bounds),
+    dt(_dt),
     numParticles(_numParticles),
     massPerParticle(_massPerParticle)
 {
@@ -36,47 +51,76 @@ Simulation::~Simulation()
     
 }
 
-void Simulation::initialize()
+/**
+ * Loads all of the OpenCL kernels that will be used for during the simulation
+ */
+void Simulation::loadKernels()
 {
-    // We multiply by 3, since we need to store the (x,y,z) components for each
-    unsigned int K = 3 * this->numParticles;
-
-    // Dimension all of the vectors / matrices based on the number of
-    // particles to be simulated:
-    this->particleX.resize(K);
-    this->particleV.resize(K);
-    this->particleMass.resize(K, K);
-    this->invParticleMass.resize(K, K);
-    
-    // Set the initial positions of the particles:
-    // particleX ...
-    
-    
-    // All particle velocities are initially zero:
-    this->particleV.setZero();
+    this->openCL.loadProgramFromFile("kernels/UpdatePositions.cl");
+    this->openCL.loadKernel("updatePositions");
 }
 
+/**
+ * Initializes the simulation
+ */
+void Simulation::initialize()
+{
+    auto p1 = this->bounds.getMinExtent();
+    auto p2 = this->bounds.getMaxExtent();
+    
+    // Dimension the OpenCL buffer to hold the given number of particles:
+    this->particles.initBuffer(this->numParticles);
+    
+    for (int i = 0; i < this->numParticles; i++) {
+
+        Particle &p = this->particles[i];
+
+        // Random position in the bounding box:
+        p.x.x = ofRandom(p1[0], p2[0]);
+        p.x.y = ofRandom(p1[1], p2[1]);
+        p.x.z = ofRandom(p1[2], p2[2]);
+        
+        // All particles have uniform mass:
+        p.mass = 1.0f;
+        
+        // and no initial velocity:
+        p.v.x = p.v.y = p.v.z = 0.0f;
+    }
+    
+    // Dump the particles to the GPU:
+    this->particles.writeToDevice();
+    
+    // Load the kernels:
+    this->loadKernels();
+}
+
+/**
+ * Resets the state of the simulation
+ */
 void Simulation::reset()
 {
     
 }
 
+/**
+ * Runs once per step of the simulation. The update() method is run before the
+ * accompanying draw method to change the state of the simulation.
+ *
+ * In this method, the motion of the particles, as well as the various
+ * quatities assigned to them are updated, as described in the paper
+ * "Position Based Fluids" by Miles Macklin & Matthias Muller.
+ */
 void Simulation::update()
 {
-    float dt = 0.01;
-    
     // Apply external forces to the particles, like gravity:
     this->computeExternalForce();
-
-    // Perform PDB integration over all particles:
-    this->integratePBD(this->particleX, this->particleV, dt, 10);
-
-    //vector<CollisionInstance> collisions;
-    //detectCollision(x, collisions);
-    //resolveCollision(x, v, collisions);
 }
 
-void Simulation::draw()
+/**
+ * Draws the bounds of the simulated environment as a transparent with solid
+ * lines indicating the edges of the bounding box.
+ */
+void Simulation::drawBounds() const
 {
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
@@ -87,43 +131,49 @@ void Simulation::draw()
     auto w  = p2[0] - p1[0];
     auto h  = p2[1] - p1[1];
     auto d  = p2[2] - p1[2];
-
+    
     ofNoFill();
     ofSetColor(255, 255, 255);
     ofDrawBox(x, y, z, w, h, d);
 }
 
+/**
+ * Currently, draws the positions of the particles using a fixed color. 
+ * Later, this may be changed so that the color of the particle reflects
+ * some quantity like velocity, mass, viscosity, etc.
+ */
+void Simulation::drawParticles()
+{
+    for (int i = 0; i < this->numParticles; i++) {
+
+        Particle &p = this->particles[i];
+
+        ofSetColor(0, 255, 0);
+        ofFill();
+        ofDrawSphere(p.x.x, p.x.y, p.x.z, 0.1f);
+    }
+}
+
+/**
+ * This method is once per step of the simulation to render all graphical
+ * output, including rendering the bounding box of the simulated environment,
+ * all particles in the simulation, as well as any additional objects (meshs,
+ * walls, etc.) that may exist.
+ */
+void Simulation::draw()
+{
+    this->drawBounds();
+    this->drawParticles();
+}
+
 /******************************************************************************/
 
+/**
+ * Applies external forces to the
+ */
 void Simulation::computeExternalForce()
 {
     
-}
-
-void Simulation::integratePBD(VectorX& x, VectorX& v, float dt, unsigned int ns)
-{
-    /*
-    // Explicit Euler step, with only gravity acting as an external force:
-    v = v + (dt * (m_mesh->m_inv_mass_matrix * this->m_external_force));
-    VectorX p = x + (dt * v);
-    
-    for (unsigned int i=0; i<this->m_iterations_per_frame; i++) {
-        if ((i % 2) == 0) {
-            // Forward
-            for (auto k = this->m_constraints.begin(); k != this->m_constraints.end(); k++) {
-                (*k)->PBDProject(p, this->m_mesh->m_inv_mass_matrix, ns);
-            }
-        } else {
-            // Backward
-            for (auto k = this->m_constraints.rbegin(); k != this->m_constraints.rend(); k++) {
-                (*k)->PBDProject(p, this->m_mesh->m_inv_mass_matrix, ns);
-            }
-        }
-    }
-    
-    v = (p - x) / dt;
-    x = p;
-    */
 }
 
 /******************************************************************************/

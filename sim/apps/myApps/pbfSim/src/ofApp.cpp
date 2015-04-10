@@ -36,7 +36,8 @@ void ofApp::setup()
     AABB bounds(EigenVector3(-5.0f, -5.0f, -5.0f), EigenVector3(5.0f, 5.0f, 5.0f));
 
     // Instantiate the simulator:
-    this->simulation = std::shared_ptr<Simulation>(new Simulation(bounds, 100, 0.1f));
+    this->simulation =
+        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds, 0.01f, 100, 0.1f));
 }
 
 void ofApp::update()
