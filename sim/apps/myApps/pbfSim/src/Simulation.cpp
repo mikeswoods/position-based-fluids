@@ -146,7 +146,7 @@ void Simulation::step()
     //cout << "STEP " << this->frameNumber << " " << this->particles[0] << endl;
     
     // Apply external forces to the particles, like gravity:
-    //this->applyExternalForces();
+    this->applyExternalForces();
  
     // Predict the next position of the particles:
     this->predictPositions();
@@ -208,7 +208,7 @@ void Simulation::drawParticles()
  */
 void Simulation::draw()
 {
-    ofClear(0, 0, 0);
+    //ofClear(0, 0, 0);
     this->drawBounds();
     this->drawParticles();
     

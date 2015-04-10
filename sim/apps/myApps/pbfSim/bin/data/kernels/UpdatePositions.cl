@@ -16,11 +16,23 @@
  * but not type definitions (as far as I know).
  */
 typedef struct {
-    float3 pos;
-    float3 vel;
-    float  mass;
-    float  radius;
-} Particle;
+    float4 pos;    // 4 words
+    float4 vel;    // 4 words
+    float  mass;   // 1 word
+    float  radius; // 1 word
+    /**
+     * VERY IMPORTANT: This is needed so that the struct's size is aligned
+     * for x86 memory access along 4/word 16 byte intervals.
+     *
+     * If the size is not aligned, results WILL be screwed up!!!
+     * Don't be like me and waste hours trying to debug this issue. The
+     * OpenCL compiler WILL NOT pad your struct to so that boundary aligned
+     * like g++/clang will in the C++ world.
+     *
+     * See http://en.wikipedia.org/wiki/Data_structure_alignment
+     */
+    float  __dummy[2]; // 2 words
+} Particle; // total = 12 words = 64 bytes
 
 /**
  * Acceleration due to gravity: 9.8 m/s
@@ -34,7 +46,7 @@ typedef struct {
  *
  *   v_i = v_i + dt + f_external(x_i)
  */
-__kernel void applyExternalForces(__global Particle* particles, float dt)
+kernel void applyExternalForces(global Particle* particles, float dt)
 {
     int id = get_global_id(0);
     
@@ -47,12 +59,10 @@ __kernel void applyExternalForces(__global Particle* particles, float dt)
  *
  *   x_i = x_i + (dt * v_i)
  */
-__kernel void predictPosition(__global Particle* particles, float dt)
+kernel void predictPosition(global Particle* particles, float dt)
 {
     int id = get_global_id(0);
 
     // Explicit Euler step:
-    //particles[id].pos += (dt * particles[id].vel);
-    
-    particles[id].pos.y += -0.5f;
+    particles[id].pos += (dt * particles[id].vel);
 }

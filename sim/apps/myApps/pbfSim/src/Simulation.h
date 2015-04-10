@@ -15,10 +15,22 @@
 /******************************************************************************/
 
 typedef struct {
-    float3 pos;
-    float3 vel;
+    float4 pos;
+    float4 vel;
     float  mass;
     float  radius;
+    /**
+     * VERY IMPORTANT: This is needed so that the struct's size is aligned 
+     * for x86 memory access along 16 byte intervals.
+     *
+     * If the size is not aligned, results WILL be screwed up!!! 
+     * Don't be like me and waste hours trying to debug this issue. The
+     * OpenCL compiler WILL NOT pad your struct to so that boundary aligned
+     * like g++/clang will in the C++ world.
+     *
+     * See http://en.wikipedia.org/wiki/Data_structure_alignment
+     */
+    float  __dummy[2];
 } Particle;
 
 /**
