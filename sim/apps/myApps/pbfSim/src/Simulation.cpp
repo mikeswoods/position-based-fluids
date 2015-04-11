@@ -3,11 +3,12 @@
  * - The heart of the position-based fluids simulator. This class encapsulates
  *   the current state of the simulation
  *
- * CIS563: Physcially Based Animation final project
+ * CIS563: Physically Based Animation final project
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
 #include "ofMain.h"
+#include "ofx3DModelLoader.h"
 #include "Simulation.h"
 
 /******************************************************************************/
@@ -19,6 +20,16 @@ using namespace std;
 ostream& operator<<(ostream& os, EigenVector3 v)
 {
     return os << "<" << v[0] << "," << v[1] << "," << v[2] << ">";
+}
+
+ostream& operator<<(ostream& os, Particle p)
+{
+    return os << "Particle {" << endl
+              << "  pos: <" << p.pos.x << "," << p.pos.y << "," << p.pos.z << ">" << endl
+              << "  vel: <" << p.vel.x << "," << p.vel.y << "," << p.vel.z << ">" << endl
+              << "  mass: " << p.mass << endl
+              << " radiusL " << p.radius << endl
+              << "}";
 }
 
 /******************************************************************************/
@@ -41,7 +52,8 @@ Simulation::Simulation(msa::OpenCL& _openCL
     bounds(_bounds),
     dt(_dt),
     numParticles(_numParticles),
-    massPerParticle(_massPerParticle)
+    massPerParticle(_massPerParticle),
+    frameNumber(0)
 {
     this->initialize();
 }
@@ -54,13 +66,24 @@ Simulation::~Simulation()
 /**
  * Loads all of the OpenCL kernels that will be used for during the simulation
  */
-void Simulation::loadKernels()
+void Simulation::initializeKernels()
 {
     
+    // Read the source:
     this->openCL.loadProgramFromFile("kernels/UpdatePositions.cl");
-    this->openCL.loadKernel("updatePositions");
     
-    this->openCL.kernel("updateParticle")->setArg(0, particles);
+    // Initialize the specified kernels and bind the parameters that are
+    // the same across invocations of the kernel:
+
+    // 0) applyExternalForces
+    this->openCL.loadKernel("applyExternalForces");
+    this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
+    this->openCL.kernel("applyExternalForces")->setArg(1, this->dt);
+    
+    // 1) predictPosition
+    this->openCL.loadKernel("predictPosition");
+    this->openCL.kernel("predictPosition")->setArg(0, this->particles);
+    this->openCL.kernel("predictPosition")->setArg(1, this->dt);
 
 }
 
@@ -80,22 +103,26 @@ void Simulation::initialize()
         Particle &p = this->particles[i];
 
         // Random position in the bounding box:
-        p.x.x = ofRandom(p1[0], p2[0]);
-        p.x.y = ofRandom(p1[1], p2[1]);
-        p.x.z = ofRandom(p1[2], p2[2]);
+        p.pos.x = ofRandom(p1[0], p2[0]);
+        p.pos.y = ofRandom(p1[1], p2[1]);
+        p.pos.z = ofRandom(p1[2], p2[2]);
         
-        // All particles have uniform mass:
-        p.mass = 1.0f;
+        // All particles have uniform mass (for now):
+        p.mass = this->massPerParticle;
+        
+        // and a uniform radius (for now):
+        p.radius = 0.1f;
         
         // and no initial velocity:
-        p.v.x = p.v.y = p.v.z = 0.0f;
+        p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
     
-    // Dump the particles to the GPU:
+    // Dump the initial quantities assigned to the particles to the GPU, so we
+    // can use them in GPU-land/OpenCL
     this->particles.writeToDevice();
     
     // Load the kernels:
-    this->loadKernels();
+    this->initializeKernels();
 }
 
 /**
@@ -107,17 +134,36 @@ void Simulation::reset()
 }
 
 /**
- * Runs once per step of the simulation. The update() method is run before the
- * accompanying draw method to change the state of the simulation.
+ * Moves the state of the simulation forward one time step according to the
+ * time step value, dt, passed to the constrcutor
  *
  * In this method, the motion of the particles, as well as the various
  * quatities assigned to them are updated, as described in the paper
  * "Position Based Fluids" by Miles Macklin & Matthias Muller.
  */
-void Simulation::update()
+void Simulation::step()
 {
+    // Dump whatever changes occurred in host-land to the GPU
+    this->particles.writeToDevice();
+ 
+    //cout << "STEP " << this->frameNumber << " " << this->particles[0] << endl;
+    
     // Apply external forces to the particles, like gravity:
-    this->computeExternalForce();
+    this->applyExternalForces();
+ 
+    // Predict the next position of the particles:
+    this->predictPositions();
+
+    // Make sure no more work remains in the OpenCL work queue. This will
+    // block until all OpenCL related stuff in the step() function has
+    // finished running:
+    this->openCL.finish();
+    
+    // Read the changes back from the GPU so we can manipulate the values
+    // in our C++ program:
+    this->particles.readFromDevice();
+
+    this->frameNumber++;
 }
 
 /**
@@ -148,14 +194,14 @@ void Simulation::drawBounds() const
  */
 void Simulation::drawParticles()
 {
+    ofSetColor(0, 0, 255);
+    ofFill();
+
     for (int i = 0; i < this->numParticles; i++) {
-
         Particle &p = this->particles[i];
-
-        ofSetColor(0, 0, 255);
-        ofFill();
-        ofDrawSphere(p.x.x, p.x.y, p.x.z, 0.1f);
+        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
     }
+    
 }
 
 /**
@@ -166,17 +212,14 @@ void Simulation::drawParticles()
  */
 void Simulation::draw()
 {
+    //ofClear(0, 0, 0);
     this->drawBounds();
     this->drawParticles();
     
-    glColor3f(1, 1, 1);
-    string info = "fps: " + ofToString(ofGetFrameRate()) + "\nnumber of particles: " + ofToString(this->numParticles);
-    ofDrawBitmapString(info, 20, 20);
-
 }
 
 /**
- * This method sorts the buckets
+ * This method sorts the buckets by 
  *
  */
 void countingSort(int arr[], int sz)
@@ -204,16 +247,56 @@ void countingSort(int arr[], int sz)
             arr[idx++] = i;
     
     delete [] B;
+
+}
+
+
+#define H               1.5f  // smoothing radius
+#define H_9             (H*H*H*H*H*H*H*H*H) // h^9
+#define H_6             (H*H*H*H*H*H) // h^6
+
+float poly6Kernel(Vector3DS p_i, Vector3DS p_j){
+    Vector3DS diff = p_i - p_j;
+    float r = diff.length();
+    if (H > r && r > 0) {
+        float h_minus_r = (H * H - r * r);
+        float div = 64.0 * M_PI * H_9 * h_minus_r * h_minus_r * h_minus_r;
+        return 315.0f / div;
+    }
+    return 0;
+}
+
+float spikyKernel(Vector3DS p_i, Vector3DS p_j){
+    Vector3DS diff = p_i - p_j;
+    float r = diff.length();
+    if (H > r && r > 0) {
+        float h_minus_r = H - r;
+        float div = M_PI * H_6 * h_minus_r * h_minus_r * h_minus_r;
+        return 15.0f / div;
+    }
+    return 0;
 }
 
 /******************************************************************************/
 
 /**
- * Applies external forces to the
+ * Applies external forces to the particles in the simulation.
+ *
+ * @see kernels/UpdatePositions.cl for details
  */
-void Simulation::computeExternalForce()
+void Simulation::applyExternalForces()
 {
-    
+    this->openCL.kernel("applyExternalForces")->run1D(this->numParticles);
+}
+
+/**
+ * Updates the predicted positions of the particles via an explicit Euler step
+ *
+ * @see kernels/UpdatePositions.cl for details
+ */
+void Simulation::predictPositions()
+{
+    this->openCL.kernel("predictPosition")->run1D(this->numParticles);
 }
 
 /******************************************************************************/

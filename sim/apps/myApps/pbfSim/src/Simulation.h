@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Simulation.h
- * CIS563: Physcially Based Animation final project
+ * CIS563: Physically Based Animation final project
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
@@ -15,9 +15,22 @@
 /******************************************************************************/
 
 typedef struct {
-    float3 x;
-    float3 v;
-    float mass;
+    float4 pos;
+    float4 vel;
+    float  mass;
+    float  radius;
+    /**
+     * VERY IMPORTANT: This is needed so that the struct's size is aligned 
+     * for x86 memory access along 16 byte intervals.
+     *
+     * If the size is not aligned, results WILL be screwed up!!! 
+     * Don't be like me and waste hours trying to debug this issue. The
+     * OpenCL compiler WILL NOT pad your struct to so that boundary aligned
+     * like g++/clang will in the C++ world.
+     *
+     * See http://en.wikipedia.org/wiki/Data_structure_alignment
+     */
+    float  __dummy[2];
 } Particle;
 
 /**
@@ -30,7 +43,11 @@ typedef struct {
 class Simulation
 {
     private:
-        void loadKernels();
+        // Count of the current frame number
+        unsigned int frameNumber;
+    
+        // Load kernels and bind parameters
+        void initializeKernels();
     
     protected:
         // OpenCL manager
@@ -52,10 +69,14 @@ class Simulation
         // particle example
         msa::OpenCLBufferManagedT<Particle>	particles;
     
+        // Initialization-related functions:
         void initialize();
 
-        void computeExternalForce();
+        // Simulation state-related functions:
+        void applyExternalForces();
+        void predictPositions();
     
+        // Drawing-related functions:
         void drawBounds() const;
         void drawParticles();
         void countingSort();
@@ -63,15 +84,16 @@ class Simulation
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,float dt
-                  ,unsigned int numParticles
-                  ,float massPerParticle);
+                  ,float dt = 0.025f
+                  ,unsigned int numParticles = 1000
+                  ,float massPerParticle = 1.0f);
         virtual ~Simulation();
-    
+
+        const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
-    
+
         void reset();
-        void update();
+        void step();
         void draw();
     
         friend std::ostream& operator<<(std::ostream& os, EigenVector3 v);

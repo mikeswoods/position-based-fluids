@@ -1,62 +1,75 @@
-
-#define DAMP			0.95f
-#define CENTER_FORCE	0.007f
-#define MOUSE_FORCE		300.0f
-#define MIN_SPEED		0.1f
-
+/*******************************************************************************
+ * UpdatePositions.cl
+ * - The OpenCL kernel responsible for apply external forces, like gravity
+ *   for instance to each particle in the simulation, and subsequenly updating
+ *   the predicted position of each particle using a simple explicit Euler
+ *   step
+ *
+ * CIS563: Physically Based Animation final project
+ * Created by Michael Woods & Michael O'Meara
+ ******************************************************************************/
 
 
 typedef struct {
-    float3 x;
-    float3 v;
-    float mass;
-} Particle;
+    
+    float4 pos;    // 4 words
+    
+    float4 vel;    // 4 words
+    
+    float  mass;   // 1 word
 
+    float  radius; // 1 word
 
-__kernel void updateParticle(__global Particle* particles)  //, __global float2* posBuffer, const float2 mousePos, const float2 dimensions)
-{
-    int id = get_global_id(0);
-    __global Particle *p = &particles[id];
-    
-    p->v += float3(0,9.8f,0);
-    
-    /*
-    float2 diff = mousePos - posBuffer[id];
-    float invDistSQ = 1.0f / dot(diff, diff);
-    diff *= MOUSE_FORCE * invDistSQ;
-    
-    p->v += (dimensions*0.5f - posBuffer[id]) * CENTER_FORCE - diff* p->mass;
-    
-    float speed2 = dot(p->v, p->v);
-    if(speed2<MIN_SPEED) posBuffer[id] = mousePos + diff * (1.0f + p->mass);
-    
-    posBuffer[id] += p->vel;
-    p->v *= DAMP;
+    /**
+     * VERY IMPORTANT: This is needed so that the struct's size is aligned
+     * for x86 memory access along 4/word 16 byte intervals.
+     *
+     * If the size is not aligned, results WILL be screwed up!!!
+     * Don't be like me and waste hours trying to debug this issue. The
+     * OpenCL compiler WILL NOT pad your struct to so that boundary aligned
+     * like g++/clang will in the C++ world.
+     *
+     * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
+    float  __dummy[2]; // 2 words
+
+} Particle; // total = 12 words = 64 bytes
+
+/**
+ * Acceleration due to gravity: 9.8 m/s
+ */
+#define G 9.8f
+
+/**
+ * [KERNEL]
+ *
+ * Currently, only applies gravity to the y component of the velocity.
+ * Additional forces may be added later like wind and other forms of
+ * turbulence, etc.
+ *
+ *   v_i = v_i + dt + f_external(x_i)
+ */
+kernel void applyExternalForces(global Particle* particles, float dt)
+{
+    int i = get_global_id(0);
+    
+    // Apply the force of gravity along the y-axis:
+    particles[i].vel.y += (dt * -G);
 }
 
-#define H               1.5f  // smoothing radius
-#define H_9             (H*H*H*H*H*H*H*H*H) // h^9
-#define H_6             (H*H*H*H*H*H) // h^6
+/**
+ * [KERNEL]
+ *
+ * Updates the predicted position of the particle using an explicit Euler step
+ *
+ *   x_i = x_i + (dt * v_i)
+ */
+kernel void predictPosition(global Particle* particles, float dt)
+{
+    int i = get_global_id(0);
 
-__kernel float poly6Kernel(float3 p_i, float3 p_j){
-    float3 diff = p_i - p_j;
-    float r = sqrt(diff * diff);
-    if (H > r && r > 0) {
-        float h_minus_r = (H * H - r * r);
-        float div = 64.0 * PI * H_9 * h_minus_r * h_minus_r * h_minus_r;
-        return 315.0f / div;
-    }
-    return 0;
+    // Explicit Euler step:
+    particles[i].pos += (dt * particles[i].vel);
+    
 }
 
-__kernel float spikyKernel(float3 p_i, float3 p_j){
-    float3 diff = p_i - p_j;
-    float r = sqrt(diff * diff);
-    if (H > r && r > 0) {
-        float h_minus_r = H - r;
-        float div = PI * H_6 * h_minus_r * h_minus_r * h_minus_r;
-        return 15.0f / div;
-    }
-    return 0;
-}

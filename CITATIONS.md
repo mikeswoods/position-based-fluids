@@ -1,4 +1,7 @@
 ==== CITIATIONS ====
 
-* https://github.com/dopuskh3/ofx-projects
-** A CMake file for cross-platform building openFrameworks
+* Rendering millions of geometry instances efficiently
+** http://www.flashbang.se/archives/315
+
+* GPU based nearest neighbor search
+** http://www.rchoetzlein.com/fluids3/?page_id=15

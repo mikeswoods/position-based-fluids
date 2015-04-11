@@ -2,7 +2,7 @@
  * ofApp
  * - The OpenFrameworks application entry point
  *
- * CIS563: Physcially Based Animation final project
+ * CIS563: Physically Based Animation final project
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
@@ -30,7 +30,7 @@ void ofApp::setup()
     // This sets the camera's distance from the object
     this->camera.setDistance(25);
     
-    //
+    // Initialize from GL world:
     this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
@@ -38,12 +38,12 @@ void ofApp::setup()
 
     // Instantiate the simulator:
     this->simulation =
-        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds, 0.01f, 100, 0.1f));
+        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds));
 }
 
 void ofApp::update()
 {
-
+    this->simulation->step();
 }
 
 void ofApp::draw()
@@ -56,6 +56,11 @@ void ofApp::draw()
 
     this->camera.end();
     
+    // Show the current frame rate and frame count
+    ofSetColor(255);
+    ofFill();
+    ofDrawBitmapString(ofToString(ofGetFrameRate()) + " fps", 10, 15);
+    ofDrawBitmapString("Frame: " + ofToString(this->simulation->getFrameNumber()), 10, 30);
 }
 
 void ofApp::keyPressed(int key)
