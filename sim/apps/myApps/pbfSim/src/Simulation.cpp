@@ -56,6 +56,9 @@ Simulation::Simulation(msa::OpenCL& _openCL
     massPerParticle(_massPerParticle),
     frameNumber(0)
 {
+    this->numCells =   static_cast<unsigned int>(this->cellsPerAxis[0])
+                     * static_cast<unsigned int>(this->cellsPerAxis[1])
+                     * static_cast<unsigned int>(this->cellsPerAxis[2]);
     this->initialize();
 }
 
@@ -69,31 +72,49 @@ Simulation::~Simulation()
  */
 void Simulation::initializeKernels()
 {
-    
     // Read the source files for the kernels:
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
     // Initialize the specified kernels and bind the parameters that are
     // the same across invocations of the kernel:
 
-    // 0) applyExternalForces
+    // 0) Apply external forces
     this->openCL.loadKernel("applyExternalForces");
     this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
     this->openCL.kernel("applyExternalForces")->setArg(1, this->dt);
     
-    // 1) predictPosition
+    // 1) Predict position
     this->openCL.loadKernel("predictPosition");
     this->openCL.kernel("predictPosition")->setArg(0, this->particles);
     this->openCL.kernel("predictPosition")->setArg(1, this->dt);
 
-    // 2.1) discretizePositions
+    // 2.1) Discretize particle positions
     float3 _cellsPerAxis = (float3)(this->cellsPerAxis[0], this->cellsPerAxis[1], this->cellsPerAxis[2]);
-    this->openCL.loadKernel("discretizePositions");
-    this->openCL.kernel("discretizePositions")->setArg(0, this->particles);
-    this->openCL.kernel("discretizePositions")->setArg(1, this->particleToCell);
-    this->openCL.kernel("discretizePositions")->setArg(2, _cellsPerAxis);
-    this->openCL.kernel("discretizePositions")->setArg(3, this->bounds.getMinExtent());
-    this->openCL.kernel("discretizePositions")->setArg(4, this->bounds.getMaxExtent());
+    this->openCL.loadKernel("discretizeParticlePositions");
+    this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(2, _cellsPerAxis);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(3, this->bounds.getMinExtent());
+    this->openCL.kernel("discretizeParticlePositions")->setArg(4, this->bounds.getMaxExtent());
+    
+    // 2.2) Zero out the cell histogram
+    this->openCL.loadKernel("zeroCellHistogram");
+    this->openCL.kernel("zeroCellHistogram")->setArg(0, this->cellHistogram);
+    
+    // 2.3) Compute cell histogram
+    this->openCL.loadKernel("computeCellHistogram");
+    this->openCL.kernel("computeCellHistogram")->setArg(0, this->particleToCell);
+    this->openCL.kernel("computeCellHistogram")->setArg(1, this->cellHistogram);
+    this->openCL.kernel("computeCellHistogram")->setArg(2, _cellsPerAxis);
+    
+    /*
+    // 2.4)
+    this->openCL.loadKernel("sortParticlesByCell");
+    this->openCL.kernel("sortParticlesByCell")->setArg(0, this->particleToCell);
+    this->openCL.kernel("sortParticlesByCell")->setArg(1, this->cellHistogram);
+    this->openCL.kernel("sortParticlesByCell")->setArg(2, static_cast<int>(this->numCells));
+    this->openCL.kernel("sortParticlesByCell")->setArg(3, this->sortedParticleToCell);
+     */
 }
 
 /**
@@ -103,11 +124,27 @@ void Simulation::initialize()
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
+    int N   = this->cellsPerAxis[0] * this->cellsPerAxis[1] * this->cellsPerAxis[2];
     
     // Dimension the OpenCL buffer to hold the given number of particles:
+
     this->particles.initBuffer(this->numParticles);
-    this->particleToCell.initBuffer(this->numParticles);
     
+    // A mapping of particle indices to linearized cell indices. Each entry
+    // is a pair (i,j), where i referes to a particle in this->particles,
+    // and j refers to a linear index in the range [0, N], where
+    // N = (cellsPerAxis[0] * _cellsPerAxis[1] * _cellsPerAxis[2])
+
+    this->particleToCell.initBuffer(this->numParticles);
+    //this->sortedParticleToCell.initBuffer(this->numParticles);
+    
+    // A histogram (count table), where the i-th entry contains the number of
+    // particles occupying that linearized grid cell. For a linear grid cell
+    // z, z can be computed from subscripts (i, j, k) by way of
+    // z = i + (j * GRIDWIDTH) + (k * GRIDWIDTH * GRIDHEIGHT)
+
+    this->cellHistogram.initBuffer(N);
+
     for (int i = 0; i < this->numParticles; i++) {
 
         Particle &p = this->particles[i];
@@ -126,16 +163,30 @@ void Simulation::initialize()
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
         
-        //this->particleToCell[i].x = -1; // Particle index; -1 indicates unset
-        //this->particleToCell[i].y = -1; // Cell index; -1 indicates unset
+        this->particleToCell[i].particleIndex = -1; // Particle index; -1 indicates unset
+        this->particleToCell[i].cellI         = -1; // Cell index; -1 indicates unset
+        this->particleToCell[i].cellJ         = -1; // Cell index; -1 indicates unset
+        this->particleToCell[i].cellK         = -1; // Cell index; -1 indicates unset
+        
+        /*
+        this->sortedParticleToCell[i].particleIndex = -1; // Particle index; -1 indicates unset
+        this->sortedParticleToCell[i].cellI         = -1; // Cell index; -1 indicates unset
+        this->sortedParticleToCell[i].cellJ         = -1; // Cell index; -1 indicates unset
+        this->sortedParticleToCell[i].cellK         = -1; // Cell index; -1 indicates unset
+         */
+    }
+    
+    for (int i = 0; i < N; i++) {
+    //    this->cellHistogram[i] = 0;
     }
     
     // Dump the initial quantities assigned to the particles to the GPU, so we
     // can use them in GPU-land/OpenCL
-    this->particles.writeToDevice();
-    //this->particleToCell.writeToDevice();
+
+    this->writeToGPU();
     
     // Load the kernels:
+
     this->initializeKernels();
 }
 
@@ -144,7 +195,29 @@ void Simulation::initialize()
  */
 void Simulation::reset()
 {
-    
+    this->frameNumber = 0;
+}
+
+/**
+ * Moves data from GPU buffers back to the host
+ */
+void Simulation::readFromGPU()
+{
+    this->particles.readFromDevice();
+    this->particleToCell.readFromDevice();
+    //this->sortedParticleToCell.readFromDevice();
+    this->cellHistogram.readFromDevice();
+}
+
+/**
+ * Writes data from the host to buffers on the GPU (device
+ */
+void Simulation::writeToGPU()
+{
+    this->particles.writeToDevice();
+    this->particleToCell.writeToDevice();
+    //this->sortedParticleToCell.writeToDevice();
+    this->cellHistogram.writeToDevice();
 }
 
 /**
@@ -158,7 +231,7 @@ void Simulation::reset()
 void Simulation::step()
 {
     // Dump whatever changes occurred in host-land to the GPU
-    this->particles.writeToDevice();
+    this->writeToGPU();
  
     //cout << "STEP " << this->frameNumber << " " << this->particles[0] << endl;
     
@@ -168,8 +241,10 @@ void Simulation::step()
     // Predict the next position of the particles:
     this->predictPositions();
 
-    // First step in nearest neighbor finding:
-    //this->discretizePositions();
+    // Steps in nearest neighbor finding:
+    this->discretizeParticlePositions();
+    this->zeroCellHistogram();
+    this->computeCellHistogram();
     
     // Make sure no more work remains in the OpenCL work queue. This will
     // block until all OpenCL related stuff in the step() function has
@@ -178,8 +253,9 @@ void Simulation::step()
     
     // Read the changes back from the GPU so we can manipulate the values
     // in our C++ program:
-    this->particles.readFromDevice();
+    this->readFromGPU();
 
+    // Finally, bump up the frame counter;
     this->frameNumber++;
 }
 
@@ -260,9 +336,33 @@ void Simulation::predictPositions()
 /**
  *
  */
-void Simulation::discretizePositions()
+void Simulation::discretizeParticlePositions()
 {
-    this->openCL.kernel("discretizePositions")->run1D(this->numParticles);
+    this->openCL.kernel("discretizeParticlePositions")->run1D(this->numParticles);
+}
+
+/**
+ *
+ */
+void Simulation::zeroCellHistogram()
+{
+    this->openCL.kernel("zeroCellHistogram")->run1D(this->numCells);
+}
+
+/**
+ *
+ */
+void Simulation::computeCellHistogram()
+{
+    this->openCL.kernel("computeCellHistogram")->run1D(this->numCells);
+}
+
+/**
+ *
+ */
+void Simulation::sortParticlesByCell()
+{
+    //this->openCL.kernel("sortParticlesByCell")->run1D(1);
 }
 
 /******************************************************************************/

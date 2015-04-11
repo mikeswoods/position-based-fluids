@@ -33,6 +33,13 @@ typedef struct {
     float  __dummy[2];
 } Particle;
 
+typedef struct {
+    int particleIndex; // Index of particle in particle buffer
+    int cellI;         // Corresponding grid index in the x-axis
+    int cellJ;         // Corresponding grid index in the y-axis
+    int cellK;         // Corresponding grid index in the z-axis
+} ParticlePosition;
+
 /**
  * This class encompasses the current statue of the 
  * Position-Based Fluids/Dynamics system at a given point in time. Much of the
@@ -48,6 +55,12 @@ class Simulation
     
         // Load kernels and bind parameters
         void initializeKernels();
+    
+        // Moves data from GPU buffers back to the host
+        void readFromGPU();
+    
+        // Writes data from the host to buffers on the GPU (device)
+        void writeToGPU();
     
     protected:
         // OpenCL manager
@@ -65,13 +78,18 @@ class Simulation
         // Total number of particles in the system
         unsigned int numParticles;
     
+        // Total number of cells in the system
+        unsigned int numCells;
+    
         // Just as the name describes
         float massPerParticle;
 
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
         // particle example
-        msa::OpenCLBufferManagedT<Particle>	particles;
-        msa::OpenCLBufferManagedT<float2>	particleToCell;
+        msa::OpenCLBufferManagedT<Particle>	        particles;
+        msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
+        //msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
+        msa::OpenCLBufferManagedT<int>	    cellHistogram;
     
         // Initialization-related functions:
         void initialize();
@@ -79,7 +97,10 @@ class Simulation
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
-        void discretizePositions();
+        void discretizeParticlePositions();
+        void zeroCellHistogram();
+        void computeCellHistogram();
+        void sortParticlesByCell();
     
         // Drawing-related functions:
         void drawBounds() const;
@@ -96,7 +117,9 @@ class Simulation
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
-
+        const unsigned int getNumberOfParticles() const { return this->numParticles; }
+        const unsigned int getNumberOfCells() const { return this->numCells; }
+    
         void reset();
         void step();
         void draw();
