@@ -87,10 +87,10 @@ class Simulation
                   ,unsigned int numParticles = 1000
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
-    
+
         const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
-    
+
         void reset();
         void step();
         void draw();

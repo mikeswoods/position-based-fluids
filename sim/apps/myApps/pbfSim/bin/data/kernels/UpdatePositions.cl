@@ -21,10 +21,15 @@
  * but not type definitions (as far as I know).
  */
 typedef struct {
+    
     float4 pos;    // 4 words
+    
     float4 vel;    // 4 words
+    
     float  mass;   // 1 word
+
     float  radius; // 1 word
+
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
      * for x86 memory access along 4/word 16 byte intervals.
@@ -37,6 +42,7 @@ typedef struct {
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
     float  __dummy[2]; // 2 words
+
 } Particle; // total = 12 words = 64 bytes
 
 /**
@@ -45,6 +51,8 @@ typedef struct {
 #define G 9.8f
 
 /**
+ * [KERNEL]
+ *
  * Currently, only applies gravity to the y component of the velocity.
  * Additional forces may be added later like wind and other forms of
  * turbulence, etc.
@@ -53,21 +61,23 @@ typedef struct {
  */
 kernel void applyExternalForces(global Particle* particles, float dt)
 {
-    int id = get_global_id(0);
+    int i = get_global_id(0);
     
     // Apply the force of gravity along the y-axis:
-    particles[id].vel.y += (dt * -G);
+    particles[i].vel.y += (dt * -G);
 }
 
 /**
+ * [KERNEL]
+ *
  * Updates the predicted position of the particle using an explicit Euler step
  *
  *   x_i = x_i + (dt * v_i)
  */
 kernel void predictPosition(global Particle* particles, float dt)
 {
-    int id = get_global_id(0);
+    int i = get_global_id(0);
 
     // Explicit Euler step:
-    particles[id].pos += (dt * particles[id].vel);
+    particles[i].pos += (dt * particles[i].vel);
 }
