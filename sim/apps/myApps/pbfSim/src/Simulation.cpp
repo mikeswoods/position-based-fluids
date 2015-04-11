@@ -51,6 +51,7 @@ Simulation::Simulation(msa::OpenCL& _openCL
     openCL(_openCL),
     bounds(_bounds),
     dt(_dt),
+    cellsPerAxis(EigenVector3(10, 10, 10)),
     numParticles(_numParticles),
     massPerParticle(_massPerParticle),
     frameNumber(0)
@@ -69,8 +70,8 @@ Simulation::~Simulation()
 void Simulation::initializeKernels()
 {
     
-    // Read the source:
-    this->openCL.loadProgramFromFile("kernels/UpdatePositions.cl");
+    // Read the source files for the kernels:
+    this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
     // Initialize the specified kernels and bind the parameters that are
     // the same across invocations of the kernel:
@@ -85,6 +86,14 @@ void Simulation::initializeKernels()
     this->openCL.kernel("predictPosition")->setArg(0, this->particles);
     this->openCL.kernel("predictPosition")->setArg(1, this->dt);
 
+    // 2.1) discretizePositions
+    float3 _cellsPerAxis = (float3)(this->cellsPerAxis[0], this->cellsPerAxis[1], this->cellsPerAxis[2]);
+    this->openCL.loadKernel("discretizePositions");
+    this->openCL.kernel("discretizePositions")->setArg(0, this->particles);
+    this->openCL.kernel("discretizePositions")->setArg(1, this->particleToCell);
+    this->openCL.kernel("discretizePositions")->setArg(2, _cellsPerAxis);
+    this->openCL.kernel("discretizePositions")->setArg(3, this->bounds.getMinExtent());
+    this->openCL.kernel("discretizePositions")->setArg(4, this->bounds.getMaxExtent());
 }
 
 /**
@@ -97,6 +106,7 @@ void Simulation::initialize()
     
     // Dimension the OpenCL buffer to hold the given number of particles:
     this->particles.initBuffer(this->numParticles);
+    this->particleToCell.initBuffer(this->numParticles);
     
     for (int i = 0; i < this->numParticles; i++) {
 
@@ -115,11 +125,15 @@ void Simulation::initialize()
         
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
+        
+        //this->particleToCell[i].x = -1; // Particle index; -1 indicates unset
+        //this->particleToCell[i].y = -1; // Cell index; -1 indicates unset
     }
     
     // Dump the initial quantities assigned to the particles to the GPU, so we
     // can use them in GPU-land/OpenCL
     this->particles.writeToDevice();
+    //this->particleToCell.writeToDevice();
     
     // Load the kernels:
     this->initializeKernels();
@@ -154,6 +168,9 @@ void Simulation::step()
     // Predict the next position of the particles:
     this->predictPositions();
 
+    // First step in nearest neighbor finding:
+    //this->discretizePositions();
+    
     // Make sure no more work remains in the OpenCL work queue. This will
     // block until all OpenCL related stuff in the step() function has
     // finished running:
@@ -218,65 +235,6 @@ void Simulation::draw()
     
 }
 
-/**
- * This method sorts the buckets by 
- *
- */
-void countingSort(int arr[], int sz)
-{
-    int i, j, k, min, max, idx = 0;
-    
-    min = max = arr[0];
-    
-    for(i = 1; i < sz; i++)
-    {
-        min = (arr[i] < min) ? arr[i] : min;
-        max = (arr[i] > max) ? arr[i] : max;
-    }
-    k = max - min + 1; /* creates k buckets */
-    int *B = new int [k];
-    
-    for(i = 0; i < k; i++)
-        B[i] = 0;
-    
-    for(i = 0; i < sz; i++)
-        B[arr[i] - min]++;
-    
-    for(i = min; i <= max; i++)
-        for(j = 0; j < B[i - min]; j++)
-            arr[idx++] = i;
-    
-    delete [] B;
-
-}
-
-
-#define H               1.5f  // smoothing radius
-#define H_9             (H*H*H*H*H*H*H*H*H) // h^9
-#define H_6             (H*H*H*H*H*H) // h^6
-
-float poly6Kernel(Vector3DS p_i, Vector3DS p_j){
-    Vector3DS diff = p_i - p_j;
-    float r = diff.length();
-    if (H > r && r > 0) {
-        float h_minus_r = (H * H - r * r);
-        float div = 64.0 * M_PI * H_9 * h_minus_r * h_minus_r * h_minus_r;
-        return 315.0f / div;
-    }
-    return 0;
-}
-
-float spikyKernel(Vector3DS p_i, Vector3DS p_j){
-    Vector3DS diff = p_i - p_j;
-    float r = diff.length();
-    if (H > r && r > 0) {
-        float h_minus_r = H - r;
-        float div = M_PI * H_6 * h_minus_r * h_minus_r * h_minus_r;
-        return 15.0f / div;
-    }
-    return 0;
-}
-
 /******************************************************************************/
 
 /**
@@ -297,6 +255,14 @@ void Simulation::applyExternalForces()
 void Simulation::predictPositions()
 {
     this->openCL.kernel("predictPosition")->run1D(this->numParticles);
+}
+
+/**
+ *
+ */
+void Simulation::discretizePositions()
+{
+    this->openCL.kernel("discretizePositions")->run1D(this->numParticles);
 }
 
 /******************************************************************************/

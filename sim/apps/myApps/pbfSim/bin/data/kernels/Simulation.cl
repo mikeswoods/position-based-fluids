@@ -1,17 +1,18 @@
 /*******************************************************************************
- * SearchNeighbors.cl
- * - TODO
+ * UpdatePositions.cl
+ * - The OpenCL kernel responsible for apply external forces, like gravity
+ *   for instance to each particle in the simulation, and subsequenly updating
+ *   the predicted position of each particle using a simple explicit Euler
+ *   step
  *
  * CIS563: Physically Based Animation final project
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
-/**
- * This needs to be re-defined here, so we have an inline definition of a
- * Particle. Since the original definition sits in Simulation.h, it's in
- * host-land, and we're in GPU-world. We can pass data from host <-> GPU,
- * but not type definitions (as far as I know).
- */
+/*******************************************************************************
+ * Types
+ ******************************************************************************/
+
 typedef struct {
     
     float4 pos;    // 4 words
@@ -19,9 +20,9 @@ typedef struct {
     float4 vel;    // 4 words
     
     float  mass;   // 1 word
-    
+
     float  radius; // 1 word
-    
+
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
      * for x86 memory access along 4/word 16 byte intervals.
@@ -34,8 +35,21 @@ typedef struct {
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
     float  __dummy[2]; // 2 words
-    
+
 } Particle; // total = 12 words = 64 bytes
+
+/*******************************************************************************
+ * Constants
+ ******************************************************************************/
+
+/**
+ * Acceleration due to gravity: 9.8 m/s
+ */
+#define G 9.8f
+
+/*******************************************************************************
+ * Helper functions
+ ******************************************************************************/
 
 /**
  * A helper function that scales a value x in the range [a0,a1] to a new
@@ -47,8 +61,6 @@ float rescale(float x, float a0, float a1, float b0, float b1)
 }
 
 /**
- * [HELPER]
- *
  * A function that converts a 3D subscript (i,j,k) into a linear index
  *
  * @param [in] int i x component of subscript
@@ -76,8 +88,41 @@ int3 ind2sub(int x, int w, int h)
     return (int3)(x % w, (x / w) % h, x / (w * h));
 }
 
+/*******************************************************************************
+ * Kernels
+ ******************************************************************************/
+
 /**
- * [KERNEL] Discretizes particles based on their positions to a cell in
+ * Currently, only applies gravity to the y component of the velocity.
+ * Additional forces may be added later like wind and other forms of
+ * turbulence, etc.
+ *
+ *   v_i = v_i + dt + f_external(x_i)
+ */
+kernel void applyExternalForces(global Particle* particles, float dt)
+{
+    int i = get_global_id(0);
+    
+    // Apply the force of gravity along the y-axis:
+    particles[i].vel.y += (dt * -G);
+}
+
+/**
+ * Updates the predicted position of the particle using an explicit Euler step
+ *
+ *   x_i = x_i + (dt * v_i)
+ */
+kernel void predictPosition(global Particle* particles, float dt)
+{
+    int i = get_global_id(0);
+
+    // Explicit Euler step:
+    particles[i].pos += (dt * particles[i].vel);
+    
+}
+
+/**
+ * Discretizes particles based on their positions to a cell in
  * a grid consisting of (cellsPerAxis[0], cellsPerAxis[1], cellsPerAxis[2])
  * along the (x, y, z) axes.
  *
@@ -88,16 +133,16 @@ int3 ind2sub(int x, int w, int h)
  * 0 <= j_x < cellsPerAxis.x, 0 <= j_y < cellsPerAxis.y,
  * and 0 <= j_z < cellsPerAxis.z
  * @param [in] int3 cellsPerAxis The number of cells per axis in the grid
- * @param [in] float3 minExtent The minimum extent of the simulation's 
+ * @param [in] float3 minExtent The minimum extent of the simulation's
  *             bounding box in world space
  * @param [in] float3 maxExtent The maximum extent of the simulation's
  *             bounding box in world space
  */
-kernel void discretize(global Particle* particles
-                      ,global int2* particleToCell
-                      ,int3 cellsPerAxis
-                      ,float3 minExtent
-                      ,float3 maxExtent)
+kernel void discretizePositions(global Particle* particles
+                                ,global int2* particleToCell
+                                ,int3 cellsPerAxis
+                                ,float3 minExtent
+                                ,float3 maxExtent)
 {
     int i = get_global_id(0);
     global Particle *p = &particles[i];
@@ -113,5 +158,40 @@ kernel void discretize(global Particle* particles
     // Store the particle's index i, and the linearized and
     // discretized cell index z
     particleToCell[i] = (int2)(i, z);
+}
+
+
+/**
+ *
+ *
+ */
+kernel void computeHistogram(global int2* particleToCell
+                             ,global int* cellHistogram)
+{
+    int i = get_global_id(0);
+    int particleIndex = particleToCell[i].x;
+    int cellIndex     = particleToCell[i].y;
+    
+    cellHistogram[cellIndex]++;
+}
+
+/**
+ *
+ *
+ */
+kernel void countSortCells(global int2* particleToCell
+                           ,global int* cellHistogram
+                           ,int n
+                           ,global int2* sortedParticleToCell)
+{
+    int total = 0;
+    
+    for (int i = 0; i < n; i++) {
+        int oldCount = cellHistogram[i];
+        cellHistogram[i] += total;
+        total += oldCount;
+    }
+    
+    
 }
 

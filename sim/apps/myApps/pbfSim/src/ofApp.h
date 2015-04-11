@@ -11,6 +11,8 @@
 class ofApp : public ofBaseApp
 {
     protected:
+        bool paused;
+        bool advanceStep;
         ofEasyCam camera;
         msa::OpenCL openCL;
         std::shared_ptr<Simulation> simulation;
@@ -19,6 +21,9 @@ class ofApp : public ofBaseApp
 		void setup();
 		void update();
 		void draw();
+    
+        bool isPaused() const;
+        void togglePaused();
 
 		void keyPressed(int key);
 		void keyReleased(int key);

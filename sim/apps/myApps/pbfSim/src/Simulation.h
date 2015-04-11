@@ -58,7 +58,10 @@ class Simulation
     
         // Timestep size:
         float dt;
-
+    
+        // Cells per axis for spatial subdivision:
+        EigenVector3 cellsPerAxis;
+    
         // Total number of particles in the system
         unsigned int numParticles;
     
@@ -68,6 +71,7 @@ class Simulation
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
         // particle example
         msa::OpenCLBufferManagedT<Particle>	particles;
+        msa::OpenCLBufferManagedT<float2>	particleToCell;
     
         // Initialization-related functions:
         void initialize();
@@ -75,6 +79,7 @@ class Simulation
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
+        void discretizePositions();
     
         // Drawing-related functions:
         void drawBounds() const;
