@@ -88,9 +88,9 @@ class Simulation
         // particle example
         msa::OpenCLBufferManagedT<Particle>	        particles;
         msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
-        //msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
-        msa::OpenCLBufferManagedT<int>	    cellHistogram;
-    
+        //msa::OpenCLBufferManagedT<int>	sortedParticleToCell;
+        msa::OpenCLBufferManagedT<int>	            cellHistogram;
+
         // Initialization-related functions:
         void initialize();
 

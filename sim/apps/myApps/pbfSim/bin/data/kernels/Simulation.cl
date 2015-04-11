@@ -164,16 +164,6 @@ kernel void discretizeParticlePositions(global Particle* particles
  *
  *
  */
-kernel void zeroCellHistogram(global int* cellHistogram)
-{
-    int i = get_global_id(0);
-    cellHistogram[i] = 0;
-}
-
-/**
- *
- *
- */
 kernel void computeCellHistogram(global ParticlePosition* particleToCell
                                 ,global int* cellHistogram
                                 ,int3 cellsPerAxis)
@@ -191,17 +181,11 @@ kernel void computeCellHistogram(global ParticlePosition* particleToCell
  *
  */
 /*
-kernel void sortParticlesByCell(global int2* particleToCell
+kernel void sortParticlesByCell(global ParticlePosition* particleToCell
                                ,global int* cellHistogram
-                               ,int n
-                               ,global int2* sortedParticleToCell)
+                               ,global ParticlePosition* sortedParticleToCell
+                               ,int n)
 {
-    int total = 0;
     
-    for (int i = 0; i < n; i++) {
-        int oldCount = cellHistogram[i];
-        cellHistogram[i] += total;
-        total += oldCount;
-    }
 }
-*/
+ */
