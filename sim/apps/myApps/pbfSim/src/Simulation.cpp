@@ -56,8 +56,12 @@ Simulation::~Simulation()
  */
 void Simulation::loadKernels()
 {
+    
     this->openCL.loadProgramFromFile("kernels/UpdatePositions.cl");
     this->openCL.loadKernel("updatePositions");
+    
+    this->openCL.kernel("updateParticle")->setArg(0, particles);
+
 }
 
 /**
@@ -148,7 +152,7 @@ void Simulation::drawParticles()
 
         Particle &p = this->particles[i];
 
-        ofSetColor(0, 255, 0);
+        ofSetColor(0, 0, 255);
         ofFill();
         ofDrawSphere(p.x.x, p.x.y, p.x.z, 0.1f);
     }
@@ -164,6 +168,42 @@ void Simulation::draw()
 {
     this->drawBounds();
     this->drawParticles();
+    
+    glColor3f(1, 1, 1);
+    string info = "fps: " + ofToString(ofGetFrameRate()) + "\nnumber of particles: " + ofToString(this->numParticles);
+    ofDrawBitmapString(info, 20, 20);
+
+}
+
+/**
+ * This method sorts the buckets
+ *
+ */
+void countingSort(int arr[], int sz)
+{
+    int i, j, k, min, max, idx = 0;
+    
+    min = max = arr[0];
+    
+    for(i = 1; i < sz; i++)
+    {
+        min = (arr[i] < min) ? arr[i] : min;
+        max = (arr[i] > max) ? arr[i] : max;
+    }
+    k = max - min + 1; /* creates k buckets */
+    int *B = new int [k];
+    
+    for(i = 0; i < k; i++)
+        B[i] = 0;
+    
+    for(i = 0; i < sz; i++)
+        B[arr[i] - min]++;
+    
+    for(i = min; i <= max; i++)
+        for(j = 0; j < B[i - min]; j++)
+            arr[idx++] = i;
+    
+    delete [] B;
 }
 
 /******************************************************************************/

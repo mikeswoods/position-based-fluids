@@ -1,3 +1,3 @@
 dependencies: \
-  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/video/ofQTKitMovieRenderer.m \
+  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/video/ofQTKitMovieRenderer.m \
   ../../../../libs/openFrameworks/video/ofQTKitMovieRenderer.h

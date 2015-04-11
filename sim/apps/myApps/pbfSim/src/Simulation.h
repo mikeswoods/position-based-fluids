@@ -58,6 +58,7 @@ class Simulation
     
         void drawBounds() const;
         void drawParticles();
+        void countingSort();
 
     public:
         Simulation(msa::OpenCL& openCL

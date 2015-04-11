@@ -17,6 +17,7 @@ using namespace std;
 
 /******************************************************************************/
 
+
 void ofApp::setup()
 {
 	ofSetLogLevel(OF_LOG_VERBOSE);
@@ -54,6 +55,7 @@ void ofApp::draw()
         this->simulation->draw();
 
     this->camera.end();
+    
 }
 
 void ofApp::keyPressed(int key)
