@@ -7,6 +7,8 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
+#include "MSAOpenCL.h"
+
 // For the Eigen library:
 #include "Core"
 #include "Dense"
@@ -25,7 +27,6 @@ typedef Eigen::Triplet<float, int> SparseMatrixTriplet;
 /******************************************************************************/
 
 #define block_vector(a) block<3,1>(3*(a), 0)
-#define NUM_PARTICLES (100000)
 
 /******************************************************************************/
 

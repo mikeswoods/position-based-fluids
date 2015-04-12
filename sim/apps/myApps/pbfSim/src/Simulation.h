@@ -33,6 +33,13 @@ typedef struct {
     float  __dummy[2];
 } Particle;
 
+typedef struct {
+    int particleIndex; // Index of particle in particle buffer
+    int cellI;         // Corresponding grid index in the x-axis
+    int cellJ;         // Corresponding grid index in the y-axis
+    int cellK;         // Corresponding grid index in the z-axis
+} ParticlePosition;
+
 /**
  * This class encompasses the current statue of the 
  * Position-Based Fluids/Dynamics system at a given point in time. Much of the
@@ -49,6 +56,12 @@ class Simulation
         // Load kernels and bind parameters
         void initializeKernels();
     
+        // Moves data from GPU buffers back to the host
+        void readFromGPU();
+    
+        // Writes data from the host to buffers on the GPU (device)
+        void writeToGPU();
+    
     protected:
         // OpenCL manager
         msa::OpenCL& openCL;
@@ -58,16 +71,25 @@ class Simulation
     
         // Timestep size:
         float dt;
-
+    
+        // Cells per axis for spatial subdivision:
+        EigenVector3 cellsPerAxis;
+    
         // Total number of particles in the system
-        unsigned int numParticles;
+        int numParticles;
+    
+        // Total number of cells in the system
+        int numCells;
     
         // Just as the name describes
         float massPerParticle;
 
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
         // particle example
-        msa::OpenCLBufferManagedT<Particle>	particles;
+        msa::OpenCLBufferManagedT<Particle>	        particles;
+        msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
+        msa::OpenCLBufferManagedT<int>	            cellHistogram;
+        msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
     
         // Initialization-related functions:
         void initialize();
@@ -75,6 +97,10 @@ class Simulation
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
+        void discretizeParticlePositions();
+        void initializeParticleSort();
+        void computeCellHistogram();
+        void sortParticlesByCell();
     
         // Drawing-related functions:
         void drawBounds() const;
@@ -85,13 +111,15 @@ class Simulation
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,unsigned int numParticles = 1000
+                  ,int numParticles = 100
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
-
+        const unsigned int getNumberOfParticles() const { return this->numParticles; }
+        const unsigned int getNumberOfCells() const { return this->numCells; }
+    
         void reset();
         void step();
         void draw();

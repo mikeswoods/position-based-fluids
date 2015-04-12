@@ -17,9 +17,11 @@ using namespace std;
 
 /******************************************************************************/
 
-
 void ofApp::setup()
 {
+    this->paused = true;
+    this->advanceStep = false;
+    
 	ofSetLogLevel(OF_LOG_VERBOSE);
     ofSetVerticalSync(true);
     
@@ -34,7 +36,7 @@ void ofApp::setup()
     this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
-    AABB bounds(EigenVector3(-5.0f, -5.0f, -5.0f), EigenVector3(5.0f, 5.0f, 5.0f));
+    AABB bounds((float3)(-5.0f, -5.0f, -5.0f), (float3)(5.0f, 5.0f, 5.0f));
 
     // Instantiate the simulator:
     this->simulation =
@@ -43,7 +45,14 @@ void ofApp::setup()
 
 void ofApp::update()
 {
-    this->simulation->step();
+    if (this->isPaused()) {
+        if (this->advanceStep) {
+            this->simulation->step();
+            this->advanceStep = false;
+        }
+    } else {
+        this->simulation->step();
+    }
 }
 
 void ofApp::draw()
@@ -61,11 +70,41 @@ void ofApp::draw()
     ofFill();
     ofDrawBitmapString(ofToString(ofGetFrameRate()) + " fps", 10, 15);
     ofDrawBitmapString("Frame: " + ofToString(this->simulation->getFrameNumber()), 10, 30);
+    if (this->isPaused()) {
+        ofDrawBitmapString("Paused", 10, 45);
+    }
+}
+
+bool ofApp::isPaused() const
+{
+    return this->paused;
+}
+
+void ofApp::togglePaused()
+{
+    this->paused = !this->paused;
 }
 
 void ofApp::keyPressed(int key)
 {
-
+    switch (key) {
+        // Pause
+        case 'p':
+        case ' ':
+        {
+            this->togglePaused();
+        }
+        break;
+        // Step
+        case 's':
+        {
+            this->advanceStep = true;
+        }
+        break;
+        // Reset
+        case 'r':
+            break;
+    }
 }
 
 void ofApp::keyReleased(int key)

@@ -10,6 +10,7 @@
 #define AABB_H
 
 #include <iostream>
+#include "MSAOpenCL.h"
 #include "Definitions.h"
 
 /******************************************************************************/
@@ -17,16 +18,16 @@
 class AABB
 {
     protected:
-        EigenVector3 minV, maxV;
+        float3 minV, maxV;
 
     public:
         AABB();
-        AABB(EigenVector3 p, EigenVector3 q);
+        AABB(float3 p, float3 q);
         AABB(const AABB& other);
         AABB& operator=(const AABB& other);
     
-        const EigenVector3& getMinExtent() const;
-        const EigenVector3& getMaxExtent() const;
+        const float3& getMinExtent() const;
+        const float3& getMaxExtent() const;
     
         friend std::ostream& operator<<(std::ostream& stream, const AABB& aabb);
 };
