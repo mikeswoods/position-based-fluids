@@ -10,8 +10,19 @@
  ******************************************************************************/
 
 /*******************************************************************************
+ * Constants
+ ******************************************************************************/
+
+/**
+ * Acceleration due to gravity: 9.8 m/s
+ */
+#define G 9.8f
+
+/*******************************************************************************
  * Types
  ******************************************************************************/
+
+// A particle type:
 
 typedef struct {
     
@@ -30,7 +41,7 @@ typedef struct {
      * If the size is not aligned, results WILL be screwed up!!!
      * Don't be like me and waste hours trying to debug this issue. The
      * OpenCL compiler WILL NOT pad your struct to so that boundary aligned
-     * like g++/clang will in the C++ world.
+     * like g++/clang will in host (C++) land!!!.
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
@@ -38,21 +49,32 @@ typedef struct {
 
 } Particle; // total = 12 words = 64 bytes
 
+// A type to represent the position of a given particle in the spatial
+// grid the simulated world is divided into
+
 typedef struct {
-    int particleIndex; // Index of particle in particle buffer
-    int cellI;         // Corresponding grid index in the x-axis
-    int cellJ;         // Corresponding grid index in the y-axis
-    int cellK;         // Corresponding grid index in the z-axis
+
+    int particleIndex; // Index of particle in particle buffer (1 word)
+
+    int cellI;         // Corresponding grid index in the x-axis (1 word)
+    
+    int cellJ;         // Corresponding grid index in the y-axis (1 word)
+    
+    int cellK;         // Corresponding grid index in the z-axis (1 word)
+
 } ParticlePosition;
 
-/*******************************************************************************
- * Constants
- ******************************************************************************/
+// A type that encodes the start and length of a grid cell in sortedParticleToCell
 
-/**
- * Acceleration due to gravity: 9.8 m/s
- */
-#define G 9.8f
+typedef struct {
+    
+    int  start; // Start of the grid cell in sortedParticleToCell
+    
+    int length;
+    
+    int __dummy[2]; // Padding
+    
+} GridCellOffset;
 
 /*******************************************************************************
  * Helper functions
@@ -82,8 +104,6 @@ int sub2ind(int i, int j, int k, int w, int h)
 }
 
 /**
- * [HELPER]
- *
  * A function that converts a linear index x into a 3D subscript (i,j,k)
  *
  * @param [in] int x The linear index x
@@ -93,6 +113,86 @@ int sub2ind(int i, int j, int k, int w, int h)
 int3 ind2sub(int x, int w, int h)
 {
     return (int3)(x % w, (x / w) % h, x / (w * h));
+}
+
+/**
+ * Given the subscript (i,j,k) as an int3 of a cell to search the vicinity of,
+ * this function will return a count of valid neighboring cells (including
+ * itself) in the range [1,27], e.g. between 1 and 27 neighboring cells are
+ * valid and need to be searched for neighbors. The indices from 
+ * [0 .. neighborCount-1] will be populated with the indices of neighboring 
+ * cells in gridCellOffsets, such that for each nerighboring grid cell
+ * (i', j', k'), 0 <= i' < cellX, 0 <= j' < cellY, 0 <= k' < cellZ, and the
+ * corresponding entry for cell (i',j',k') in gridCellOffsets has a cell 
+ * start index != -1.
+ *
+ * @param [in]  sortedParticleToCell
+ * @param [in]  GridCellOffset* gridCellOffsets
+ * @param [in]  int cellsX
+ * @param [in]  int cellsY
+ * @param [in]  int cellsZ
+ * @param [in]  int3 cellSubscript
+ * @param [out] int* neighbors
+ */
+int getNeighborsBySubscript(ParticlePosition* sortedParticleToCell
+                           ,global GridCellOffset* gridCellOffsets
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,int3 cellSubscript
+                           ,int* neighbors)
+{
+    int i = cellSubscript.x;
+    int j = cellSubscript.y;
+    int k = cellSubscript.z;
+    
+    // Count of valid neighbors:
+
+    int neighborCount = 0;
+
+    // We need to search the following potential 27 cells about (i,j,k):
+    // (i + [-1,0,1], j + [-1,0,1], k + [-1,0,1]):
+
+    int offsets[3] = { -1, 0, 1};
+    int I = -1;
+    int J = -1;
+    int K = -1;
+    
+    // -1 indicates an invalid/non-existent neighbor:
+
+    for (int i = 0; i < 27; i++) {
+        neighbors[i] = -1;
+    }
+
+    for (int u = 0; u < 3; u++) {
+
+        I = i + offsets[u]; // I = i-1, i, i+1
+
+        for (int v = 0; v < 3; v++) {
+        
+            J = j + offsets[v]; // J = j-1, j, j+1
+
+            for (int w = 0; w < 3; w++) {
+            
+                K = k + offsets[w]; // K = k-1, k, k+1
+                
+                if (   (I >= 0 && I < cellsX)
+                    && (J >= 0 && J < cellsY)
+                    && (K >= 0 && K < cellsZ))
+                {
+                    int key = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
+
+                    // The specified grid cell offset has a valid starting
+                    // index, so we can return it as a valid neighbor:
+                    if (gridCellOffsets[key].start != -1) {
+                        neighbors[neighborCount++] = key;
+                    }
+                }
+            }
+        }
+    }
+    
+    return neighborCount;
 }
 
 /*******************************************************************************
@@ -125,7 +225,6 @@ kernel void predictPosition(global Particle* particles, float dt)
 
     // Explicit Euler step:
     particles[i].pos += (dt * particles[i].vel);
-    
 }
 
 /**
@@ -167,36 +266,147 @@ kernel void discretizeParticlePositions(global Particle* particles
     int cellI = (int)(rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1)));
     int cellJ = (int)(rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1)));
     int cellK = (int)(rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1)));
+
+    particleToCell[i].particleIndex = i;
     
-    // Set the (i,j,k) index of the cell
+    // Set the (i,j,k) index of the cell:
     particleToCell[i].cellI = cellI;
     particleToCell[i].cellJ = cellJ;
     particleToCell[i].cellK = cellK;
     
     // Compute the linear index for the histogram counter
-    int z = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
+    int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
 
-    atomic_add(&cellHistogram[z], 1);
+    /*
+    printf("[%d] @ (%f, %f, %f) => (%d/%d, %d/%d, %d/%d) => %d\n",
+           i,
+           p->pos.x, p->pos.y, p->pos.z,
+           cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
+           key);
+    */
+
+    // This is needed; "cellHistogram[z] += 1" won't work here as multiple
+    // threads are modifying cellHistogram simultaneously:
+    atomic_add(&cellHistogram[key], 1);
 }
 
 /**
+ * NOTE: This kernel is meant to be run with 1 thread. This is necessary
+ * since we have to perform a sort and perform some other actions which are
+ * inherently sequential in nature
  *
+ * This kernel basically performs a counting sort 
+ * (http://en.wikipedia.org/wiki/Counting_sort) on the particles, sorting
+ * them by the grid cell they were each assigned to. Rather than sorting by
+ * a 3 dimensional subscript (i,j,k), we linearize the subscript, and sort by
+ * that
  *
+ * @see discretizeParticlePositions
+ *
+ * @param [in] particleToCell
+ * @param [in/out] cellHistogram
+ * @param [out] sortedParticleToCell
+ * @param [out] gridCellOffsets
+ * @param [in] numParticles
+ * @param [in] numCells
+ * @param [in] cellsX
+ * @param [in] cellsY
+ * @param [in] cellsZ
  */
 kernel void sortParticlesByCell(global ParticlePosition* particleToCell
                                ,global int* cellHistogram
                                ,global ParticlePosition* sortedParticleToCell
+                               ,global GridCellOffset* gridCellOffsets
                                ,int numParticles
-                               ,int numCells)
+                               ,int numCells
+                               ,int cellsX
+                               ,int cellsY
+                               ,int cellsZ)
 {
-     int id = get_global_id(0);
-     printf("sortParticlesByCell :: [%d] numParticles = %d, numCells = %d\n", id, numParticles, numCells);
-     int total = 0;
-     for (int i = 0; i < numCells; i++) {
-     total += cellHistogram[i];
-     printf("[%d] = %d \n", i, cellHistogram[i]);
-     }
-     
-     printf("total = %d\n", total);
+    // First step of counting sort is done already, since we calculated
+    //the histogram (cellHistogram) in the discretizeParticlePositions kernel:
+    
+    int prefixSum = 0;
+    int totalSum  = 0;
+
+    // Second step of counting sort:
+    for (int i = 0; i < numCells; i++) {
+        prefixSum        = cellHistogram[i];
+        cellHistogram[i] = totalSum;
+        totalSum        += prefixSum;
+    }
+
+    // Final step of counting sort:
+    for (int i = 0; i < numParticles; i++) {
+
+        global ParticlePosition* pp = &particleToCell[i];
+
+        int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
+        int j   = cellHistogram[key];
+        
+        /*
+        sortedParticleToCell[j].particleIndex = pp->particleIndex;
+        sortedParticleToCell[j].cellI         = pp->cellI;
+        sortedParticleToCell[j].cellJ         = pp->cellJ;
+        sortedParticleToCell[j].cellK         = pp->cellK;
+        */
+        sortedParticleToCell[j] = *pp;
+        
+        cellHistogram[key] += 1;
+    }
+    
+    // Now, the ParticlePosition entries of sortedParticleToCell are sorted in
+    // ascending order by the value sub2ind(pp[i].cellI, pp[i].cellJ, pp[i].cellK, cellsX, cellsY),
+    // where pp is an instance of ParticlePosition  at index i, such that
+    // 0 <= i < numParticles.
+
+    // Record the offsets per grid cell:
+    // The i-th entry of the gridCellOffsets contains the start and length
+    // of the i-th linearized grid cell in sortedParticleToCell
+
+    int lengthCount = 1;
+    int cellStart   = 0;
+    
+    for (int i = 0; i < (numParticles - 1); i++) {
+
+        global ParticlePosition* currentP = &sortedParticleToCell[i];
+        global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
+
+        int currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
+        int nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        
+        if (currentKey == nextKey) {
+
+            lengthCount++;
+
+        } else {
+            
+            gridCellOffsets[currentKey].start  = cellStart;
+            gridCellOffsets[currentKey].length = lengthCount;
+            
+            cellStart   = i + 1;
+            lengthCount = 1;
+        }
+    }
+
+    /*
+    // Dump everything out for verification:
+    for (int i = 0; i < numParticles; i++) {
+        global ParticlePosition* spp = &sortedParticleToCell[i];
+        int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
+        printf("P [%d] :: particleIndex = %d, key = %d \n", i, spp->particleIndex, key);
+    }
+    
+    printf("numCells = %d\n", numCells);
+    
+    for (int i = 0; i < numCells; i++) {
+        global GridCellOffset* gco = &gridCellOffsets[i];
+        printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
+    }
+    */
 }
+
+
+
+
 

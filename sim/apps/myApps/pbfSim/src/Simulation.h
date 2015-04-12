@@ -14,11 +14,18 @@
 
 /******************************************************************************/
 
+// A particle type:
+
 typedef struct {
+
     float4 pos;
+
     float4 vel;
+    
     float  mass;
+    
     float  radius;
+    
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
      * for x86 memory access along 16 byte intervals.
@@ -30,15 +37,38 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    float  __dummy[2];
+    float  __dummy[2]; // Padding
+
 } Particle;
 
+// A type to represent the position of a given particle in the spatial
+// grid the simulated world is divided into
+
 typedef struct {
+
     int particleIndex; // Index of particle in particle buffer
+
     int cellI;         // Corresponding grid index in the x-axis
+
     int cellJ;         // Corresponding grid index in the y-axis
+
     int cellK;         // Corresponding grid index in the z-axis
+
 } ParticlePosition;
+
+// A type that encodes the start and length of a grid cell in sortedParticleToCell
+
+typedef struct {
+    
+    int  start; // Start of the grid cell in sortedParticleToCell
+    
+    int length;
+    
+    int __dummy[2]; // Padding
+    
+} GridCellOffset;
+
+/******************************************************************************/
 
 /**
  * This class encompasses the current statue of the 
@@ -61,6 +91,12 @@ class Simulation
     
         // Writes data from the host to buffers on the GPU (device)
         void writeToGPU();
+    
+        // Individual functions needed for grouping particles into bins/cells
+        void initializeParticleSort();
+        void computeCellHistogram();
+        void discretizeParticlePositions();
+        void sortParticlesByCell();
     
     protected:
         // OpenCL manager
@@ -90,6 +126,7 @@ class Simulation
         msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
         msa::OpenCLBufferManagedT<int>	            cellHistogram;
         msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
+        msa::OpenCLBufferManagedT<GridCellOffset>	gridCellOffsets;
     
         // Initialization-related functions:
         void initialize();
@@ -97,21 +134,17 @@ class Simulation
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
-        void discretizeParticlePositions();
-        void initializeParticleSort();
-        void computeCellHistogram();
-        void sortParticlesByCell();
+        void groupParticlesByCell();
     
         // Drawing-related functions:
         void drawBounds() const;
         void drawParticles();
-        void countingSort();
 
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,int numParticles = 100
+                  ,int numParticles = 500
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 
