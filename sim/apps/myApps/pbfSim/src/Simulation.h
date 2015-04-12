@@ -76,10 +76,10 @@ class Simulation
         EigenVector3 cellsPerAxis;
     
         // Total number of particles in the system
-        unsigned int numParticles;
+        int numParticles;
     
         // Total number of cells in the system
-        unsigned int numCells;
+        int numCells;
     
         // Just as the name describes
         float massPerParticle;
@@ -88,9 +88,9 @@ class Simulation
         // particle example
         msa::OpenCLBufferManagedT<Particle>	        particles;
         msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
-        //msa::OpenCLBufferManagedT<int>	sortedParticleToCell;
         msa::OpenCLBufferManagedT<int>	            cellHistogram;
-
+        msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
+    
         // Initialization-related functions:
         void initialize();
 
@@ -98,7 +98,7 @@ class Simulation
         void applyExternalForces();
         void predictPositions();
         void discretizeParticlePositions();
-        void zeroCellHistogram();
+        void initializeParticleSort();
         void computeCellHistogram();
         void sortParticlesByCell();
     
@@ -111,7 +111,7 @@ class Simulation
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,unsigned int numParticles = 1000
+                  ,int numParticles = 100
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 

@@ -139,7 +139,13 @@ kernel void predictPosition(global Particle* particles, float dt)
  * the linear index of the corresponding linear bin (j_x, j_y, j_z), where
  * 0 <= j_x < cellsPerAxis.x, 0 <= j_y < cellsPerAxis.y,
  * and 0 <= j_z < cellsPerAxis.z
- * @param [in] int3 cellsPerAxis The number of cells per axis in the grid
+ * @param [out] int* cellHistogram A histogram of counts of particles per cell
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
  * @param [in] float3 minExtent The minimum extent of the simulation's
  *             bounding box in world space
  * @param [in] float3 maxExtent The maximum extent of the simulation's
@@ -147,7 +153,10 @@ kernel void predictPosition(global Particle* particles, float dt)
  */
 kernel void discretizeParticlePositions(global Particle* particles
                                        ,global ParticlePosition* particleToCell
-                                       ,int3 cellsPerAxis
+                                       ,global int* cellHistogram
+                                       ,int cellsX
+                                       ,int cellsY
+                                       ,int cellsZ
                                        ,float3 minExtent
                                        ,float3 maxExtent)
 {
@@ -155,37 +164,39 @@ kernel void discretizeParticlePositions(global Particle* particles
     global Particle *p = &particles[i];
     
     // Now we have the discretized cell at (i, j, k):
-    particleToCell[i].cellI = (int)(rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsPerAxis.x - 1)));
-    particleToCell[i].cellJ = (int)(rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsPerAxis.y - 1)));
-    particleToCell[i].cellK = (int)(rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsPerAxis.z - 1)));
-}
-
-/**
- *
- *
- */
-kernel void computeCellHistogram(global ParticlePosition* particleToCell
-                                ,global int* cellHistogram
-                                ,int3 cellsPerAxis)
-{
-    int i = get_global_id(0);
-    int cellI = particleToCell[i].cellI;
-    int cellJ = particleToCell[i].cellJ;
-    int cellK = particleToCell[i].cellK;
+    int cellI = (int)(rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1)));
+    int cellJ = (int)(rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1)));
+    int cellK = (int)(rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1)));
     
-    cellHistogram[sub2ind(cellI, cellJ, cellK, cellsPerAxis.x, cellsPerAxis.y)]++;
+    // Set the (i,j,k) index of the cell
+    particleToCell[i].cellI = cellI;
+    particleToCell[i].cellJ = cellJ;
+    particleToCell[i].cellK = cellK;
+    
+    // Compute the linear index for the histogram counter
+    int z = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
+
+    atomic_add(&cellHistogram[z], 1);
 }
 
 /**
  *
  *
  */
-/*
 kernel void sortParticlesByCell(global ParticlePosition* particleToCell
                                ,global int* cellHistogram
                                ,global ParticlePosition* sortedParticleToCell
-                               ,int n)
+                               ,int numParticles
+                               ,int numCells)
 {
-    
+     int id = get_global_id(0);
+     printf("sortParticlesByCell :: [%d] numParticles = %d, numCells = %d\n", id, numParticles, numCells);
+     int total = 0;
+     for (int i = 0; i < numCells; i++) {
+     total += cellHistogram[i];
+     printf("[%d] = %d \n", i, cellHistogram[i]);
+     }
+     
+     printf("total = %d\n", total);
 }
- */
+
