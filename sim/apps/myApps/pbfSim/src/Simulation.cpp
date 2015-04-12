@@ -50,7 +50,7 @@ Simulation::Simulation(msa::OpenCL& _openCL
     openCL(_openCL),
     bounds(_bounds),
     dt(_dt),
-    cellsPerAxis(EigenVector3(4, 4, 4 )),
+    cellsPerAxis(EigenVector3(8, 8, 8)),
     numParticles(_numParticles),
     massPerParticle(_massPerParticle),
     frameNumber(0)
@@ -102,6 +102,9 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(2, this->sortedParticleToCell);
     this->openCL.kernel("sortParticlesByCell")->setArg(3, this->numParticles);
     this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numCells);
+    this->openCL.kernel("sortParticlesByCell")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
 }
 
 /**
@@ -150,7 +153,8 @@ void Simulation::initialize()
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
     
-    // Needed for particle to cell binning later:
+    // Needed for particle grouping/"binning" by cell later:
+
     this->initializeParticleSort();
     
     // Dump the initial quantities assigned to the particles to the GPU, so we
@@ -164,7 +168,22 @@ void Simulation::initialize()
 }
 
 /**
+ * This implementation is based off of the method described in
+ * "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID" by
+ * Hoetzlein, 2014 that uses counting sort as an alternative to radix sort.
  *
+ * See http://on-demand.gputechconf.com/gtc/2014/presentations/S4117-fast-fixed-radius-nearest-neighbor-gpu.pdf
+ */
+void Simulation::groupParticlesByCell()
+{
+    this->discretizeParticlePositions();
+    this->sortParticlesByCell();
+}
+
+/**
+ * Initializes the datastructures needed to group particles by cell. This
+ * mostly involves zeroing out the structures and/or setting marker values
+ * like -1 to indicate unset entries in the requisite arrays, etc.
  */
 void Simulation::initializeParticleSort()
 {
@@ -172,10 +191,12 @@ void Simulation::initializeParticleSort()
     for (int i = 0; i < this->numCells; i++) {
         this->cellHistogram[i] = 0;
     }
-    
+
     // as well as the particle to cell mappings:
     for (int i = 0; i < this->numParticles; i++) {
-        this->particleToCell[i].particleIndex       = -1; // Particle index; -1 indicates unset
+
+        // Particle index; -1 indicates unset
+        this->particleToCell[i].particleIndex       = -1;
         this->particleToCell[i].cellI               = -1;
         this->particleToCell[i].cellJ               = -1;
         this->particleToCell[i].cellK               = -1;
@@ -207,7 +228,8 @@ void Simulation::readFromGPU()
 }
 
 /**
- * Writes data from the host to buffers on the GPU (device
+ * Writes data from the host to buffers on the GPU (i.e. the "device" in 
+ * OpenCL parlance)
  */
 void Simulation::writeToGPU()
 {
@@ -227,23 +249,45 @@ void Simulation::writeToGPU()
  */
 void Simulation::step()
 {
+    // We need to perform this step (zeroing out the histogram array and some
+    // other data structures needed) before we compute the particle cell groups
+    // because the zeroed structures will be written back to the GPU on the
+    // next line, i.e. writeToGPU()
+
     this->initializeParticleSort();
     
-    // Dump whatever changes occurred in host-land to the GPU
+    // Dump whatever changes occurred in host-land to the GPU:
+
     this->writeToGPU();
 
+    // Where the actual work is done: the sequence of substeps follows
+    // more-or-less from the listing "Algorithm 1 Simulation Loop" in the
+    // paper "Position Based Fluids". The main difference is that we are using
+    // a different method than Macklin and Muller to compute the nearest
+    // neighbors of a given particle. Whereas they use the method by
+    // [Green 2008], we use the method described by Hoetzlein, 2014
+    // in the slides
+    // "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID"
+    // that uses counting sort as an alternative to radix sort
+    
     this->applyExternalForces();
     this->predictPositions();
-    this->discretizeParticlePositions();
-    this->sortParticlesByCell();
+    this->groupParticlesByCell();
 
+    // Make sure the OpenCL work queue is empty before proceeding. This will
+    // block until all the stuff in GPU-land is done before moving forward
+    // and reading the results of the work we did on the GPU back into
+    //host-land:
+    
     this->openCL.finish();
     
     // Read the changes back from the GPU so we can manipulate the values
     // in our C++ program:
+
     this->readFromGPU();
 
-    // Finally, bump up the frame counter;
+    // Finally, bump up the frame counter:
+
     this->frameNumber++;
 }
 

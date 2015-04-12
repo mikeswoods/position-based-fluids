@@ -167,6 +167,8 @@ kernel void discretizeParticlePositions(global Particle* particles
     int cellI = (int)(rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1)));
     int cellJ = (int)(rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1)));
     int cellK = (int)(rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1)));
+
+    particleToCell[i].particleIndex = i;
     
     // Set the (i,j,k) index of the cell
     particleToCell[i].cellI = cellI;
@@ -176,27 +178,78 @@ kernel void discretizeParticlePositions(global Particle* particles
     // Compute the linear index for the histogram counter
     int z = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
 
+    /*
+    printf("[%d] @ (%f, %f, %f) => (%d/%d, %d/%d, %d/%d) => %d\n",
+           i,
+           p->pos.x, p->pos.y, p->pos.z,
+           cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
+           z);
+    */
+
+    // This is needed; "cellHistogram[z] += 1" won't work here
     atomic_add(&cellHistogram[z], 1);
 }
 
 /**
+ * Counting sort (http://en.wikipedia.org/wiki/Counting_sort)
  *
- *
+ * @param [in] particleToCell
+ * @param [in/out] cellHistogram
+ * @param [in] sortedParticleToCell
+ * @param [in] numParticles
+ * @param [in] numCells
+ * @param [in] cellsX
+ * @param [in] cellsY
+ * @param [in] cellsZ
  */
 kernel void sortParticlesByCell(global ParticlePosition* particleToCell
                                ,global int* cellHistogram
                                ,global ParticlePosition* sortedParticleToCell
                                ,int numParticles
-                               ,int numCells)
+                               ,int numCells
+                               ,int cellsX
+                               ,int cellsY
+                               ,int cellsZ)
 {
+    /*
      int id = get_global_id(0);
      printf("sortParticlesByCell :: [%d] numParticles = %d, numCells = %d\n", id, numParticles, numCells);
-     int total = 0;
-     for (int i = 0; i < numCells; i++) {
-     total += cellHistogram[i];
-     printf("[%d] = %d \n", i, cellHistogram[i]);
-     }
-     
-     printf("total = %d\n", total);
+    */
+
+    int prefixSum = 0;
+    int totalSum  = 0;
+
+    for (int i = 0; i < numCells; i++) {
+        prefixSum        = cellHistogram[i];
+        cellHistogram[i] = totalSum;
+        totalSum        += prefixSum;
+    }
+
+    for (int i = 0; i < numParticles; i++) {
+
+        global ParticlePosition* pp = &particleToCell[i];
+
+        int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
+        int j   = cellHistogram[key];
+        
+        /*
+        sortedParticleToCell[j].particleIndex = pp->particleIndex;
+        sortedParticleToCell[j].cellI         = pp->cellI;
+        sortedParticleToCell[j].cellJ         = pp->cellJ;
+        sortedParticleToCell[j].cellK         = pp->cellK;
+        */
+        sortedParticleToCell[j] = *pp;
+        
+        cellHistogram[key] += 1;
+    }
+    
+    for (int i = 0; i < numParticles; i++) {
+        
+        global ParticlePosition* spp = &sortedParticleToCell[i];
+        
+        int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
+
+        printf("[%d] :: particleIndex = %d, key = %d \n", i, spp->particleIndex, key);
+    }
 }
 

@@ -62,6 +62,12 @@ class Simulation
         // Writes data from the host to buffers on the GPU (device)
         void writeToGPU();
     
+        // Individual functions needed for grouping particles into bins/cells
+        void initializeParticleSort();
+        void computeCellHistogram();
+        void discretizeParticlePositions();
+        void sortParticlesByCell();
+    
     protected:
         // OpenCL manager
         msa::OpenCL& openCL;
@@ -97,21 +103,17 @@ class Simulation
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
-        void discretizeParticlePositions();
-        void initializeParticleSort();
-        void computeCellHistogram();
-        void sortParticlesByCell();
+        void groupParticlesByCell();
     
         // Drawing-related functions:
         void drawBounds() const;
         void drawParticles();
-        void countingSort();
 
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,int numParticles = 100
+                  ,int numParticles = 500
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 
