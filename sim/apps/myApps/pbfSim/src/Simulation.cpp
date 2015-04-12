@@ -100,11 +100,12 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(0, this->particleToCell);
     this->openCL.kernel("sortParticlesByCell")->setArg(1, this->cellHistogram);
     this->openCL.kernel("sortParticlesByCell")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("sortParticlesByCell")->setArg(3, this->numParticles);
-    this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numCells);
-    this->openCL.kernel("sortParticlesByCell")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("sortParticlesByCell")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numParticles);
+    this->openCL.kernel("sortParticlesByCell")->setArg(5, this->numCells);
+    this->openCL.kernel("sortParticlesByCell")->setArg(6, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
 }
 
 /**
@@ -125,7 +126,10 @@ void Simulation::initialize()
     // N = (cellsPerAxis[0] * _cellsPerAxis[1] * _cellsPerAxis[2])
 
     this->particleToCell.initBuffer(this->numParticles);
+
     this->sortedParticleToCell.initBuffer(this->numParticles);
+
+    this->gridCellOffsets.initBuffer(this->numCells);
 
     // A histogram (count table), where the i-th entry contains the number of
     // particles occupying that linearized grid cell. For a linear grid cell
@@ -156,12 +160,12 @@ void Simulation::initialize()
     // Needed for particle grouping/"binning" by cell later:
 
     this->initializeParticleSort();
-    
+
     // Dump the initial quantities assigned to the particles to the GPU, so we
     // can use them in GPU-land/OpenCL
 
     this->writeToGPU();
-    
+
     // Load the kernels:
 
     this->initializeKernels();
@@ -187,9 +191,13 @@ void Simulation::groupParticlesByCell()
  */
 void Simulation::initializeParticleSort()
 {
-    // Zero out the histogram counts:
+    // Zero out the histogram counts and grid cell offsets:
     for (int i = 0; i < this->numCells; i++) {
+
         this->cellHistogram[i] = 0;
+
+        this->gridCellOffsets[i].start  = -1;
+        this->gridCellOffsets[i].length = -1;
     }
 
     // as well as the particle to cell mappings:
@@ -225,6 +233,7 @@ void Simulation::readFromGPU()
     this->particleToCell.readFromDevice();
     this->cellHistogram.readFromDevice();
     this->sortedParticleToCell.readFromDevice();
+    this->gridCellOffsets.readFromDevice();
 }
 
 /**
@@ -237,6 +246,7 @@ void Simulation::writeToGPU()
     this->particleToCell.writeToDevice();
     this->cellHistogram.writeToDevice();
     this->sortedParticleToCell.writeToDevice();
+    this->gridCellOffsets.writeToDevice();
 }
 
 /**
@@ -390,6 +400,7 @@ void Simulation::sortParticlesByCell()
     // Only 1 thread is needed to run this. The sorting operation is
     // sequential in nature, hence the invocation with 1 thread, e.g.
     // "kernel("sortParticlesByCell")->run1D(1)"!
+
     this->openCL.kernel("sortParticlesByCell")->run1D(1);
 }
 
