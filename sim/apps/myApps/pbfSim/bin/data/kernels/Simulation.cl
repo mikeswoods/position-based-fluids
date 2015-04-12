@@ -115,6 +115,86 @@ int3 ind2sub(int x, int w, int h)
     return (int3)(x % w, (x / w) % h, x / (w * h));
 }
 
+/**
+ * Given the subscript (i,j,k) as an int3 of a cell to search the vicinity of,
+ * this function will return a count of valid neighboring cells (including
+ * itself) in the range [1,27], e.g. between 1 and 27 neighboring cells are
+ * valid and need to be searched for neighbors. The indices from 
+ * [0 .. neighborCount-1] will be populated with the indices of neighboring 
+ * cells in gridCellOffsets, such that for each nerighboring grid cell
+ * (i', j', k'), 0 <= i' < cellX, 0 <= j' < cellY, 0 <= k' < cellZ, and the
+ * corresponding entry for cell (i',j',k') in gridCellOffsets has a cell 
+ * start index != -1.
+ *
+ * @param [in]  sortedParticleToCell
+ * @param [in]  GridCellOffset* gridCellOffsets
+ * @param [in]  int cellsX
+ * @param [in]  int cellsY
+ * @param [in]  int cellsZ
+ * @param [in]  int3 cellSubscript
+ * @param [out] int* neighbors
+ */
+int getNeighborsBySubscript(ParticlePosition* sortedParticleToCell
+                           ,global GridCellOffset* gridCellOffsets
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,int3 cellSubscript
+                           ,int* neighbors)
+{
+    int i = cellSubscript.x;
+    int j = cellSubscript.y;
+    int k = cellSubscript.z;
+    
+    // Count of valid neighbors:
+
+    int neighborCount = 0;
+
+    // We need to search the following potential 27 cells about (i,j,k):
+    // (i + [-1,0,1], j + [-1,0,1], k + [-1,0,1]):
+
+    int offsets[3] = { -1, 0, 1};
+    int I = -1;
+    int J = -1;
+    int K = -1;
+    
+    // -1 indicates an invalid/non-existent neighbor:
+
+    for (int i = 0; i < 27; i++) {
+        neighbors[i] = -1;
+    }
+
+    for (int u = 0; u < 3; u++) {
+
+        I = i + offsets[u]; // I = i-1, i, i+1
+
+        for (int v = 0; v < 3; v++) {
+        
+            J = j + offsets[v]; // J = j-1, j, j+1
+
+            for (int w = 0; w < 3; w++) {
+            
+                K = k + offsets[w]; // K = k-1, k, k+1
+                
+                if (   (I >= 0 && I < cellsX)
+                    && (J >= 0 && J < cellsY)
+                    && (K >= 0 && K < cellsZ))
+                {
+                    int key = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
+
+                    // The specified grid cell offset has a valid starting
+                    // index, so we can return it as a valid neighbor:
+                    if (gridCellOffsets[key].start != -1) {
+                        neighbors[neighborCount++] = key;
+                    }
+                }
+            }
+        }
+    }
+    
+    return neighborCount;
+}
+
 /*******************************************************************************
  * Kernels
  ******************************************************************************/
@@ -145,7 +225,6 @@ kernel void predictPosition(global Particle* particles, float dt)
 
     // Explicit Euler step:
     particles[i].pos += (dt * particles[i].vel);
-    
 }
 
 /**
@@ -326,4 +405,8 @@ kernel void sortParticlesByCell(global ParticlePosition* particleToCell
     }
     */
 }
+
+
+
+
 
