@@ -250,6 +250,7 @@ void countingSort(int arr[], int sz)
 
 }
 
+/*
 
 #define H               1.5f  // smoothing radius
 #define H_9             (H*H*H*H*H*H*H*H*H) // h^9
@@ -257,6 +258,7 @@ void countingSort(int arr[], int sz)
 
 float poly6Kernel(Vector3DS p_i, Vector3DS p_j){
     Vector3DS diff = p_i - p_j;
+    
     float r = diff.length();
     if (H > r && r > 0) {
         float h_minus_r = (H * H - r * r);
@@ -276,6 +278,7 @@ float spikyKernel(Vector3DS p_i, Vector3DS p_j){
     }
     return 0;
 }
+*/
 
 /******************************************************************************/
 
