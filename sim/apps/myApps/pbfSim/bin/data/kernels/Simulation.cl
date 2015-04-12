@@ -176,22 +176,33 @@ kernel void discretizeParticlePositions(global Particle* particles
     particleToCell[i].cellK = cellK;
     
     // Compute the linear index for the histogram counter
-    int z = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
+    int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
 
     /*
     printf("[%d] @ (%f, %f, %f) => (%d/%d, %d/%d, %d/%d) => %d\n",
            i,
            p->pos.x, p->pos.y, p->pos.z,
            cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
-           z);
+           key);
     */
 
-    // This is needed; "cellHistogram[z] += 1" won't work here
-    atomic_add(&cellHistogram[z], 1);
+    // This is needed; "cellHistogram[z] += 1" won't work here as multiple
+    // threads are modifying cellHistogram simultaneously:
+    atomic_add(&cellHistogram[key], 1);
 }
 
 /**
- * Counting sort (http://en.wikipedia.org/wiki/Counting_sort)
+ * NOTE: This kernel is meant to be run with 1 thread. This is necessary
+ * since we have to perform a sort and perform some other actions which are
+ * inherently sequential in nature
+ *
+ * This kernel basically performs a counting sort 
+ * (http://en.wikipedia.org/wiki/Counting_sort) on the particles, sorting
+ * them by the grid cell they were each assigned to. Rather than sorting by
+ * a 3 dimensional subscript (i,j,k), we linearize the subscript, and sort by
+ * that
+ *
+ * @see discretizeParticlePositions
  *
  * @param [in] particleToCell
  * @param [in/out] cellHistogram
@@ -243,13 +254,12 @@ kernel void sortParticlesByCell(global ParticlePosition* particleToCell
         cellHistogram[key] += 1;
     }
     
+    /*
     for (int i = 0; i < numParticles; i++) {
-        
         global ParticlePosition* spp = &sortedParticleToCell[i];
-        
         int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
-
         printf("[%d] :: particleIndex = %d, key = %d \n", i, spp->particleIndex, key);
     }
+    */
 }
 

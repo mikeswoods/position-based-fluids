@@ -346,7 +346,7 @@ void Simulation::draw()
 /**
  * Applies external forces to the particles in the simulation.
  *
- * @see kernels/UpdatePositions.cl for details
+ * @see kernels/Simulation.cl for details
  */
 void Simulation::applyExternalForces()
 {
@@ -356,7 +356,7 @@ void Simulation::applyExternalForces()
 /**
  * Updates the predicted positions of the particles via an explicit Euler step
  *
- * @see kernels/UpdatePositions.cl for details
+ * @see kernels/Simulation.cl for details
  */
 void Simulation::predictPositions()
 {
@@ -364,7 +364,12 @@ void Simulation::predictPositions()
 }
 
 /**
+ * Discretizes all of the particles to a grid cell, where the number of
+ * grid cells along each axis in the simulated space is specified by 
+ * cellsPerAxis, e.g. (4,5,6) specifies 4 cells in the x-axs, 5 in the y-axis, 
+ * and 6 in the z-axis
  *
+ * @see kernels/Simulation.cl for details
  */
 void Simulation::discretizeParticlePositions()
 {
@@ -372,10 +377,19 @@ void Simulation::discretizeParticlePositions()
 }
 
 /**
+ * Sorts the particles by the assigned grid cell. Following the run of this
+ * function, sortedParticleToCell (after read back fro the GPU) will contain a 
+ * listing of ParticlePosition, that are sorted by linearized cell indices, e.g.
+ * particles that are in the same cell will be consecutive in 
+ * sortedParticleToCell, making neighbor search quick.
  *
+ * @see kernels/Simulation.cl for details
  */
 void Simulation::sortParticlesByCell()
 {
+    // Only 1 thread is needed to run this. The sorting operation is
+    // sequential in nature, hence the invocation with 1 thread, e.g.
+    // "kernel("sortParticlesByCell")->run1D(1)"!
     this->openCL.kernel("sortParticlesByCell")->run1D(1);
 }
 
