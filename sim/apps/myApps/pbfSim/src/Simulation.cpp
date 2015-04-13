@@ -116,15 +116,27 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
     
-    // KERNEL :: SPHEstimateDensity
-    this->openCL.loadKernel("SPHEstimateDensity");
-    this->openCL.kernel("SPHEstimateDensity")->setArg(0, this->particles);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(6, this->density);
+    // KERNEL :: estimateDensity
+    this->openCL.loadKernel("estimateDensity");
+    this->openCL.kernel("estimateDensity")->setArg(0, this->particles);
+    this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("estimateDensity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("estimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("estimateDensity")->setArg(6, this->density);
+    
+    // KERNEL :: computeLambda
+    this->openCL.loadKernel("computeLambda");
+    this->openCL.kernel("computeLambda")->setArg(0, this->particles);
+    this->openCL.kernel("computeLambda")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("computeLambda")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("computeLambda")->setArg(3, this->density);
+    this->openCL.kernel("computeLambda")->setArg(4, this->numParticles);
+    this->openCL.kernel("computeLambda")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("computeLambda")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("computeLambda")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("computeLambda")->setArg(8, this->lambda);
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
@@ -140,6 +152,7 @@ void Simulation::resetParticleQuantities()
 {
     for (int i = 0; i < this->numParticles; i++) {
         this->density[i] = 0;
+        this->lambda[i] = 0;
     }
 }
 
@@ -197,6 +210,7 @@ void Simulation::initialize()
     // corresponds to the i-th particle in this->particles:
     
     this->density.initBuffer(this->numParticles);
+    this->lambda.initBuffer(this->numParticles);
     
     // Set up initial positions and velocities for the particles:
     
@@ -305,6 +319,7 @@ void Simulation::readFromGPU()
     this->sortedParticleToCell.readFromDevice();
     this->gridCellOffsets.readFromDevice();
     this->density.readFromDevice();
+    this->lambda.readFromDevice();
 }
 
 /**
@@ -319,6 +334,7 @@ void Simulation::writeToGPU()
     this->sortedParticleToCell.writeToDevice();
     this->gridCellOffsets.writeToDevice();
     this->density.writeToDevice();
+    this->lambda.writeToDevice();
 }
 
 /**
@@ -368,7 +384,7 @@ void Simulation::step()
         
         this->calculateDensity();
         
-    //    this->calculatePositionDelta();
+        this->calculatePositionDelta();
         
         this->handleCollisions();
     }
@@ -567,7 +583,7 @@ float spikyKernel(Vector3DS p_i, Vector3DS p_j){
 /**
  * Applies external forces to the particles in the simulation.
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (applyExternalForces) for details
  */
 void Simulation::applyExternalForces()
 {
@@ -577,7 +593,7 @@ void Simulation::applyExternalForces()
 /**
  * Updates the predicted positions of the particles via an explicit Euler step
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (predictPosition) for details
  */
 void Simulation::predictPositions()
 {
@@ -590,7 +606,7 @@ void Simulation::predictPositions()
  * cellsPerAxis, e.g. (4,5,6) specifies 4 cells in the x-axs, 5 in the y-axis, 
  * and 6 in the z-axis
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (discretizeParticlePositions) for details
  */
 void Simulation::discretizeParticlePositions()
 {
@@ -604,7 +620,7 @@ void Simulation::discretizeParticlePositions()
  * particles that are in the same cell will be consecutive in 
  * sortedParticleToCell, making neighbor search quick.
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (sortParticlesByCell) for details
  */
 void Simulation::sortParticlesByCell()
 {
@@ -616,28 +632,34 @@ void Simulation::sortParticlesByCell()
 }
 
 /**
- * Computes the density of each particle using the SPH density estimator
+ * Computes the density for each particle using the SPH density estimator
+ * 
+ * (*) Specifically, this function is part of the constraint solver loop
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (estimateDensity) for details
  */
 void Simulation::calculateDensity()
 {
-    this->openCL.kernel("SPHEstimateDensity")->run1D(this->numParticles);
+    this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
 }
 
 /**
- * TODO
+ * Computes the position delta
  *
- * @see kernels/Simulation.cl for details
+ * (*) Specifically, this function is part of the constraint solver loop
+ *
+ * @see kernels/Simulation.cl (computeLambda) for details
  */
 void Simulation::calculatePositionDelta()
 {
-    
+    this->openCL.kernel("computeLambda")->run1D(this->numParticles);
 }
 
 /**
  * TODO: All this does now is clamp the particle positions to the simulation
- * boudning box
+ * bounding box
+ *
+ * @see kernels/Simulation.cl (resolveCollisions) for details
  */
 void Simulation::handleCollisions()
 {

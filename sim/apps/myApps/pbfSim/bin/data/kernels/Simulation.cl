@@ -20,15 +20,25 @@
  ******************************************************************************/
 
 /**
- * Acceleration due to gravity: 9.8 m/s
+ * Acceleration force due to gravity: 9.8 m/s
  */
 const constant float G = 9.8f;
 
+/**
+ * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
+ * of the Position Based Fluids paper
+ */
 const constant float EPSILON = 1.0e-4f;
 
+/**
+ * Particle rest density: 1000kg/m^3
+ */
 const constant float REST_DENSITY = 1000.0f;
 
-const constant float H_SMOOTHING_RADIUS = 1.0f + EPSILON;
+/**
+ * Default kernel smoothing radius
+ */
+const constant float H_SMOOTHING_RADIUS = 1.2f;
 
 /*******************************************************************************
  * Types
@@ -89,7 +99,7 @@ typedef struct {
 } GridCellOffset;
 
 /*******************************************************************************
- * Helper functions
+ * Utility functions
  ******************************************************************************/
 
 /**
@@ -218,29 +228,31 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
  * function to all particle pairs (p_i, p_j), accumulating the result and
  * returning it
  *
- * @param [in] Particle* particles
- * @param [in] ParticlePosition* sortedParticleToCell
- * @param [in] GridCellOffset* gridCellOffsets
- * @param [in] int cellsX
- * @param [in] int cellsY
- * @param [in] int cellsZ
- * @param [in] int3 cellSubscript
- * @param [in] float (*apply)(const global Particle*, const global Particle*, float dist)
- * @returns float The accumulated result
+ * @param [in]  Particle* particles
+ * @param [in]  ParticlePosition* sortedParticleToCell
+ * @param [in]  GridCellOffset* gridCellOffsets
+ * @param [in]  int cellsX
+ * @param [in]  int cellsY
+ * @param [in]  int cellsZ
+ * @param [in]  int3 cellSubscript
+ * @param [in]  (*apply)(const global Particle*, const global Particle*, void* accum)
+ * @param [out] void* accum The accumulated result, passed to and update by apply
+ *              for every neighbor pair of particles
  */
-float forAllNeighbors(const global Particle* particles
+void forAllNeighbors(const global Particle* particles
                      ,const global ParticlePosition* sortedParticleToCell
                      ,const global GridCellOffset* gridCellOffsets
                      ,int cellsX
                      ,int cellsY
                      ,int cellsZ
                      ,int3 cellSubscript
-                     ,float (*apply)(const global Particle*, const global Particle*, float dist))
+                     ,void (*apply)(const global Particle*, const global Particle*, void* accum)
+                     ,void* accum)
 {
     int id = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
     const global Particle *p_i = &particles[id];
     
-    // 27 possible neighbors to search
+    // 27 (3x3x3) possible neighbors to search:
     int neighbors[27];
     
     int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell
@@ -258,9 +270,6 @@ float forAllNeighbors(const global Particle* particles
                id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
                neighborCellCount);
     #endif
-    
-    // The accumulated result to return:
-    float result = 0.0f;
     
     // For all neighbors found for the given cell at grid subscript (i,j, k):
     for (int j = 0; j < neighborCellCount; j++) {
@@ -295,6 +304,7 @@ float forAllNeighbors(const global Particle* particles
                     const global Particle* p_j = &particles[J];
                     
                     // Now, we compute the distance between the two particles:
+
                     float r = distance(p_i->pos, p_j->pos);
                     
                     // If the position delta is less then the sum of the
@@ -312,7 +322,7 @@ float forAllNeighbors(const global Particle* particles
                         // Apply the given function to the particle pair
                         // (p_i, p_j) and accumulate the result:
 
-                        result += apply(p_i, p_j, r);
+                        apply(p_i, p_j, accum);
 
                         #ifdef DEBUG
                             contributingParticles += 1;
@@ -322,56 +332,63 @@ float forAllNeighbors(const global Particle* particles
             }
         }
     }
-    
-    #ifdef DEBUG
-        printf("forAllNeighbors [%d] :: contributingParticles = %d, density = %f\n",
-               id, contributingParticles, density[id]);
-    #endif
-
-    return result;
 }
 
-// Smoothing kernels:
+/*******************************************************************************
+ * Density estimation functions
+ ******************************************************************************/
 
 /**
- * Poly6 kernel
+ * Poly6 smoothing kernel
  *
- * @param float r
+ * From the PBF slides SIGGRAPH 2013, pg. 13
+ *
+ * @param float4 Particle i position
+ * @param float4 particle j position
  * @param float h Smoothing kernel radius
  * @returns float
  */
-float W_poly6(float r, float h)
+float poly6(float4 pos_i, float4 pos_j, float h)
 {
-    if (h == 0)  {
-        return 0;
-    }
+    float4 r   = pos_i - pos_j;
+    float rBar = length(r);
     
+    if (rBar > h) {
+        return 0.0;
+    }
+
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
     float A  = 1.566681471061 * h9;
-    float B  = (h * h) - (r * r);
+    float B  = (h * h) - (rBar * rBar);
+
     return A * (B * B * B);
 }
 
 /**
- * Spiky kernel
+ * Spiky smoothing kernel
  *
- * @param float r
+ * From the PBF slides SIGGRAPH 2013, pg. 13
+ *
+ * @param float4 Particle i position
+ * @param float4 particle j position
  * @param float h Smoothing kernel radius
- * @returns float
+ * @returns float4
  */
-float W_spiky(float r, float h)
+float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
-    if (h == 0) {
-        return 0;
+    float4 r   = pos_i - pos_j;
+    float rBar = length(r);
+    
+    if (rBar > h) {
+        return 0.0;
     }
     
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
     float A    = 14.323944878271 * h6;
-    float rAbs = fabs(r);
-    float B    = (h - rAbs);
-    return A * (B * B) * (r / rAbs);
+    float B    = (h - rBar);
+    return A * (B * B) * (r / rBar);
 }
 
 /**
@@ -379,13 +396,103 @@ float W_spiky(float r, float h)
  *
  * @param Particle* p_i Pair particle p_i
  * @param Particle* p_j Pair particle p_j
- * @param float dist The distance from the positions (centers) of p_i and p_j
+ * @param void* The data to update (generally a float of accumulated densities)
  */
-float estimateDensity(const global Particle* p_i
-                     ,const global Particle* p_j
-                     ,float dist)
+void SPHDensityEstimator(const global Particle* p_i
+                        ,const global Particle* p_j
+                        ,void* data)
 {
-    return p_i->mass * W_poly6(dist, H_SMOOTHING_RADIUS);
+    // Cast the void pointer to the type we expect, so we can update the
+    // variable accordingly:
+
+    float* accumDensity = (float*)data;
+    
+    *accumDensity += poly6(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
+}
+
+/**
+ * SPH gradient of a function
+ *
+ * @param Particle* p_i Pair particle p_i
+ * @param Particle* p_j Pair particle p_j
+ * @param void* The data to update (generally a float4 gradient vector)
+ */
+void SPHGradient(const global Particle* p_i
+                ,const global Particle* p_j
+                ,void* data)
+{
+    // Cast the void pointer to the type we expect, so we can update the
+    // variable accordingly:
+
+    float4* gradVector = (float4*)data;
+    
+    *gradVector += spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
+}
+
+/**
+ * Given particle indices i and j, this function computes the gradient of the
+ * constraint for particle i, C_i, w.r.t. particle j
+ *
+ *                                 / if k = i, \sum_j \nabla(p_k) * W(p_i - p_j, h)
+ * \nabla(p_k) C_i = (1 / \rho_0) |
+ *                                 \ if k = j, -\nabla(p_k) * W(p_i - p_j, h)
+ *
+ * See the section "Enforcing Incompressibility" / figure (8)
+ *
+ * @param [in] Particle* particles
+ * @param [in] ParticlePosition* sortedParticleToCell
+ * @param [in] GridCellOffset* gridCellOffsets
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
+ * @param [in] int i The index of the i-th particle
+ * @param [in] int j The index of the j-th particle
+ * @returns float4 The computed constraint gradient vector
+ */
+float4 constraintGradient(const global Particle* particles
+                  ,const global ParticlePosition* sortedParticleToCell
+                  ,const global GridCellOffset* gridCellOffsets
+                  ,int cellsX
+                  ,int cellsY
+                  ,int cellsZ
+                  ,int i
+                  ,int j)
+{
+    float invRestDensity = 1.0f / REST_DENSITY;
+    float4 gradVector    = (float4)(0.0, 0.0, 0.0, 0.0);
+    
+    // Case: \sum_j \nabla(p_k) * W(p_i - p_j, h)
+    if (i == j) {
+        
+        // Convert a linear index z into (i, j, k):
+        
+        int3 cellSubscript = ind2sub(i, cellsX, cellsY);
+
+        forAllNeighbors(particles
+                       ,sortedParticleToCell
+                       ,gridCellOffsets
+                       ,cellsX
+                       ,cellsY
+                       ,cellsZ
+                       ,cellSubscript
+                       ,SPHGradient
+                       ,(void*)&gradVector);
+
+        return invRestDensity * gradVector;
+    
+    // Case: -\nabla(p_k) * W(p_i - p_j, h)
+    } else {
+
+        const global Particle* p_i = &particles[i];
+        const global Particle* p_j = &particles[j];
+
+        SPHGradient(p_i, p_j, (void*)&gradVector);
+        
+        return invRestDensity * -gradVector;
+    }
 }
 
 /*******************************************************************************
@@ -638,69 +745,121 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
- * @param [in]  int cellsX
- * @param [in]  int cellsY
- * @param [in]  int cellsZ
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
  * @param [out] float* density
  */
-void kernel SPHEstimateDensity(const global Particle* particles
-                              ,const global ParticlePosition* sortedParticleToCell
-                              ,const global GridCellOffset* gridCellOffsets
-                              ,int cellsX
-                              ,int cellsY
-                              ,int cellsZ
-                              ,global float* density)
+void kernel estimateDensity(const global Particle* particles
+                           ,const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,global float* density)
 {
     int id = get_global_id(0);
     
     // Convert a linear index z into (i, j, k):
+
     int3 cellSubscript = ind2sub(id, cellsX, cellsY);
     
-    density[id] = forAllNeighbors(particles
-                                 ,sortedParticleToCell
-                                 ,gridCellOffsets
-                                 ,cellsX
-                                 ,cellsY
-                                 ,cellsZ
-                                 ,cellSubscript
-                                 ,estimateDensity);
+    // For all neighboring particles p_j of the current particle (specified
+    // by particles[id], aka p_i), apply the function estimateDensity for
+    // all (p_i, p_j), accumulating the result into the density variable:
 
+    float estDensity = 0.0f;
+    
+    forAllNeighbors(particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,cellSubscript
+                   ,SPHDensityEstimator
+                   ,(void*)&estDensity);
+
+    density[id] = estDensity;
+    
     #ifdef DEBUG
-        printf("SPHEstimateDensity [%d] :: density = %f\n", id, density[id]);
+        printf("estimateDensity [%d] :: density = %f\n", id, density[id]);
     #endif
 }
 
 /**
- * For all particles p_i in particles, this kernel computes the density 
- * constraint, defined as
+ * For all particles p_i in particles, this kernel computes the density
+ * constraint lambda value, defined as
  *
- * C_i(p_1, ..., p_n) = (\rho_i / \rho_0) - 1 = 0
+ *   \lambda_i = -C_i(p_1, ..., p_n) / \sum_k |\nabla(p_k) C_i|^2
  *
- * where \rho_0 is the rest density, and \rho_i is the density for particle p_i
+ * where,
+ * 
+ *   1) C_i(p_1, ..., p_n) = (\rho_i / \rho_0) - 1 = 0,
  *
- * Note: this corresponds to Figure (1) in the section 
- * "Enforcing Incompressibility"
+ *   2) \rho_0 is the rest density, and
+ *
+ *   3) \rho_i is the density for particle p_i
+ *
+ * NOTE:
+ * This corresponds to Figure (1) in the section "Enforcing Incompressibility"
+ *
+ * @param [in]  const Particle* particles The particles in the simulation
+ * @param [in]  const ParticlePosition* sortedParticleToCell
+ * @param [in]  const GridCellOffset* gridCellOffsets
+ * @param [in]  const float* density The density per particle. The i-th entry
+ *              contains the density for the i-th particle
+ * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
+ * @param [out] float* lambda The constraint lambda value
  */
-/*
-kernel void computeDensityConstraint(const global float* density
-                                    ,global float* densityConstraint)
+kernel void computeLambda(const global Particle* particles
+                         ,const global ParticlePosition* sortedParticleToCell
+                         ,const global GridCellOffset* gridCellOffsets
+                         ,const global float* density
+                         ,int numParticles
+                         ,int cellsX
+                         ,int cellsY
+                         ,int cellsZ
+                         ,global float* lambda)
 {
     int id = get_global_id(0);
-    densityConstraint[id] = (density[id] / REST_DENSITY) - 1.0f;
-}
-*/
 
-/**
- * For all particles p_i in particles, this kernel computes the gradient of the 
- * constraint,
- *
- */
-/*
-kernel void computeConstraintGradient()
-{
-    int id = get_global_id(0);
+    // Compute the constraint value C_i(p_1, ... p_n) for all neighbors [1..n]
+    // of particle i:
+
+    float C_i = (density[id] / REST_DENSITY) - 1.0f;
+    
+    // and the summation of the gradient of C_i w.r.t. each particle k:
+
+    float gradientSum_i = 0.0f;
+
+    for (int k = 0; k < numParticles; k++) {
+
+        float4 gradient = constraintGradient(particles
+                                            ,sortedParticleToCell
+                                            ,gridCellOffsets
+                                            ,cellsX
+                                            ,cellsY
+                                            ,cellsZ
+                                            ,id
+                                            ,k);
+
+        float gradLength = length(gradient);
+
+        gradientSum_i += (gradLength * gradLength);
+    }
+
+    lambda[id] = -(C_i / (gradientSum_i + EPSILON));
 }
-*/
 
 /**
  * Tests for collisions between particles and objects/bounds and projects
