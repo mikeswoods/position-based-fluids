@@ -55,24 +55,43 @@ void ofApp::update()
     }
 }
 
+/**
+ * Draws a "heads up display" that shows the status of the simulation, as well
+ * as some other pieces of pertinent information
+ */
+void ofApp::drawHeadsUpDisplay()
+{
+    // Show the current frame rate and frame count
+    ofSetColor(255);
+    ofFill();
+
+    int textYOffset = 15;
+    
+    // FPS
+    ofDrawBitmapString(ofToString(ofGetFrameRate()) + " fps", 10, textYOffset += 15);
+
+    // Current frame
+    ofDrawBitmapString("Frame: " + ofToString(this->simulation->getFrameNumber()), 10, textYOffset += 15);
+
+    
+    // Hotkeys:
+    ofDrawBitmapString("Hotkeys: 's' = step, 'p' or space = toggle pause, 'r' = reset", 10, textYOffset += 15);
+    
+    // Paused flag
+    if (this->isPaused()) {
+        ofDrawBitmapString("Paused", 10, textYOffset += 15);
+    }
+}
+
 void ofApp::draw()
 {
     ofBackground(0);
     
     this->camera.begin();
- 
-        this->simulation->draw();
-
+    this->simulation->draw();
     this->camera.end();
     
-    // Show the current frame rate and frame count
-    ofSetColor(255);
-    ofFill();
-    ofDrawBitmapString(ofToString(ofGetFrameRate()) + " fps", 10, 15);
-    ofDrawBitmapString("Frame: " + ofToString(this->simulation->getFrameNumber()), 10, 30);
-    if (this->isPaused()) {
-        ofDrawBitmapString("Paused", 10, 45);
-    }
+    this->drawHeadsUpDisplay();
 }
 
 bool ofApp::isPaused() const
@@ -91,18 +110,21 @@ void ofApp::keyPressed(int key)
         // Pause
         case 'p':
         case ' ':
-        {
-            this->togglePaused();
-        }
+            {
+                this->togglePaused();
+            }
         break;
         // Step
         case 's':
-        {
-            this->advanceStep = true;
-        }
+            {
+                this->advanceStep = true;
+            }
         break;
         // Reset
         case 'r':
+            {
+                this->simulation->reset();
+            }
             break;
     }
 }

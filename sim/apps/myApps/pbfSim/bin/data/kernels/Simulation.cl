@@ -205,7 +205,8 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
 
 // Smoothing kernels:
 
-float poly6(float r, float h)
+// Poly6 kernel
+float W_poly6(float r, float h)
 {
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
@@ -214,7 +215,8 @@ float poly6(float r, float h)
     return A * (B * B * B);
 }
 
-float spiky(float r, float h)
+// Spiky kernel
+float W_spiky(float r, float h)
 {
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
@@ -381,13 +383,7 @@ kernel void sortParticlesByCell(global ParticlePosition* particleToCell
 
         int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
         int j   = cellHistogram[key];
-        
-        /*
-        sortedParticleToCell[j].particleIndex = pp->particleIndex;
-        sortedParticleToCell[j].cellI         = pp->cellI;
-        sortedParticleToCell[j].cellJ         = pp->cellJ;
-        sortedParticleToCell[j].cellK         = pp->cellK;
-        */
+
         sortedParticleToCell[j] = *pp;
         
         cellHistogram[key] += 1;
@@ -447,6 +443,11 @@ kernel void sortParticlesByCell(global ParticlePosition* particleToCell
 /**
  * From the Macklin & Muller paper: SPH density estimation
  * 
+ * The SPH density estimator calculates \rho_i = \sum_j * m_j * W(p_i - p_j, h),
+ * where \rho_i is the density of the i-th particle, m_j is the mass of the 
+ * j-th particle, p_i - p_j is the position delta between the particles p_i and
+ * p_j and h is the smoothing radius
+ *
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
@@ -463,21 +464,87 @@ void kernel SPHEstimateDensity(global Particle* particles
                               ,int cellsZ
                               ,global float* density)
 {
-    int i = get_global_id(0);
-    global Particle *p = &particles[i];
+    int id = get_global_id(0);
+    global Particle *p_i = &particles[id];
     
     // 27 possible neighbors to search
     int neighbors[27];
     
     // Convert a linear index z into (i, j, k):
-    int3 cellSubscript = ind2sub(i, cellsX, cellsY);
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
 
-    int neighborCount = getNeighborsBySubscript(sortedParticleToCell
-                                               ,gridCellOffsets
-                                               ,cellsX
-                                               ,cellsY
-                                               ,cellsZ
-                                               ,cellSubscript
-                                               ,neighbors);
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell
+                                                   ,gridCellOffsets
+                                                   ,cellsX
+                                                   ,cellsY
+                                                   ,cellsZ
+                                                   ,cellSubscript
+                                                   ,neighbors);
     
+    int contributingParticles = 0;
+    
+    // For all neighbors found for the given cell at grid subscript (i,j, k):
+    for (int j = 0; j < neighborCellCount; j++) {
+        
+        // We fetch the all indices returned in neighbors and check
+        // the corresponding entries in gridCellOffsets (if neighbors[j]
+        // is valid):
+        if (neighbors[j] != -1) {
+
+            global GridCellOffset* g = &gridCellOffsets[neighbors[j]];
+            
+            // If the start index of the grid-cell is valid, we iterate over
+            // every neighbor we find:
+            if (g->start != -1) {
+
+                int start = g->start;
+                int end   = start + g->length;
+            
+                for (int k = start; k < end; k++) {
+                    
+                    global Particle* p_j = &particles[sortedParticleToCell[k].particleIndex];
+                    
+                    // Now, we compute the distance between the two particles:
+                    float r = distance(p_i->pos, p_j->pos);
+                    float h = 0.0;
+                    
+                    if (r < p_i->radius) {
+                        
+                        float D = p_j->mass * W_poly6(r, h);
+                        
+                        density[id] += D;
+                        contributingParticles += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+    printf("[PARTICLE] :: %i ; (%d,%d,%d) => neighboring search cells: %d; contributing particles: %d\n",
+           id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
+           neighborCellCount,
+           contributingParticles);
+    */
 }
+
+/**
+ * Tests for collisions between particles and objects/bounds and projects
+ * the positions of the particles accordingly
+ * 
+ * TODO: For now, this just clamps the particle to the world bounds
+ */
+kernel void resolveCollisions(global Particle* particles
+                             ,float3 minExtent
+                             ,float3 maxExtent)
+{
+    int id = get_global_id(0);
+    global Particle *p = &particles[id];
+
+    p->pos.x = clamp(p->pos.x, minExtent.x + p->radius, maxExtent.x - p->radius);
+    p->pos.y = clamp(p->pos.y, minExtent.y + p->radius, maxExtent.y - p->radius);
+    p->pos.z = clamp(p->pos.z, minExtent.z + p->radius, maxExtent.z - p->radius);
+}
+
+
+

@@ -142,6 +142,7 @@ class Simulation
     
         // Initialization-related functions:
         void initialize();
+        void resetParticleQuantities();
 
         // Simulation state-related functions:
         void applyExternalForces();
@@ -149,6 +150,7 @@ class Simulation
         void groupParticlesByCell();
         void calculateDensity();
         void calculatePositionDelta();
+        void handleCollisions();
     
         // Drawing-related functions:
         void drawBounds() const;
@@ -158,7 +160,7 @@ class Simulation
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,int numParticles = 500
+                  ,int numParticles = 100
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 

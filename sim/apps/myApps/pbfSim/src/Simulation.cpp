@@ -116,6 +116,22 @@ void Simulation::initializeKernels()
     this->openCL.kernel("SPHEstimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("SPHEstimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
     this->openCL.kernel("SPHEstimateDensity")->setArg(6, this->density);
+    
+    // KERNEL :: resolveCollisions
+    this->openCL.loadKernel("resolveCollisions");
+    this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
+    this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
+}
+
+/**
+ * Resets various particle quantities, like density, etc.
+ */
+void Simulation::resetParticleQuantities()
+{
+    for (int i = 0; i < this->numParticles; i++) {
+        this->density[i] = 0;
+    }
 }
 
 /**
@@ -194,6 +210,10 @@ void Simulation::initialize()
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
     
+    // Set the initial state:
+
+    this->resetParticleQuantities();
+    
     // Needed for particle grouping/"binning" by cell later:
 
     this->initializeParticleSort();
@@ -259,6 +279,8 @@ void Simulation::initializeParticleSort()
 void Simulation::reset()
 {
     this->frameNumber = 0;
+    
+    this->initialize();
 }
 
 /**
@@ -299,6 +321,7 @@ void Simulation::writeToGPU()
 void Simulation::step()
 {
     // Solver iterations (this will be adjustable later)
+
     int N = 1;
     
     // We need to perform this step (zeroing out the histogram array and some
@@ -307,6 +330,8 @@ void Simulation::step()
     // next line, i.e. writeToGPU()
 
     this->initializeParticleSort();
+
+    this->resetParticleQuantities();
     
     // Dump whatever changes occurred in host-land to the GPU:
 
@@ -330,9 +355,11 @@ void Simulation::step()
 
     for (int i = 0; i < N; i++) {
         
-        this->calculateDensity();
+    //    this->calculateDensity();
         
-        this->calculatePositionDelta();
+    //    this->calculatePositionDelta();
+        
+        this->handleCollisions();
     }
     
     // Make sure the OpenCL work queue is empty before proceeding. This will
@@ -473,6 +500,15 @@ void Simulation::calculateDensity()
 void Simulation::calculatePositionDelta()
 {
     
+}
+
+/**
+ * TODO: All this does now is clamp the particle positions to the simulation
+ * boudning box
+ */
+void Simulation::handleCollisions()
+{
+    this->openCL.kernel("resolveCollisions")->run1D(this->numParticles);
 }
 
 /******************************************************************************/
