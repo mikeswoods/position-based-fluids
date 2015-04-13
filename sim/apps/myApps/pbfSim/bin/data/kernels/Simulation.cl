@@ -403,14 +403,16 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
 
     int lengthCount = 1;
     int cellStart   = 0;
+    int currentKey  = -1;
+    int nextKey     = -1;
     
     for (int i = 0; i < (numParticles - 1); i++) {
 
         const global ParticlePosition* currentP = &sortedParticleToCell[i];
         const global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
 
-        int currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
-        int nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
+        nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
         
         if (currentKey == nextKey) {
 
@@ -424,6 +426,11 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
             cellStart   = i + 1;
             lengthCount = 1;
         }
+    }
+    
+    if (nextKey != -1) {
+        gridCellOffsets[nextKey].start  = cellStart;
+        gridCellOffsets[nextKey].length = lengthCount;
     }
 
     // Dump everything out for verification:
