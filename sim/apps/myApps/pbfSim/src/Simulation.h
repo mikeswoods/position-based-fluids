@@ -83,6 +83,9 @@ class Simulation
         // Count of the current frame number
         unsigned int frameNumber;
     
+        // Flag to draw the spatial grid
+        bool flagDrawGrid;
+    
         // Load kernels and bind parameters
         void initializeKernels();
     
@@ -154,13 +157,15 @@ class Simulation
     
         // Drawing-related functions:
         void drawBounds() const;
+        void drawGrid() const;
         void drawParticles();
 
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,int numParticles = 100
+                  ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
+                  ,int numParticles = 5
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 
@@ -168,6 +173,9 @@ class Simulation
         const AABB& getBounds() const { return this->bounds; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
+    
+        const bool drawGridEnabled() const { return this->flagDrawGrid; }
+        void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
     
         void reset();
         void step();

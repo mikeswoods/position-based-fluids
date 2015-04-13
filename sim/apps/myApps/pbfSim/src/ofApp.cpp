@@ -126,6 +126,12 @@ void ofApp::keyPressed(int key)
                 this->simulation->reset();
             }
             break;
+        // Toggle drawing the spatial grid:
+        case 'g':
+            {
+                this->simulation->toggleDrawGrid();
+            }
+            break;
     }
 }
 
