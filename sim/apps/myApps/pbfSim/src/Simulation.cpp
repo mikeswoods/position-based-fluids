@@ -384,7 +384,7 @@ void Simulation::step()
         
         this->calculateDensity();
         
-    //    this->calculatePositionDelta();
+        this->calculatePositionDelta();
         
         this->handleCollisions();
     }
@@ -520,7 +520,7 @@ void Simulation::draw()
 /**
  * Applies external forces to the particles in the simulation.
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (applyExternalForces) for details
  */
 void Simulation::applyExternalForces()
 {
@@ -530,7 +530,7 @@ void Simulation::applyExternalForces()
 /**
  * Updates the predicted positions of the particles via an explicit Euler step
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (predictPosition) for details
  */
 void Simulation::predictPositions()
 {
@@ -543,7 +543,7 @@ void Simulation::predictPositions()
  * cellsPerAxis, e.g. (4,5,6) specifies 4 cells in the x-axs, 5 in the y-axis, 
  * and 6 in the z-axis
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (discretizeParticlePositions) for details
  */
 void Simulation::discretizeParticlePositions()
 {
@@ -557,7 +557,7 @@ void Simulation::discretizeParticlePositions()
  * particles that are in the same cell will be consecutive in 
  * sortedParticleToCell, making neighbor search quick.
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (sortParticlesByCell) for details
  */
 void Simulation::sortParticlesByCell()
 {
@@ -569,30 +569,34 @@ void Simulation::sortParticlesByCell()
 }
 
 /**
- * Computes the density + constraints for each particle using the 
- * SPH density estimator
+ * Computes the density for each particle using the SPH density estimator
+ * 
+ * (*) Specifically, this function is part of the constraint solver loop
  *
- * @see kernels/Simulation.cl for details
+ * @see kernels/Simulation.cl (estimateDensity) for details
  */
 void Simulation::calculateDensity()
 {
     this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
+}
+
+/**
+ * Computes the position delta
+ *
+ * (*) Specifically, this function is part of the constraint solver loop
+ *
+ * @see kernels/Simulation.cl (computeLambda) for details
+ */
+void Simulation::calculatePositionDelta()
+{
     this->openCL.kernel("computeLambda")->run1D(this->numParticles);
 }
 
 /**
- * TODO
- *
- * @see kernels/Simulation.cl for details
- */
-void Simulation::calculatePositionDelta()
-{
-    
-}
-
-/**
  * TODO: All this does now is clamp the particle positions to the simulation
- * boudning box
+ * bounding box
+ *
+ * @see kernels/Simulation.cl (resolveCollisions) for details
  */
 void Simulation::handleCollisions()
 {
