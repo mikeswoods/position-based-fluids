@@ -406,20 +406,35 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
     int currentKey  = -1;
     int nextKey     = -1;
     
+    // We traverse the list to find sequences of consecutive particles that
+    // are assigned the same cell. We record the start and length to these
+    // sequences and store the results in gridCellOffsets, so we can
+    // quickly find all of the particles in a given cell quickly.
+
     for (int i = 0; i < (numParticles - 1); i++) {
 
+        // Compare the particle position at index i and i+1:
+        
         const global ParticlePosition* currentP = &sortedParticleToCell[i];
         const global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
+
+        // If two particles p and q have cell subscripts (p_x, p_y, p_z) and
+        // (q_x, q_y, q_z), then the keys are the linearized indices for p and
+        // q, p_key and q_key.
 
         currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
         nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
         
+        // If p_key and q_key are equal, increase the length of the span:
+
         if (currentKey == nextKey) {
 
             lengthCount++;
 
         } else {
             
+            // We hit a new key. Record this grid cell offset and continue;
+
             gridCellOffsets[currentKey].start  = cellStart;
             gridCellOffsets[currentKey].length = lengthCount;
             
@@ -428,11 +443,15 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         }
     }
     
+    // For the last particle, since we iterate up to, but not including
+    // the particle at index (numParticles - 1):
+
     if (nextKey != -1) {
         gridCellOffsets[nextKey].start  = cellStart;
         gridCellOffsets[nextKey].length = lengthCount;
     }
 
+    /*
     // Dump everything out for verification:
     for (int i = 0; i < numParticles; i++) {
         global ParticlePosition* spp = &sortedParticleToCell[i];
@@ -447,6 +466,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         global GridCellOffset* gco = &gridCellOffsets[i];
         printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
     }
+    */
 }
 
 /**
