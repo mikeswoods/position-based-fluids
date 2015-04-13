@@ -10,17 +10,25 @@
  ******************************************************************************/
 
 /*******************************************************************************
+ * Preprocessor directives
+ ******************************************************************************/
+
+//#define DEBUG
+
+/*******************************************************************************
  * Constants
  ******************************************************************************/
 
 /**
  * Acceleration due to gravity: 9.8 m/s
  */
-#define G 9.8f
+const constant float G = 9.8f;
 
-#define EPSILON 1.0e-4f;
+const constant float EPSILON = 1.0e-4f;
 
-//#define DEBUG
+const constant float REST_DENSITY = 1000.0f;
+
+const constant float H_SMOOTHING_RADIUS = 1.0f + EPSILON;
 
 /*******************************************************************************
  * Types
@@ -79,14 +87,6 @@ typedef struct {
     int __dummy[2]; // Padding
     
 } GridCellOffset;
-
-// Smoothing kernel enum:
-
-enum SmoothingKernel
-{
-     POLY_6
-    ,SPIKY
-};
 
 /*******************************************************************************
  * Helper functions
@@ -218,6 +218,10 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
 // Poly6 kernel
 float W_poly6(float r, float h)
 {
+    if (h == 0)  {
+        return 0;
+    }
+    
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
     float A  = 1.566681471061 * h9;
@@ -228,6 +232,10 @@ float W_poly6(float r, float h)
 // Spiky kernel
 float W_spiky(float r, float h)
 {
+    if (h == 0) {
+        return 0;
+    }
+    
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
     float A    = 14.323944878271 * h6;
@@ -530,12 +538,14 @@ void kernel SPHEstimateDensity(const global Particle* particles
         // We fetch the all indices returned in neighbors and check
         // the corresponding entries in gridCellOffsets (if neighbors[j]
         // is valid):
+
         if (neighbors[j] != -1) {
 
             const global GridCellOffset* g = &gridCellOffsets[neighbors[j]];
             
             // If the start index of the grid-cell is valid, we iterate over
             // every neighbor we find:
+    
             if (g->start != -1) {
 
                 int start = g->start;
@@ -556,21 +566,23 @@ void kernel SPHEstimateDensity(const global Particle* particles
                     
                     // Now, we compute the distance between the two particles:
                     float r = distance(p_i->pos, p_j->pos);
-                    float h = 0.0;
                     
                     // If the position delta is less then the sum of the
                     // radii of both particles, then use the particle in the
                     // density calculation:
                     
-                    float distThreshold = p_i->radius + p_j->radius + EPSILON;
+                    float distThreshold = p_i->radius + p_j->radius;
 
                     if (r < distThreshold) {
                     
                         #ifdef DEBUG
-                            printf("-- p_i [i=%d] - p_j [J=%d] = %f, radius = %f\n", id, J, r, p_i->radius);
+                            printf("-- p_i [i=%d] - p_j [J=%d] = %f, poly6 = %f\n", id, J, r, W_poly6(r, p_i->radius));
                         #endif
                         
-                        float D = p_j->mass * W_poly6(r, h);
+                        // Use the poly 6 smoothing kernal, as per the
+                        // Position Based Fluids paper, pg. 2:
+                        
+                        float D = p_j->mass * W_poly6(r, H_SMOOTHING_RADIUS);
                         
                         density[id] += D;
                         contributingParticles += 1;
@@ -579,6 +591,10 @@ void kernel SPHEstimateDensity(const global Particle* particles
             }
         }
     }
+    
+    #ifdef DEBUG
+        printf("[%d] contributingParticles = %d, density = %f\n", id, contributingParticles, density[id]);
+    #endif
 }
 
 /**
