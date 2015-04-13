@@ -116,15 +116,15 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
     
-    // KERNEL :: SPHEstimateDensity
-    this->openCL.loadKernel("SPHEstimateDensity");
-    this->openCL.kernel("SPHEstimateDensity")->setArg(0, this->particles);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("SPHEstimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("SPHEstimateDensity")->setArg(6, this->density);
+    // KERNEL :: EstimateDensity
+    this->openCL.loadKernel("estimateDensity");
+    this->openCL.kernel("estimateDensity")->setArg(0, this->particles);
+    this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("estimateDensity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("estimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("estimateDensity")->setArg(6, this->density);
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
@@ -559,7 +559,7 @@ void Simulation::sortParticlesByCell()
  */
 void Simulation::calculateDensity()
 {
-    this->openCL.kernel("SPHEstimateDensity")->run1D(this->numParticles);
+    this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
 }
 
 /**

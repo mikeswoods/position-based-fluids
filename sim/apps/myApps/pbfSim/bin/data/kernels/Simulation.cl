@@ -381,9 +381,9 @@ float W_spiky(float r, float h)
  * @param Particle* p_j Pair particle p_j
  * @param float dist The distance from the positions (centers) of p_i and p_j
  */
-float estimateDensity(const global Particle* p_i
-                     ,const global Particle* p_j
-                     ,float dist)
+float SPHDensityEstimator(const global Particle* p_i
+                         ,const global Particle* p_j
+                         ,float dist)
 {
     return p_i->mass * W_poly6(dist, H_SMOOTHING_RADIUS);
 }
@@ -643,19 +643,24 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  * @param [in]  int cellsZ
  * @param [out] float* density
  */
-void kernel SPHEstimateDensity(const global Particle* particles
-                              ,const global ParticlePosition* sortedParticleToCell
-                              ,const global GridCellOffset* gridCellOffsets
-                              ,int cellsX
-                              ,int cellsY
-                              ,int cellsZ
-                              ,global float* density)
+void kernel estimateDensity(const global Particle* particles
+                           ,const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,global float* density)
 {
     int id = get_global_id(0);
     
     // Convert a linear index z into (i, j, k):
+
     int3 cellSubscript = ind2sub(id, cellsX, cellsY);
     
+    // For all neighboring particles p_j of the current particle (specified
+    // by particles[id], aka p_i), apply the function estimateDensity for
+    // all (p_i, p_j), accumulating the result into the density variable:
+
     density[id] = forAllNeighbors(particles
                                  ,sortedParticleToCell
                                  ,gridCellOffsets
@@ -663,10 +668,10 @@ void kernel SPHEstimateDensity(const global Particle* particles
                                  ,cellsY
                                  ,cellsZ
                                  ,cellSubscript
-                                 ,estimateDensity);
+                                 ,SPHDensityEstimator);
 
     #ifdef DEBUG
-        printf("SPHEstimateDensity [%d] :: density = %f\n", id, density[id]);
+        printf("estimateDensity [%d] :: density = %f\n", id, density[id]);
     #endif
 }
 
@@ -693,7 +698,9 @@ kernel void computeDensityConstraint(const global float* density
 /**
  * For all particles p_i in particles, this kernel computes the gradient of the 
  * constraint,
- *
+ *                                 / if k = i, \sum_j \nabla(p_k) * W(p_i - p_j, h)
+ * \nabla(p_k) C_i = (1 / \rho_0) |
+ *                                 \ if k = j, -\nabla(p_k) * W(p_i - p_j, h)
  */
 /*
 kernel void computeConstraintGradient()
