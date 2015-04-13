@@ -76,6 +76,14 @@ typedef struct {
     
 } GridCellOffset;
 
+// Smoothing kernel enum:
+
+enum SmoothingKernel
+{
+     POLY_6
+    ,SPIKY
+};
+
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
@@ -134,8 +142,8 @@ int3 ind2sub(int x, int w, int h)
  * @param [in]  int3 cellSubscript
  * @param [out] int* neighbors
  */
-int getNeighborsBySubscript(ParticlePosition* sortedParticleToCell
-                           ,global GridCellOffset* gridCellOffsets
+int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
@@ -195,11 +203,35 @@ int getNeighborsBySubscript(ParticlePosition* sortedParticleToCell
     return neighborCount;
 }
 
+// Smoothing kernels:
+
+float poly6(float r, float h)
+{
+    // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
+    float h9 = (h * h * h * h * h * h * h * h * h);
+    float A  = 1.566681471061 * h9;
+    float B  = (h * h) - (r * r);
+    return A * (B * B * B);
+}
+
+float spiky(float r, float h)
+{
+    // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
+    float h6   = (h * h * h * h * h * h);
+    float A    = 14.323944878271 * h6;
+    float rAbs = fabs(r);
+    float B    = (h - rAbs);
+    return A * (B * B) * (r / rAbs);
+}
+
 /*******************************************************************************
  * Kernels
  ******************************************************************************/
 
 /**
+ * For all particles p_i in particles, this kernel applies external forces to the
+ * velocity of p_i
+ *
  * Currently, only applies gravity to the y component of the velocity.
  * Additional forces may be added later like wind and other forms of
  * turbulence, etc.
@@ -215,9 +247,11 @@ kernel void applyExternalForces(global Particle* particles, float dt)
 }
 
 /**
- * Updates the predicted position of the particle using an explicit Euler step
+ * For all particles p_i in particles, this kernel updates the predicted 
+ * position of p_i using an explicit Euler step like so:
  *
- *   x_i = x_i + (dt * v_i)
+ * x_i = x_i + (dt * v_i), where x_i is the position of p_i and v_i is
+ * the velocity of p_i
  */
 kernel void predictPosition(global Particle* particles, float dt)
 {
@@ -228,9 +262,8 @@ kernel void predictPosition(global Particle* particles, float dt)
 }
 
 /**
- * Discretizes particles based on their positions to a cell in
- * a grid consisting of (cellsPerAxis[0], cellsPerAxis[1], cellsPerAxis[2])
- * along the (x, y, z) axes.
+ * For all particles p_i in particles, this kernel discretizes each p_i's
+ * position into a grid of cells with dimensions specified by cellsPerAxis.
  *
  * @param [in] Particle* particles The particles to assign to cells
  * @param [out] int2* particleToCell Each entry contains a int2 pair
@@ -306,12 +339,17 @@ kernel void discretizeParticlePositions(global Particle* particles
  * @param [in] particleToCell
  * @param [in/out] cellHistogram
  * @param [out] sortedParticleToCell
- * @param [out] gridCellOffsets
- * @param [in] numParticles
- * @param [in] numCells
- * @param [in] cellsX
- * @param [in] cellsY
- * @param [in] cellsZ
+ * @param [out] gridCellOffsets An array of size [0 .. numCells-1], where
+ *              each index i contains the start and length of the i-th
+ *              cell in the grid as it occurs in sortedParticleToCell
+ * @param [in] numParticles The total number of particles in the simulation
+ * @param [in] numCells The total number of cells in the spatial grid
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
  */
 kernel void sortParticlesByCell(global ParticlePosition* particleToCell
                                ,global int* cellHistogram
@@ -406,7 +444,40 @@ kernel void sortParticlesByCell(global ParticlePosition* particleToCell
     */
 }
 
+/**
+ * From the Macklin & Muller paper: SPH density estimation
+ * 
+ * @param [in]  Particle* particles
+ * @param [in]  ParticlePosition* sortedParticleToCell
+ * @param [in]  GridCellOffset* gridCellOffsets
+ * @param [in]  int cellsX
+ * @param [in]  int cellsY
+ * @param [in]  int cellsZ
+ * @param [out] float* density
+ */
+void kernel SPHEstimateDensity(global Particle* particles
+                              ,global ParticlePosition* sortedParticleToCell
+                              ,global GridCellOffset* gridCellOffsets
+                              ,int cellsX
+                              ,int cellsY
+                              ,int cellsZ
+                              ,global float* density)
+{
+    int i = get_global_id(0);
+    global Particle *p = &particles[i];
+    
+    // 27 possible neighbors to search
+    int neighbors[27];
+    
+    // Convert a linear index z into (i, j, k):
+    int3 cellSubscript = ind2sub(i, cellsX, cellsY);
 
-
-
-
+    int neighborCount = getNeighborsBySubscript(sortedParticleToCell
+                                               ,gridCellOffsets
+                                               ,cellsX
+                                               ,cellsY
+                                               ,cellsZ
+                                               ,cellSubscript
+                                               ,neighbors);
+    
+}

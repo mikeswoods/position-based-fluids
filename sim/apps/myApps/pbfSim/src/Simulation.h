@@ -121,12 +121,24 @@ class Simulation
         float massPerParticle;
 
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
-        // particle example
-        msa::OpenCLBufferManagedT<Particle>	        particles;
+    
+        // All particles in the simulation
+        msa::OpenCLBufferManagedT<Particle>	particles;
+    
+        // An array of particle-to-cell mappings
         msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
-        msa::OpenCLBufferManagedT<int>	            cellHistogram;
+    
+        // A cell count histogram used for particle neighbor finding
+        msa::OpenCLBufferManagedT<int> cellHistogram;
+    
+        // A sorted version of particleToCell
         msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
-        msa::OpenCLBufferManagedT<GridCellOffset>	gridCellOffsets;
+    
+        // An array of cell start locations and spans in sortedParticleToCell
+        msa::OpenCLBufferManagedT<GridCellOffset> gridCellOffsets;
+    
+        // Particle densities computed by SPH estimation
+        msa::OpenCLBufferManagedT<float> density;
     
         // Initialization-related functions:
         void initialize();
@@ -135,6 +147,8 @@ class Simulation
         void applyExternalForces();
         void predictPositions();
         void groupParticlesByCell();
+        void calculateDensity();
+        void calculatePositionDelta();
     
         // Drawing-related functions:
         void drawBounds() const;
