@@ -20,15 +20,25 @@
  ******************************************************************************/
 
 /**
- * Acceleration due to gravity: 9.8 m/s
+ * Acceleration force due to gravity: 9.8 m/s
  */
 const constant float G = 9.8f;
 
+/**
+ * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
+ * of the Position Based Fluids paper
+ */
 const constant float EPSILON = 1.0e-4f;
 
+/**
+ * Particle rest density: 1000kg/m^3
+ */
 const constant float REST_DENSITY = 1000.0f;
 
-const constant float H_SMOOTHING_RADIUS = 1.0f + EPSILON;
+/**
+ * Default kernel smoothing radius
+ */
+const constant float H_SMOOTHING_RADIUS = 1.2f;
 
 /*******************************************************************************
  * Types
@@ -848,7 +858,7 @@ kernel void computeLambda(const global Particle* particles
         gradientSum_i += (gradLength * gradLength);
     }
 
-    lambda[id] = -(C_i / gradientSum_i);
+    lambda[id] = -(C_i / (gradientSum_i + EPSILON));
 }
 
 /**
