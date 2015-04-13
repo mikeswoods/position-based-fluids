@@ -116,7 +116,7 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
     
-    // KERNEL :: EstimateDensity
+    // KERNEL :: estimateDensity
     this->openCL.loadKernel("estimateDensity");
     this->openCL.kernel("estimateDensity")->setArg(0, this->particles);
     this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
@@ -125,6 +125,18 @@ void Simulation::initializeKernels()
     this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
     this->openCL.kernel("estimateDensity")->setArg(6, this->density);
+    
+    // KERNEL :: computeLambda
+    this->openCL.loadKernel("computeLambda");
+    this->openCL.kernel("computeLambda")->setArg(0, this->particles);
+    this->openCL.kernel("computeLambda")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("computeLambda")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("computeLambda")->setArg(3, this->density);
+    this->openCL.kernel("computeLambda")->setArg(4, this->numParticles);
+    this->openCL.kernel("computeLambda")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("computeLambda")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("computeLambda")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("computeLambda")->setArg(8, this->lambda);
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
@@ -140,6 +152,7 @@ void Simulation::resetParticleQuantities()
 {
     for (int i = 0; i < this->numParticles; i++) {
         this->density[i] = 0;
+        this->lambda[i] = 0;
     }
 }
 
@@ -197,6 +210,7 @@ void Simulation::initialize()
     // corresponds to the i-th particle in this->particles:
     
     this->density.initBuffer(this->numParticles);
+    this->lambda.initBuffer(this->numParticles);
     
     // Set up initial positions and velocities for the particles:
     
@@ -305,6 +319,7 @@ void Simulation::readFromGPU()
     this->sortedParticleToCell.readFromDevice();
     this->gridCellOffsets.readFromDevice();
     this->density.readFromDevice();
+    this->lambda.readFromDevice();
 }
 
 /**
@@ -319,6 +334,7 @@ void Simulation::writeToGPU()
     this->sortedParticleToCell.writeToDevice();
     this->gridCellOffsets.writeToDevice();
     this->density.writeToDevice();
+    this->lambda.writeToDevice();
 }
 
 /**
@@ -553,13 +569,15 @@ void Simulation::sortParticlesByCell()
 }
 
 /**
- * Computes the density of each particle using the SPH density estimator
+ * Computes the density + constraints for each particle using the 
+ * SPH density estimator
  *
  * @see kernels/Simulation.cl for details
  */
 void Simulation::calculateDensity()
 {
     this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
+    this->openCL.kernel("computeLambda")->run1D(this->numParticles);
 }
 
 /**

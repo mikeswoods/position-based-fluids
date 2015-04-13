@@ -145,6 +145,10 @@ class Simulation
     
         // Particle densities computed by SPH estimation
         msa::OpenCLBufferManagedT<float> density;
+
+        // Particle density lambda value from the section "Enforcing
+        // Incompressibility" of "Position Based Fluids"
+        msa::OpenCLBufferManagedT<float> lambda;
     
         // Initialization-related functions:
         void initialize();
