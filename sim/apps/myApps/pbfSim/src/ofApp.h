@@ -17,6 +17,8 @@ class ofApp : public ofBaseApp
         msa::OpenCL openCL;
         std::shared_ptr<Simulation> simulation;
     
+        void drawHeadsUpDisplay();
+    
 	public:
 		void setup();
 		void update();

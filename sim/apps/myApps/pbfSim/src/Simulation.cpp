@@ -12,6 +12,11 @@
 
 /******************************************************************************/
 
+// Default particle radius:
+#define DEFAULT_RADIUS 1.25f
+
+/******************************************************************************/
+
 using namespace std;
 
 /******************************************************************************/
@@ -45,19 +50,22 @@ ostream& operator<<(ostream& os, Particle p)
 Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
                       ,float _dt
+                      ,EigenVector3 _cellsPerAxis
                       ,int _numParticles
                       ,float _massPerParticle) :
     openCL(_openCL),
     bounds(_bounds),
     dt(_dt),
-    cellsPerAxis(EigenVector3(8, 8, 8)),
+    cellsPerAxis(_cellsPerAxis),
     numParticles(_numParticles),
     massPerParticle(_massPerParticle),
-    frameNumber(0)
+    frameNumber(0),
+    flagDrawGrid(false)
 {
     this->numCells =   static_cast<int>(this->cellsPerAxis[0])
                      * static_cast<int>(this->cellsPerAxis[1])
                      * static_cast<int>(this->cellsPerAxis[2]);
+
     this->initialize();
 }
 
@@ -74,17 +82,17 @@ void Simulation::initializeKernels()
     // Read the source files for the kernels:
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
-    //
+    // KERNEL :: applyExternalForces
     this->openCL.loadKernel("applyExternalForces");
     this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
     this->openCL.kernel("applyExternalForces")->setArg(1, this->dt);
     
-    //
+    // KERNEL :: predictPosition
     this->openCL.loadKernel("predictPosition");
     this->openCL.kernel("predictPosition")->setArg(0, this->particles);
     this->openCL.kernel("predictPosition")->setArg(1, this->dt);
     
-    //
+    // KERNEL :: discretizeParticlePositions
     this->openCL.loadKernel("discretizeParticlePositions");
     this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
     this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
@@ -95,7 +103,7 @@ void Simulation::initializeKernels()
     this->openCL.kernel("discretizeParticlePositions")->setArg(6, this->bounds.getMinExtent());
     this->openCL.kernel("discretizeParticlePositions")->setArg(7, this->bounds.getMaxExtent());
     
-    //
+    // KERNEL :: sortParticlesByCell
     this->openCL.loadKernel("sortParticlesByCell");
     this->openCL.kernel("sortParticlesByCell")->setArg(0, this->particleToCell);
     this->openCL.kernel("sortParticlesByCell")->setArg(1, this->cellHistogram);
@@ -106,6 +114,32 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(6, static_cast<int>(this->cellsPerAxis[0]));
     this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
+    
+    // KERNEL :: SPHEstimateDensity
+    this->openCL.loadKernel("SPHEstimateDensity");
+    this->openCL.kernel("SPHEstimateDensity")->setArg(0, this->particles);
+    this->openCL.kernel("SPHEstimateDensity")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("SPHEstimateDensity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("SPHEstimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("SPHEstimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("SPHEstimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("SPHEstimateDensity")->setArg(6, this->density);
+    
+    // KERNEL :: resolveCollisions
+    this->openCL.loadKernel("resolveCollisions");
+    this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
+    this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
+}
+
+/**
+ * Resets various particle quantities, like density, etc.
+ */
+void Simulation::resetParticleQuantities()
+{
+    for (int i = 0; i < this->numParticles; i++) {
+        this->density[i] = 0;
+    }
 }
 
 /**
@@ -120,15 +154,35 @@ void Simulation::initialize()
 
     this->particles.initBuffer(this->numParticles);
     
-    // A mapping of particle indices to linearized cell indices. Each entry
-    // is a pair (i,j), where i refers to a particle in this->particles,
-    // and j refers to a linear index in the range [0, N], where
-    // N = (cellsPerAxis[0] * _cellsPerAxis[1] * _cellsPerAxis[2])
+    // particleToCell contains [0 .. this->numParticles - 1] entries, where
+    // each ParticlePosition instance (index is not important) maps
+    // a particle's index (ParticlePosition#particleIndex) to a spatial grid
+    // cell (ParticlePosition#cellI, ParticlePosition#cellJ, ParticlePosition#cellK),
+    // where 0 <= ParticlePosition#cellI < cellsPerAxis.x,
+    // 0 <= ParticlePosition#cellJ < cellsPerAxis.y, and
+    // 0 <= ParticlePosition#cellK < cellsPerAxis.z
 
     this->particleToCell.initBuffer(this->numParticles);
 
+    // Where the sorted version of the above will be sorted per simulation
+    // step. The ParticlePosition indices will be sorted in ascending order
+    // according to the linearized index computed from
+    // (ParticlePosition#cellI, ParticlePosition#cellJ, ParticlePosition#cellK
+    //
+    // See the kernel helper function sub2ind in kernels/Simulation.cl for
+    // details
+    
     this->sortedParticleToCell.initBuffer(this->numParticles);
 
+    // An array containing [0 .. this->numCells - 1] entries, where the
+    // i-th entry contains the offset information about the start of a
+    // particular grid cell in sortedParticleToCell. gridCellOffsets entries
+    // are structs of type GridCellOffset, and are considered valid if
+    // GridCellOffset#start != -1. This is used to speed up the lookup for
+    // particles that happen to be in the same cell, so for instance, given
+    // a grid cell offset at index i, g_i, all of the particles in cell
+    // i are in the range sortedParticleToCell[g_i.start .. (g_i.start + g_i.length)]
+    
     this->gridCellOffsets.initBuffer(this->numCells);
 
     // A histogram (count table), where the i-th entry contains the number of
@@ -138,6 +192,13 @@ void Simulation::initialize()
 
     this->cellHistogram.initBuffer(this->numCells);
 
+    // The density values associated with each particle. The i-th density
+    // corresponds to the i-th particle in this->particles:
+    
+    this->density.initBuffer(this->numParticles);
+    
+    // Set up initial positions and velocities for the particles:
+    
     for (int i = 0; i < this->numParticles; i++) {
 
         Particle &p = this->particles[i];
@@ -151,11 +212,15 @@ void Simulation::initialize()
         p.mass = this->massPerParticle;
         
         // and a uniform radius (for now):
-        p.radius = 0.1f;
+        p.radius = DEFAULT_RADIUS;
         
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
+    
+    // Set the initial state:
+
+    this->resetParticleQuantities();
     
     // Needed for particle grouping/"binning" by cell later:
 
@@ -222,6 +287,8 @@ void Simulation::initializeParticleSort()
 void Simulation::reset()
 {
     this->frameNumber = 0;
+    
+    this->initialize();
 }
 
 /**
@@ -234,6 +301,7 @@ void Simulation::readFromGPU()
     this->cellHistogram.readFromDevice();
     this->sortedParticleToCell.readFromDevice();
     this->gridCellOffsets.readFromDevice();
+    this->density.readFromDevice();
 }
 
 /**
@@ -247,6 +315,7 @@ void Simulation::writeToGPU()
     this->cellHistogram.writeToDevice();
     this->sortedParticleToCell.writeToDevice();
     this->gridCellOffsets.writeToDevice();
+    this->density.writeToDevice();
 }
 
 /**
@@ -259,12 +328,18 @@ void Simulation::writeToGPU()
  */
 void Simulation::step()
 {
+    // Solver iterations (this will be adjustable later)
+
+    int N = 1;
+    
     // We need to perform this step (zeroing out the histogram array and some
     // other data structures needed) before we compute the particle cell groups
     // because the zeroed structures will be written back to the GPU on the
     // next line, i.e. writeToGPU()
 
     this->initializeParticleSort();
+
+    this->resetParticleQuantities();
     
     // Dump whatever changes occurred in host-land to the GPU:
 
@@ -281,9 +356,20 @@ void Simulation::step()
     // that uses counting sort as an alternative to radix sort
     
     this->applyExternalForces();
+
     this->predictPositions();
+
     this->groupParticlesByCell();
 
+    for (int i = 0; i < N; i++) {
+        
+        this->calculateDensity();
+        
+    //    this->calculatePositionDelta();
+        
+        this->handleCollisions();
+    }
+    
     // Make sure the OpenCL work queue is empty before proceeding. This will
     // block until all the stuff in GPU-land is done before moving forward
     // and reading the results of the work we did on the GPU back into
@@ -299,6 +385,42 @@ void Simulation::step()
     // Finally, bump up the frame counter:
 
     this->frameNumber++;
+}
+
+/**
+ * Draws the cell grid
+ */
+void Simulation::drawGrid() const
+{
+    auto p1 = this->bounds.getMinExtent();
+    auto p2 = this->bounds.getMaxExtent();
+    
+    float xCellWidth = (p2[0] - p1[0]) / static_cast<float>(this->cellsPerAxis[0]);
+    float halfXWidth = xCellWidth * 0.5f;
+    float yCellWidth = (p2[1] - p1[1]) / static_cast<float>(this->cellsPerAxis[1]);
+    float halfYWidth = yCellWidth * 0.5f;
+    float zCellWidth = (p2[2] - p1[2]) / static_cast<float>(this->cellsPerAxis[2]);
+    float halfZWidth = zCellWidth * 0.5f;
+    
+    ofNoFill();
+    ofSetColor(0, 255, 0);
+
+    for (int i = 1; i < (2  * this->cellsPerAxis[0]); i += 2) {
+
+        float xCorner = p1[0] + (static_cast<float>(i) * halfXWidth);
+
+        for (int j = 1; j < (2  * this->cellsPerAxis[1]); j += 2) {
+        
+            float yCorner = p1[1] + (static_cast<float>(j) * halfYWidth);
+        
+            for (int k = 1; k < (2  * this->cellsPerAxis[2]); k += 2) {
+                
+                float zCorner = p1[2] + (static_cast<float>(k) * halfZWidth);
+
+                ofDrawBox(xCorner, yCorner, zCorner, xCellWidth, yCellWidth, zCellWidth);
+            }
+        }
+    }
 }
 
 /**
@@ -329,11 +451,18 @@ void Simulation::drawBounds() const
  */
 void Simulation::drawParticles()
 {
-    ofSetColor(0, 0, 255);
-    ofFill();
-
     for (int i = 0; i < this->numParticles; i++) {
+        
         Particle &p = this->particles[i];
+        
+        // The fill:
+        ofSetColor(51, 153, 255);
+        ofFill();
+        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
+
+        // The outline:
+        ofSetColor(0, 0, 255);
+        ofNoFill();
         ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
     }
 }
@@ -348,6 +477,11 @@ void Simulation::draw()
 {
     //ofClear(0, 0, 0);
     this->drawBounds();
+
+    if (this->drawGridEnabled()) {
+        this->drawGrid();
+    }
+
     this->drawParticles();
     
 }
@@ -465,6 +599,35 @@ void Simulation::sortParticlesByCell()
     // "kernel("sortParticlesByCell")->run1D(1)"!
 
     this->openCL.kernel("sortParticlesByCell")->run1D(1);
+}
+
+/**
+ * Computes the density of each particle using the SPH density estimator
+ *
+ * @see kernels/Simulation.cl for details
+ */
+void Simulation::calculateDensity()
+{
+    this->openCL.kernel("SPHEstimateDensity")->run1D(this->numParticles);
+}
+
+/**
+ * TODO
+ *
+ * @see kernels/Simulation.cl for details
+ */
+void Simulation::calculatePositionDelta()
+{
+    
+}
+
+/**
+ * TODO: All this does now is clamp the particle positions to the simulation
+ * boudning box
+ */
+void Simulation::handleCollisions()
+{
+    this->openCL.kernel("resolveCollisions")->run1D(this->numParticles);
 }
 
 /******************************************************************************/

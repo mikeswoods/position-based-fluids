@@ -83,6 +83,9 @@ class Simulation
         // Count of the current frame number
         unsigned int frameNumber;
     
+        // Flag to draw the spatial grid
+        bool flagDrawGrid;
+    
         // Load kernels and bind parameters
         void initializeKernels();
     
@@ -121,30 +124,48 @@ class Simulation
         float massPerParticle;
 
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
-        // particle example
-        msa::OpenCLBufferManagedT<Particle>	        particles;
+    
+        // All particles in the simulation
+        msa::OpenCLBufferManagedT<Particle>	particles;
+    
+        // An array of particle-to-cell mappings
         msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
-        msa::OpenCLBufferManagedT<int>	            cellHistogram;
+    
+        // A cell count histogram used for particle neighbor finding
+        msa::OpenCLBufferManagedT<int> cellHistogram;
+    
+        // A sorted version of particleToCell
         msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
-        msa::OpenCLBufferManagedT<GridCellOffset>	gridCellOffsets;
+    
+        // An array of cell start locations and spans in sortedParticleToCell
+        msa::OpenCLBufferManagedT<GridCellOffset> gridCellOffsets;
+    
+        // Particle densities computed by SPH estimation
+        msa::OpenCLBufferManagedT<float> density;
     
         // Initialization-related functions:
         void initialize();
+        void resetParticleQuantities();
 
         // Simulation state-related functions:
         void applyExternalForces();
         void predictPositions();
         void groupParticlesByCell();
+        void calculateDensity();
+        void calculatePositionDelta();
+        void handleCollisions();
     
         // Drawing-related functions:
         void drawBounds() const;
+        void drawGrid() const;
         void drawParticles();
 
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,int numParticles = 500
+                  ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
+                  ,int numParticles = 3
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 
@@ -152,6 +173,9 @@ class Simulation
         const AABB& getBounds() const { return this->bounds; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
+    
+        const bool drawGridEnabled() const { return this->flagDrawGrid; }
+        void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
     
         void reset();
         void step();
