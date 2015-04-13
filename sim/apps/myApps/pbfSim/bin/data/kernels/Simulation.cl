@@ -392,6 +392,9 @@ void SPHDensityEstimator(const global Particle* p_i
                         ,const global Particle* p_j
                         ,void* data)
 {
+    // Cast the void pointer to the type we expect, so we can update the
+    // variable accordingly:
+
     float* accumDensity = (float*)data;
     
     *accumDensity += poly6(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
@@ -408,6 +411,9 @@ void SPHGradient(const global Particle* p_i
                 ,const global Particle* p_j
                 ,void* data)
 {
+    // Cast the void pointer to the type we expect, so we can update the
+    // variable accordingly:
+
     float4* gradVector = (float4*)data;
     
     *gradVector += spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
