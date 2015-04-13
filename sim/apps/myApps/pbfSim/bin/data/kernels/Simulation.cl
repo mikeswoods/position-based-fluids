@@ -20,6 +20,8 @@
 
 #define EPSILON 1.0e-4f;
 
+//#define DEBUG
+
 /*******************************************************************************
  * Types
  ******************************************************************************/
@@ -164,9 +166,9 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
     // (i + [-1,0,1], j + [-1,0,1], k + [-1,0,1]):
 
     int offsets[3] = { -1, 0, 1};
-    int I = -1;
-    int J = -1;
-    int K = -1;
+    int I = -99;
+    int J = -99;
+    int K = -99;
     
     // -1 indicates an invalid/non-existent neighbor:
 
@@ -190,7 +192,13 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
                     && (J >= 0 && J < cellsY)
                     && (K >= 0 && K < cellsZ))
                 {
-                    int key = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
+                    /*
+                    printf("getNeighborsBySubscript :: (%d,%d,%d) => (I=%d,J=%d,K=%d)\n",
+                           i, j, k,
+                           I, J, K);
+                    */
+
+                    int key = sub2ind(I, J, K, cellsX, cellsY);
 
                     // The specified grid cell offset has a valid starting
                     // index, so we can return it as a valid neighbor:
@@ -314,13 +322,13 @@ kernel void discretizeParticlePositions(const global Particle* particles
     // Compute the linear index for the histogram counter
     int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
     
-    /*
-    printf("[PARTICLE %d] :: (%f, %f, %f)\t=> (%d/%d, %d/%d, %d/%d) => %d\n",
-           id,
-           p->pos.x, p->pos.y, p->pos.z,
-           cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
-           key);
-    */
+    #ifdef DEBUG
+        printf("[PARTICLE %d] :: (%f, %f, %f)\t=> (%d/%d, %d/%d, %d/%d) => %d\n",
+               id,
+               p->pos.x, p->pos.y, p->pos.z,
+               cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
+               key);
+    #endif
 
     // This is needed; "cellHistogram[z] += 1" won't work here as multiple
     // threads are modifying cellHistogram simultaneously:
@@ -451,22 +459,20 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         gridCellOffsets[nextKey].length = lengthCount;
     }
 
-    /*
-    // Dump everything out for verification:
-    for (int i = 0; i < numParticles; i++) {
-        global ParticlePosition* spp = &sortedParticleToCell[i];
-        int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
-        printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
-               i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
-    }
-    
-    printf("numCells = %d\n", numCells);
-    
-    for (int i = 0; i < numCells; i++) {
-        global GridCellOffset* gco = &gridCellOffsets[i];
-        printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
-    }
-    */
+    #ifdef DEBUG
+        printf("=======================\n");
+        for (int i = 0; i < numParticles; i++) {
+            global ParticlePosition* spp = &sortedParticleToCell[i];
+            int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
+            printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
+                   i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
+        }
+        printf("\n");
+        for (int i = 0; i < numCells; i++) {
+            global GridCellOffset* gco = &gridCellOffsets[i];
+            printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
+        }
+    #endif
 }
 
 /**
@@ -512,13 +518,11 @@ void kernel SPHEstimateDensity(const global Particle* particles
     
     int contributingParticles = 0;
     
-    /*
-    if (neighborCellCount > 0){
-    printf("[PARTICLE] :: %i ; (%d,%d,%d) => neighboring search cells: %d\n",
-           id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
-           neighborCellCount);
-    }
-    */
+    #ifdef DEBUG
+        printf("SPHEstimateDensity :: [PARTICLE] :: %i ; (%d,%d,%d) => neighboring search cells: %d\n",
+               id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
+               neighborCellCount);
+    #endif
     
     // For all neighbors found for the given cell at grid subscript (i,j, k):
     for (int j = 0; j < neighborCellCount; j++) {
@@ -562,7 +566,9 @@ void kernel SPHEstimateDensity(const global Particle* particles
 
                     if (r < distThreshold) {
                     
-                        //printf("-- p_i [i=%d] - p_j [J=%d] = %f, radius = %f\n", id, J, r, p_i->radius);
+                        #ifdef DEBUG
+                            printf("-- p_i [i=%d] - p_j [J=%d] = %f, radius = %f\n", id, J, r, p_i->radius);
+                        #endif
                         
                         float D = p_j->mass * W_poly6(r, h);
                         

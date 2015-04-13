@@ -234,6 +234,8 @@ void Simulation::initialize()
     // Load the kernels:
 
     this->initializeKernels();
+    
+    // Perform initial bounds clamping:
 }
 
 /**
@@ -454,7 +456,7 @@ void Simulation::drawParticles()
     for (int i = 0; i < this->numParticles; i++) {
         
         Particle &p = this->particles[i];
-        
+
         // The fill:
         ofSetColor(51, 153, 255);
         ofFill();
@@ -464,6 +466,13 @@ void Simulation::drawParticles()
         ofSetColor(0, 0, 255);
         ofNoFill();
         ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
+        
+        ofSetColor(255, 255, 0);
+        ofFill();
+        ofPushMatrix();
+            ofTranslate(0,0,p.pos.z);
+            ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
+        ofPopMatrix();
     }
 }
 
