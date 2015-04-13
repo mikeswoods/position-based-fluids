@@ -86,6 +86,9 @@ class Simulation
         // Flag to draw the spatial grid
         bool flagDrawGrid;
     
+        // Flag for visual debugging
+        bool flagVisualDebugging;
+    
         // Load kernels and bind parameters
         void initializeKernels();
     
@@ -176,6 +179,9 @@ class Simulation
     
         const bool drawGridEnabled() const { return this->flagDrawGrid; }
         void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
+    
+        const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
+        void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
         void reset();
         void step();
