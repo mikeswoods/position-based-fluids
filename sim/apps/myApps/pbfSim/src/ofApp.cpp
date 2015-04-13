@@ -75,7 +75,7 @@ void ofApp::drawHeadsUpDisplay()
 
     
     // Hotkeys:
-    ofDrawBitmapString("Hotkeys: 's' = step, 'p' or space = toggle pause, 'r' = reset", 10, textYOffset += 15);
+    ofDrawBitmapString("Hotkeys: 's' = step, 'p' or space = toggle pause, 'r' = reset, 'g' = toggle grid", 10, textYOffset += 15);
     
     // Paused flag
     if (this->isPaused()) {

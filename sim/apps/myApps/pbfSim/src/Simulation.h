@@ -165,7 +165,7 @@ class Simulation
                   ,AABB bounds
                   ,float dt = 0.025f
                   ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
-                  ,int numParticles = 5
+                  ,int numParticles = 3
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 

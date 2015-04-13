@@ -300,9 +300,9 @@ kernel void discretizeParticlePositions(const global Particle* particles
     const global Particle *p = &particles[id];
     
     // Now we have the discretized cell at (i, j, k):
-    int cellI = (int)(rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1)));
-    int cellJ = (int)(rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1)));
-    int cellK = (int)(rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1)));
+    int cellI = (int)round((rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1))));
+    int cellJ = (int)round((rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1))));
+    int cellK = (int)round((rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1))));
 
     particleToCell[id].particleIndex = id;
     
@@ -313,10 +313,10 @@ kernel void discretizeParticlePositions(const global Particle* particles
     
     // Compute the linear index for the histogram counter
     int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
-
+    
     /*
-    printf("[%d] @ (%f, %f, %f) => (%d/%d, %d/%d, %d/%d) => %d\n",
-           i,
+    printf("[PARTICLE %d] :: (%f, %f, %f)\t=> (%d/%d, %d/%d, %d/%d) => %d\n",
+           id,
            p->pos.x, p->pos.y, p->pos.z,
            cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
            key);
@@ -426,12 +426,12 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         }
     }
 
-    /*
     // Dump everything out for verification:
     for (int i = 0; i < numParticles; i++) {
         global ParticlePosition* spp = &sortedParticleToCell[i];
         int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
-        printf("P [%d] :: particleIndex = %d, key = %d \n", i, spp->particleIndex, key);
+        printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
+               i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
     }
     
     printf("numCells = %d\n", numCells);
@@ -440,7 +440,6 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         global GridCellOffset* gco = &gridCellOffsets[i];
         printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
     }
-    */
 }
 
 /**
