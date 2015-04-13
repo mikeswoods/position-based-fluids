@@ -60,7 +60,8 @@ Simulation::Simulation(msa::OpenCL& _openCL
     numParticles(_numParticles),
     massPerParticle(_massPerParticle),
     frameNumber(0),
-    flagDrawGrid(false)
+    flagDrawGrid(false),
+    flagVisualDebugging(false)
 {
     this->numCells =   static_cast<int>(this->cellsPerAxis[0])
                      * static_cast<int>(this->cellsPerAxis[1])
@@ -461,18 +462,22 @@ void Simulation::drawParticles()
         ofSetColor(51, 153, 255);
         ofFill();
         ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
-
-        // The outline:
-        ofSetColor(0, 0, 255);
-        ofNoFill();
-        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
         
-        ofSetColor(255, 255, 0);
-        ofFill();
-        ofPushMatrix();
-            ofTranslate(0,0,p.pos.z);
-            ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
-        ofPopMatrix();
+        if (this->isVisualDebuggingEnabled()) {
+            
+            // Draw an outline of the particle:
+            ofSetColor(0, 0, 255);
+            ofNoFill();
+            ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
+            
+            // Label the particle with its number:
+            ofSetColor(255, 255, 0);
+            ofFill();
+            ofPushMatrix();
+                ofTranslate(0,0,p.pos.z);
+                ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
+            ofPopMatrix();
+        }
     }
 }
 
@@ -487,7 +492,7 @@ void Simulation::draw()
     //ofClear(0, 0, 0);
     this->drawBounds();
 
-    if (this->drawGridEnabled()) {
+    if (this->drawGridEnabled() || this->isVisualDebuggingEnabled()) {
         this->drawGrid();
     }
 

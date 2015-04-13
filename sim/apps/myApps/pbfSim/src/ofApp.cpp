@@ -75,7 +75,8 @@ void ofApp::drawHeadsUpDisplay()
 
     
     // Hotkeys:
-    ofDrawBitmapString("Hotkeys: 's' = step, 'p' or space = toggle pause, 'r' = reset, 'g' = toggle grid", 10, textYOffset += 15);
+    ofDrawBitmapString("Hotkeys: 's' = step, 'p' or space = toggle pause, 'r' = reset, 'g' = toggle grid, 'd' = toggle visual debugging"
+                       , 10, textYOffset += 15);
     
     // Paused flag
     if (this->isPaused()) {
@@ -124,6 +125,12 @@ void ofApp::keyPressed(int key)
         case 'r':
             {
                 this->simulation->reset();
+            }
+            break;
+        // Toggle visual debugging:
+        case 'd':
+            {
+                this->simulation->toggleVisualDebugging();
             }
             break;
         // Toggle drawing the spatial grid:
