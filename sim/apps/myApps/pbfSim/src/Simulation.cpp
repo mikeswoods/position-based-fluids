@@ -138,6 +138,16 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computeLambda")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
     this->openCL.kernel("computeLambda")->setArg(8, this->lambda);
     
+    // KERNEL :: computePositionDelta
+    this->openCL.loadKernel("computePositionDelta");
+    this->openCL.kernel("computePositionDelta")->setArg(0, this->particles);
+    this->openCL.kernel("computePositionDelta")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("computePositionDelta")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("computePositionDelta")->setArg(3, this->lambda);
+    this->openCL.kernel("computePositionDelta")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("computePositionDelta")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("computePositionDelta")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+    
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
     this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
@@ -595,6 +605,7 @@ void Simulation::calculateDensity()
 void Simulation::calculatePositionDelta()
 {
     this->openCL.kernel("computeLambda")->run1D(this->numParticles);
+    this->openCL.kernel("computePositionDelta")->run1D(this->numParticles);
 }
 
 /**
