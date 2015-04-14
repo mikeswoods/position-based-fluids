@@ -179,8 +179,8 @@ class Simulation
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,float dt = 0.025f
-                  ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
-                  ,int numParticles = 3
+                  ,EigenVector3 _cellsPerAxis = EigenVector3(3, 3, 3)
+                  ,int numParticles = 15
                   ,float massPerParticle = 1.0f);
         virtual ~Simulation();
 

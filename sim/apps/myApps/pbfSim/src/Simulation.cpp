@@ -13,7 +13,7 @@
 /******************************************************************************/
 
 // Default particle radius:
-#define DEFAULT_RADIUS 1.25f
+#define DEFAULT_RADIUS 1.0f;
 
 /******************************************************************************/
 
@@ -383,7 +383,7 @@ void Simulation::step()
 {
     // Solver iterations (this will be adjustable later)
 
-    int N = 10;
+    int N = 5;
     
     // We need to perform this step (zeroing out the histogram array and some
     // other data structures needed) before we compute the particle cell groups
