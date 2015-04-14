@@ -161,6 +161,8 @@ class Simulation
         void calculateDensity();
         void calculatePositionDelta();
         void handleCollisions();
+        void applyXSPHViscosity();
+        void applyVorticityConfinement();
     
         // Drawing-related functions:
         void drawBounds() const;

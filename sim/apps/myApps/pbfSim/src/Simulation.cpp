@@ -380,6 +380,7 @@ void Simulation::step()
 
     this->groupParticlesByCell();
 
+    // Solver runs for N iterations:
     for (int i = 0; i < N; i++) {
         
         this->calculateDensity();
@@ -388,6 +389,10 @@ void Simulation::step()
         
         this->handleCollisions();
     }
+    
+    this->applyXSPHViscosity();
+    
+    this->applyVorticityConfinement();
     
     // Make sure the OpenCL work queue is empty before proceeding. This will
     // block until all the stuff in GPU-land is done before moving forward
@@ -601,6 +606,26 @@ void Simulation::calculatePositionDelta()
 void Simulation::handleCollisions()
 {
     this->openCL.kernel("resolveCollisions")->run1D(this->numParticles);
+}
+
+/**
+ * [TODO]
+ *
+ * Apply XSPH viscosity
+ */
+void Simulation::applyXSPHViscosity()
+{
+    
+}
+
+/**
+ * [TODO]
+ *
+ * Apply vorticity confinement
+ */
+void Simulation::applyVorticityConfinement()
+{
+    
 }
 
 /******************************************************************************/
