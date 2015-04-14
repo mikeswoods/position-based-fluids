@@ -28,18 +28,18 @@ const constant float G = 9.8f;
  * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
  * of the Position Based Fluids paper
  */
-const constant float EPSILON_RELAXATION = 1.0e-3f;
+const constant float EPSILON_RELAXATION = 0.1f;
 
 /**
  * Particle rest density: 1000kg/m^3
  */
-const constant float REST_DENSITY     = 10000.0f;
+const constant float REST_DENSITY     = 1000.0f;
 const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 1.2f;
+const constant float H_SMOOTHING_RADIUS = 1.0f;
 
 /*******************************************************************************
  * Types
@@ -367,9 +367,9 @@ float poly6(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-    if (rBar > h) {
-        return 0.0;
-    }
+//    if (rBar > h) {
+//        return 0.0;
+//    }
 
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
@@ -394,9 +394,9 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-    if (rBar > h) {
-        return 0.0;
-    }
+//    if (rBar > h) {
+//        return 0.0;
+//    }
     
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
@@ -920,7 +920,9 @@ kernel void computeLambda(const global Particle* particles
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [out] float* lambda The constraint lambda value
+ * @param [out] float* posDeltaX position changes in X
+ * @param [out] float* posDeltaY position changes in Y
+ * @param [out] float* posDeltaZ position changes in Z
  */
 kernel void computePositionDelta(const global Particle* particles
                                 ,const global ParticlePosition* sortedParticleToCell
@@ -928,7 +930,10 @@ kernel void computePositionDelta(const global Particle* particles
                                 ,const global float* lambda
                                 ,int cellsX
                                 ,int cellsY
-                                ,int cellsZ)
+                                ,int cellsZ
+                                ,global float* posDeltaX
+                                ,global float* posDeltaY
+                                ,global float* posDeltaZ)
 {
     int id = get_global_id(0);
 
@@ -940,7 +945,7 @@ kernel void computePositionDelta(const global Particle* particles
     
     _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0)
                                , .lambda = lambda };
-
+    
     forAllNeighbors(particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
@@ -950,7 +955,34 @@ kernel void computePositionDelta(const global Particle* particles
                    ,cellSubscript
                    ,PositionDelta_i
                    ,(void*)&pd);
+
+    float4 pStar = INV_REST_DENSITY * pd.posDelta;
     
+    posDeltaX[id] = pStar.x;
+    posDeltaY[id] = pStar.y;
+    posDeltaZ[id] = pStar.z;
+    
+    /*
+    printf("computePositionDelta [%d] :: delta => (%f,%f,%f)\n",
+           id, pStar.x, pStar.y, pStar.z);
+    */
+}
+
+/**
+ * Apply position changes to all particles
+ */
+kernel void applyPositionDelta(global Particle* particles
+                              ,global float* posDeltaX
+                              ,global float* posDeltaY
+                              ,global float* posDeltaZ)
+{
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    p->pos.x += posDeltaX[id];
+    p->pos.y += posDeltaY[id];
+    p->pos.z += posDeltaZ[id];
 }
 
 /**

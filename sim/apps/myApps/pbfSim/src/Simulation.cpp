@@ -147,6 +147,16 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computePositionDelta")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
     this->openCL.kernel("computePositionDelta")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
     this->openCL.kernel("computePositionDelta")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("computePositionDelta")->setArg(7, this->posDeltaX);
+    this->openCL.kernel("computePositionDelta")->setArg(8, this->posDeltaY);
+    this->openCL.kernel("computePositionDelta")->setArg(9, this->posDeltaZ);
+    
+    // KERNEL :: applyPositionDelta
+    this->openCL.loadKernel("applyPositionDelta");
+    this->openCL.kernel("applyPositionDelta")->setArg(0, this->particles);
+    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaX);
+    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaY);
+    this->openCL.kernel("applyPositionDelta")->setArg(3, this->posDeltaZ);
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
@@ -161,8 +171,11 @@ void Simulation::initializeKernels()
 void Simulation::resetParticleQuantities()
 {
     for (int i = 0; i < this->numParticles; i++) {
-        this->density[i] = 0;
-        this->lambda[i] = 0;
+        this->density[i]   = 0.0f;
+        this->lambda[i]    = 0.0f;
+        this->posDeltaX[i] = 0.0f;
+        this->posDeltaY[i] = 0.0f;
+        this->posDeltaZ[i] = 0.0f;
     }
 }
 
@@ -221,6 +234,11 @@ void Simulation::initialize()
     
     this->density.initBuffer(this->numParticles);
     this->lambda.initBuffer(this->numParticles);
+    
+    // For particle position correction in the solver:
+    this->posDeltaX.initBuffer(this->numParticles);
+    this->posDeltaY.initBuffer(this->numParticles);
+    this->posDeltaZ.initBuffer(this->numParticles);
     
     // Set up initial positions and velocities for the particles:
     
@@ -330,6 +348,9 @@ void Simulation::readFromGPU()
     this->gridCellOffsets.readFromDevice();
     this->density.readFromDevice();
     this->lambda.readFromDevice();
+    this->posDeltaX.readFromDevice();
+    this->posDeltaY.readFromDevice();
+    this->posDeltaZ.readFromDevice();
 }
 
 /**
@@ -345,6 +366,9 @@ void Simulation::writeToGPU()
     this->gridCellOffsets.writeToDevice();
     this->density.writeToDevice();
     this->lambda.writeToDevice();
+    this->posDeltaX.writeToDevice();
+    this->posDeltaY.writeToDevice();
+    this->posDeltaZ.writeToDevice();
 }
 
 /**
@@ -359,7 +383,7 @@ void Simulation::step()
 {
     // Solver iterations (this will be adjustable later)
 
-    int N = 1;
+    int N = 10;
     
     // We need to perform this step (zeroing out the histogram array and some
     // other data structures needed) before we compute the particle cell groups
@@ -397,6 +421,8 @@ void Simulation::step()
         
         this->calculatePositionDelta();
         
+        this->applyPositionDelta();
+
         this->handleCollisions();
     }
     
@@ -600,12 +626,22 @@ void Simulation::calculateDensity()
  *
  * (*) Specifically, this function is part of the constraint solver loop
  *
- * @see kernels/Simulation.cl (computeLambda) for details
+ * @see kernels/Simulation.cl (computeLambda, computePositionDelta) for details
  */
 void Simulation::calculatePositionDelta()
 {
     this->openCL.kernel("computeLambda")->run1D(this->numParticles);
     this->openCL.kernel("computePositionDelta")->run1D(this->numParticles);
+}
+
+/**
+ * Apply the position delta
+ *
+ * @see kernels/Simulation.cl (applyPositionDelta) for details
+ */
+void Simulation::applyPositionDelta()
+{
+    this->openCL.kernel("applyPositionDelta")->run1D(this->numParticles);
 }
 
 /**

@@ -150,6 +150,11 @@ class Simulation
         // Incompressibility" of "Position Based Fluids"
         msa::OpenCLBufferManagedT<float> lambda;
     
+        // Position deltas in x, y, and z
+        msa::OpenCLBufferManagedT<float> posDeltaX;
+        msa::OpenCLBufferManagedT<float> posDeltaY;
+        msa::OpenCLBufferManagedT<float> posDeltaZ;
+    
         // Initialization-related functions:
         void initialize();
         void resetParticleQuantities();
@@ -160,6 +165,7 @@ class Simulation
         void groupParticlesByCell();
         void calculateDensity();
         void calculatePositionDelta();
+        void applyPositionDelta();
         void handleCollisions();
         void applyXSPHViscosity();
         void applyVorticityConfinement();
