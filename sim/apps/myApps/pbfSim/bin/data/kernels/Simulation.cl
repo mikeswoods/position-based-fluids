@@ -1027,14 +1027,14 @@ kernel void applyViscosity(global Particle* particles,
     
     
     float4 viscosity = float4(0.0f,0.0f,0.0f,0.0f);
-    float4 r;
+    float r_length;
     int n_j;
     // For all neighbors found for the given cell at grid subscript (i,j, k):
     for (int j = 0; j < neighborCellCount; j++) {
         n_j = neighbors[j];
         if (neighbors[j] != -1 && n_j != id && density[n_j] != 0.0) {
-            //r = length(p->pos - particles[n_j].pos);
-            //if (H_SMOOTHING_RADIUS > r)
+            r_length = length(p->pos - particles[n_j].pos);
+            if (H_SMOOTHING_RADIUS > r_length)
             {
                 viscosity = particles[n_j].vel - p->vel;
                 viscosity *= particles[n_j].mass * d2w_viscosity(p->pos, particles[n_j].pos, H_SMOOTHING_RADIUS);
