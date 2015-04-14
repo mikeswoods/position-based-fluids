@@ -28,17 +28,18 @@ const constant float G = 9.8f;
  * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
  * of the Position Based Fluids paper
  */
-const constant float EPSILON = 1.0e-4f;
+const constant float EPSILON_RELAXATION = 0.1f;
 
 /**
  * Particle rest density: 1000kg/m^3
  */
-const constant float REST_DENSITY = 1000.0f;
+const constant float REST_DENSITY     = 1000.0f;
+const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 1.2f;
+const constant float H_SMOOTHING_RADIUS = 1.0f;
 
 /*******************************************************************************
  * Types
@@ -97,6 +98,18 @@ typedef struct {
     int __dummy[2]; // Padding
     
 } GridCellOffset;
+
+// Used to carry context into the forAllNeighbors function when
+// computing the position delta
+
+typedef struct {
+    
+    float4 posDelta;              // Accumulated position delta
+    
+    const global float* lambda;   // A pointer to the lambda array with
+                                  // [0 .. numParticles - 1] indices
+    
+} _PositionDeltaContext;
 
 /*******************************************************************************
  * Utility functions
@@ -235,7 +248,7 @@ int getNeighborsBySubscript(const global ParticlePosition* sortedParticleToCell
  * @param [in]  int cellsY
  * @param [in]  int cellsZ
  * @param [in]  int3 cellSubscript
- * @param [in]  (*apply)(const global Particle*, const global Particle*, void* accum)
+ * @param [in]  (*apply)(int, const global Particle*, int, const global Particle*, void* accum)
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
  */
@@ -246,10 +259,11 @@ void forAllNeighbors(const global Particle* particles
                      ,int cellsY
                      ,int cellsZ
                      ,int3 cellSubscript
-                     ,void (*apply)(const global Particle*, const global Particle*, void* accum)
+                     ,void (*apply)(int, const global Particle*, int, const global Particle*, void* accum)
                      ,void* accum)
 {
     int id = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
+
     const global Particle *p_i = &particles[id];
     
     // 27 (3x3x3) possible neighbors to search:
@@ -322,7 +336,7 @@ void forAllNeighbors(const global Particle* particles
                         // Apply the given function to the particle pair
                         // (p_i, p_j) and accumulate the result:
 
-                        apply(p_i, p_j, accum);
+                        apply(id, p_i, J, p_j, accum);
 
                         #ifdef DEBUG
                             contributingParticles += 1;
@@ -353,9 +367,9 @@ float poly6(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-    if (rBar > h) {
-        return 0.0;
-    }
+//    if (rBar > h) {
+//        return 0.0;
+//    }
 
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
@@ -380,9 +394,9 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-    if (rBar > h) {
-        return 0.0;
-    }
+//    if (rBar > h) {
+//        return 0.0;
+//    }
     
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
@@ -394,13 +408,17 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
 /**
  * SPH density estimator for a pair of particles p_i and p_j
  *
+ * @param int i Index of particle i
  * @param Particle* p_i Pair particle p_i
+ * @param int j Index of particle j
  * @param Particle* p_j Pair particle p_j
  * @param void* The data to update (generally a float of accumulated densities)
  */
-void SPHDensityEstimator(const global Particle* p_i
-                        ,const global Particle* p_j
-                        ,void* data)
+void SPHDensityEstimator_i(int i
+                          ,const global Particle* p_i
+                          ,int j
+                          ,const global Particle* p_j
+                          ,void* data)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
@@ -411,15 +429,19 @@ void SPHDensityEstimator(const global Particle* p_i
 }
 
 /**
- * SPH gradient of a function
+ * Computes the SPH gradient of a constraint function C_i, w.r.t a particle p_j
  *
+ * @param int i Index of particle i
  * @param Particle* p_i Pair particle p_i
+ * @param int j Index of particle j
  * @param Particle* p_j Pair particle p_j
  * @param void* The data to update (generally a float4 gradient vector)
  */
-void SPHGradient(const global Particle* p_i
-                ,const global Particle* p_j
-                ,void* data)
+void SPHGradient_i(int i
+                  ,const global Particle* p_i
+                  ,int j
+                  ,const global Particle* p_j
+                  ,void* data)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
@@ -427,6 +449,28 @@ void SPHGradient(const global Particle* p_i
     float4* gradVector = (float4*)data;
     
     *gradVector += spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
+}
+
+/**
+ * Computes the position delta of a particle p_i given a neighbor particle p_j
+ *
+ * @param int i Index of particle i
+ * @param Particle* p_i Pair particle p_i
+ * @param int j Index of particle j
+ * @param Particle* p_j Pair particle p_j
+ */
+void PositionDelta_i(int i
+                    ,const global Particle* p_i
+                    ,int j
+                    ,const global Particle* p_j
+                    ,void* data)
+{
+    _PositionDeltaContext* context = (_PositionDeltaContext*)data;
+    
+    float lambda_i = context->lambda[i];
+    float lambda_j = context->lambda[j];
+    
+    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS));
 }
 
 /**
@@ -453,16 +497,15 @@ void SPHGradient(const global Particle* p_i
  * @returns float4 The computed constraint gradient vector
  */
 float4 constraintGradient(const global Particle* particles
-                  ,const global ParticlePosition* sortedParticleToCell
-                  ,const global GridCellOffset* gridCellOffsets
-                  ,int cellsX
-                  ,int cellsY
-                  ,int cellsZ
-                  ,int i
-                  ,int j)
+                         ,const global ParticlePosition* sortedParticleToCell
+                         ,const global GridCellOffset* gridCellOffsets
+                         ,int cellsX
+                         ,int cellsY
+                         ,int cellsZ
+                         ,int i
+                         ,int j)
 {
-    float invRestDensity = 1.0f / REST_DENSITY;
-    float4 gradVector    = (float4)(0.0, 0.0, 0.0, 0.0);
+    float4 gradVector = (float4)(0.0, 0.0, 0.0, 0.0);
     
     // Case: \sum_j \nabla(p_k) * W(p_i - p_j, h)
     if (i == j) {
@@ -478,10 +521,10 @@ float4 constraintGradient(const global Particle* particles
                        ,cellsY
                        ,cellsZ
                        ,cellSubscript
-                       ,SPHGradient
+                       ,SPHGradient_i
                        ,(void*)&gradVector);
 
-        return invRestDensity * gradVector;
+        return INV_REST_DENSITY * gradVector;
     
     // Case: -\nabla(p_k) * W(p_i - p_j, h)
     } else {
@@ -489,9 +532,9 @@ float4 constraintGradient(const global Particle* particles
         const global Particle* p_i = &particles[i];
         const global Particle* p_j = &particles[j];
 
-        SPHGradient(p_i, p_j, (void*)&gradVector);
+        SPHGradient_i(i, p_i, j, p_j, (void*)&gradVector);
         
-        return invRestDensity * -gradVector;
+        return INV_REST_DENSITY * -gradVector;
     }
 }
 
@@ -780,7 +823,7 @@ void kernel estimateDensity(const global Particle* particles
                    ,cellsY
                    ,cellsZ
                    ,cellSubscript
-                   ,SPHDensityEstimator
+                   ,SPHDensityEstimator_i
                    ,(void*)&estDensity);
 
     density[id] = estDensity;
@@ -836,7 +879,7 @@ kernel void computeLambda(const global Particle* particles
     // Compute the constraint value C_i(p_1, ... p_n) for all neighbors [1..n]
     // of particle i:
 
-    float C_i = (density[id] / REST_DENSITY) - 1.0f;
+    float C_i = (density[id] * INV_REST_DENSITY) - 1.0f;
     
     // and the summation of the gradient of C_i w.r.t. each particle k:
 
@@ -858,7 +901,88 @@ kernel void computeLambda(const global Particle* particles
         gradientSum_i += (gradLength * gradLength);
     }
 
-    lambda[id] = -(C_i / (gradientSum_i + EPSILON));
+    lambda[id] = -(C_i / (gradientSum_i + EPSILON_RELAXATION));
+}
+
+/**
+ * For all particles p_i in particles, this kernel computes the position
+ * delta of p_i, p_i*
+ *
+ * @param [in]  const Particle* particles The particles in the simulation
+ * @param [in]  const ParticlePosition* sortedParticleToCell
+ * @param [in]  const GridCellOffset* gridCellOffsets
+ * @param [in]  const float* density The density per particle. The i-th entry
+ *              contains the density for the i-th particle
+ * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
+ * @param [out] float* posDeltaX position changes in X
+ * @param [out] float* posDeltaY position changes in Y
+ * @param [out] float* posDeltaZ position changes in Z
+ */
+kernel void computePositionDelta(const global Particle* particles
+                                ,const global ParticlePosition* sortedParticleToCell
+                                ,const global GridCellOffset* gridCellOffsets
+                                ,const global float* lambda
+                                ,int cellsX
+                                ,int cellsY
+                                ,int cellsZ
+                                ,global float* posDeltaX
+                                ,global float* posDeltaY
+                                ,global float* posDeltaZ)
+{
+    int id = get_global_id(0);
+
+    const global Particle *p = &particles[id];
+    
+    // Convert a linear index z into (i, j, k):
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0)
+                               , .lambda = lambda };
+    
+    forAllNeighbors(particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,cellSubscript
+                   ,PositionDelta_i
+                   ,(void*)&pd);
+
+    float4 pStar = INV_REST_DENSITY * pd.posDelta;
+    
+    posDeltaX[id] = pStar.x;
+    posDeltaY[id] = pStar.y;
+    posDeltaZ[id] = pStar.z;
+    
+    /*
+    printf("computePositionDelta [%d] :: delta => (%f,%f,%f)\n",
+           id, pStar.x, pStar.y, pStar.z);
+    */
+}
+
+/**
+ * Apply position changes to all particles
+ */
+kernel void applyPositionDelta(global Particle* particles
+                              ,global float* posDeltaX
+                              ,global float* posDeltaY
+                              ,global float* posDeltaZ)
+{
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    p->pos.x += posDeltaX[id];
+    p->pos.y += posDeltaY[id];
+    p->pos.z += posDeltaZ[id];
 }
 
 /**
@@ -872,6 +996,7 @@ kernel void resolveCollisions(global Particle* particles
                              ,float3 maxExtent)
 {
     int id = get_global_id(0);
+
     global Particle *p = &particles[id];
 
     p->pos.x = clamp(p->pos.x, minExtent.x + p->radius, maxExtent.x - p->radius);
