@@ -950,8 +950,8 @@ kernel void computePositionDelta(const global Particle* particles
     
     int3 cellSubscript = ind2sub(id, cellsX, cellsY);
     
-    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0)
-                               , .lambda = lambda };
+    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0),
+                                 .lambda = lambda };
     
     forAllNeighbors(particles
                    ,sortedParticleToCell
@@ -1038,6 +1038,7 @@ kernel void computeCurl(global Particle* particles,
  *
  */
 kernel void applyVorticity(global Particle* particles,
+                           float dt,
                            const global ParticlePosition* sortedParticleToCell,
                            const global GridCellOffset* gridCellOffsets,
                            int cellsX, int cellsY, int cellsZ)
@@ -1060,7 +1061,7 @@ kernel void applyVorticity(global Particle* particles,
                                                     ,neighbors);
     
     float4 r; // r is the distance to the center of the vortex
-    float4 grad = float4(0.0f,0.0f,0.0f,0.0f);
+    float4 gradVorticity = float4(0.0f,0.0f,0.0f,0.0f);
     float gradLength;
     int n_i;
     // For all neighbors found for the given cell at grid subscript (i,j, k):
@@ -1070,17 +1071,13 @@ kernel void applyVorticity(global Particle* particles,
             n_i = neighbors[j];
             r = particles[n_i].pos - p->pos;
             gradLength = length(particles[n_i].curl - p->curl);
-            //grad += gradLength / r;
-            grad[0] += gradLength / r[0];
-            grad[1] += gradLength / r[1];
-            grad[2] += gradLength / r[2];
-            grad[3] += gradLength / r[3];
+            gradVorticity += gradLength / r;
         }
     }
     
     float4 vorticity, N;
-    N = 1.0f / (length(grad) + EPSILON_VORTICITY) * grad;
-    vorticity = EPSILON_RELAXATION * cross(N, p->curl);
+    N = 1.0f / (length(gradVorticity) + EPSILON_VORTICITY) * gradVorticity;
+    vorticity = dt * EPSILON_RELAXATION * cross(N, p->curl);
     particles[id].vel += vorticity;
     
 }

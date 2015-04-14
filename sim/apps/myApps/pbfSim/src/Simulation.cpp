@@ -170,11 +170,12 @@ void Simulation::initializeKernels()
     // KERNEL :: applyVorticity
     this->openCL.loadKernel("applyVorticity");
     this->openCL.kernel("applyVorticity")->setArg(0, this->particles);
-    this->openCL.kernel("applyVorticity")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("applyVorticity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("applyVorticity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("applyVorticity")->setArg(1, this->dt);
+    this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("applyVorticity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
@@ -576,43 +577,11 @@ void Simulation::draw()
     
 }
 
-/**
- * This method sorts the buckets by 
- *
- */
-void countingSort(int arr[], int sz)
-{
-    int i, j, k, min, max, idx = 0;
-    
-    min = max = arr[0];
-    
-    for(i = 1; i < sz; i++)
-    {
-        min = (arr[i] < min) ? arr[i] : min;
-        max = (arr[i] > max) ? arr[i] : max;
-    }
-    k = max - min + 1; /* creates k buckets */
-    int *B = new int [k];
-    
-    for(i = 0; i < k; i++)
-        B[i] = 0;
-    
-    for(i = 0; i < sz; i++)
-        B[arr[i] - min]++;
-    
-    for(i = min; i <= max; i++)
-        for(j = 0; j < B[i - min]; j++)
-            arr[idx++] = i;
-    
-    delete [] B;
-
-}
-
 /*
 
 #define H               1.5f  // smoothing radius
-#define H_9             (H*H*H*H*H*H*H*H*H) // h^9
-#define H_6             (H*H*H*H*H*H) // h^6
+#define H_9             (float)(H*H*H*H*H*H*H*H*H) // h^9
+#define H_6             (float)(H*H*H*H*H*H) // h^6
 
 float poly6Kernel(Vector3DS p_i, Vector3DS p_j){
     Vector3DS diff = p_i - p_j;

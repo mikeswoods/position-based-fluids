@@ -22,6 +22,8 @@ typedef struct {
 
     float4 vel;
     
+    float4 curl;
+    
     float  mass;
     
     float  radius;
