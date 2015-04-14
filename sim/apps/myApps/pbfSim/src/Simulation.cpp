@@ -158,6 +158,16 @@ void Simulation::initializeKernels()
     this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaY);
     this->openCL.kernel("applyPositionDelta")->setArg(3, this->posDeltaZ);
     
+    // KERNEL :: applyViscosity
+    this->openCL.loadKernel("applyViscosity");
+    this->openCL.kernel("applyViscosity")->setArg(0, this->particles);
+    this->openCL.kernel("applyViscosity")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("applyViscosity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("applyViscosity")->setArg(3, this->density);
+    this->openCL.kernel("applyViscosity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("applyViscosity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("applyViscosity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+    
     // KERNEL :: computeCurl
     this->openCL.loadKernel("computeCurl");
     this->openCL.kernel("computeCurl")->setArg(0, this->particles);
@@ -710,10 +720,16 @@ void Simulation::handleCollisions()
  * [TODO]
  *
  * Apply XSPH viscosity
+ *
+ *  f_i_viscosity = mu SUM_j(mass_j * ((v_j - v_i)/density_j) * Nabla^2 W(|x_i - x_j|)
+ *
+ *  where mu = 0.05f and Nabla^2 = (Laplace operator)
+ *  particle i looks at neighbors j
+ *
  */
 void Simulation::applyXSPHViscosity()
 {
-    
+    this->openCL.loadKernel("applyViscosity")->run1D(this->numParticles);
 }
 
 /**
