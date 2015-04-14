@@ -24,6 +24,11 @@
  */
 const constant float G = 9.8f;
 
+/*
+ * Vorticity Epsilon
+ */
+const constant float EPSILON_VORTICITY = 0.1f;
+
 /**
  * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
  * of the Position Based Fluids paper
@@ -52,6 +57,8 @@ typedef struct {
     float4 pos;    // 4 words
     
     float4 vel;    // 4 words
+    
+    float4 curl;   // 4 words
     
     float  mass;   // 1 word
 
@@ -937,7 +944,7 @@ kernel void computePositionDelta(const global Particle* particles
 {
     int id = get_global_id(0);
 
-    const global Particle *p = &particles[id];
+    //const global Particle *p = &particles[id];
     
     // Convert a linear index z into (i, j, k):
     
@@ -983,6 +990,99 @@ kernel void applyPositionDelta(global Particle* particles
     p->pos.x += posDeltaX[id];
     p->pos.y += posDeltaY[id];
     p->pos.z += posDeltaZ[id];
+}
+
+/**
+ *  Compute the Curl for each particle
+ *
+ */
+kernel void computeCurl(global Particle* particles,
+                        const global ParticlePosition* sortedParticleToCell,
+                        const global GridCellOffset* gridCellOffsets,
+                        int cellsX, int cellsY, int cellsZ)
+{
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    // 27 (3x3x3) possible neighbors to search:
+    int neighbors[27];
+    
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell, gridCellOffsets,
+                                                    cellsX, cellsY, cellsZ,
+                                                    cellSubscript, neighbors);
+    
+    
+     float4 curl = float4(0.0f,0.0f,0.0f,0.0f);
+     float4 gradient, vel;
+     int n_i;
+     // For all neighbors found for the given cell at grid subscript (i,j, k):
+     for (int j = 0; j < neighborCellCount; j++) {
+         if (neighbors[j] != -1) {
+             n_i = neighbors[j];
+             vel = particles[n_i].vel - p->vel;
+             gradient = spiky(p->pos, particles[n_i].pos, H_SMOOTHING_RADIUS);
+             curl += cross(vel, gradient);
+         }
+     }
+     
+     particles[id].curl = curl;
+    
+}
+
+
+/**
+ * Vorticity Confinement
+ *
+ */
+kernel void applyVorticity(global Particle* particles,
+                           const global ParticlePosition* sortedParticleToCell,
+                           const global GridCellOffset* gridCellOffsets,
+                           int cellsX, int cellsY, int cellsZ)
+{
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    // 27 (3x3x3) possible neighbors to search:
+    int neighbors[27];
+    
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell
+                                                    ,gridCellOffsets
+                                                    ,cellsX
+                                                    ,cellsY
+                                                    ,cellsZ
+                                                    ,cellSubscript
+                                                    ,neighbors);
+    
+    float4 r; // r is the distance to the center of the vortex
+    float4 grad = float4(0.0f,0.0f,0.0f,0.0f);
+    float gradLength;
+    int n_i;
+    // For all neighbors found for the given cell at grid subscript (i,j, k):
+    for (int j = 0; j < neighborCellCount; j++) {
+        
+        if (neighbors[j] != -1) {
+            n_i = neighbors[j];
+            r = particles[n_i].pos - p->pos;
+            gradLength = length(particles[n_i].curl - p->curl);
+            //grad += gradLength / r;
+            grad[0] += gradLength / r[0];
+            grad[1] += gradLength / r[1];
+            grad[2] += gradLength / r[2];
+            grad[3] += gradLength / r[3];
+        }
+    }
+    
+    float4 vorticity, N;
+    N = 1.0f / (length(grad) + EPSILON_VORTICITY) * grad;
+    vorticity = EPSILON_RELAXATION * cross(N, p->curl);
+    particles[id].vel += vorticity;
+    
 }
 
 /**

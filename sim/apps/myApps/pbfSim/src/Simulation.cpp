@@ -158,11 +158,30 @@ void Simulation::initializeKernels()
     this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaY);
     this->openCL.kernel("applyPositionDelta")->setArg(3, this->posDeltaZ);
     
+    // KERNEL :: computeCurl
+    this->openCL.loadKernel("computeCurl");
+    this->openCL.kernel("computeCurl")->setArg(0, this->particles);
+    this->openCL.kernel("computeCurl")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("computeCurl")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("computeCurl")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("computeCurl")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("computeCurl")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    
+    // KERNEL :: applyVorticity
+    this->openCL.loadKernel("applyVorticity");
+    this->openCL.kernel("applyVorticity")->setArg(0, this->particles);
+    this->openCL.kernel("applyVorticity")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("applyVorticity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("applyVorticity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+    
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
     this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
     this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
     this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
+    
 }
 
 /**
@@ -735,6 +754,8 @@ void Simulation::applyXSPHViscosity()
  */
 void Simulation::applyVorticityConfinement()
 {
+    this->openCL.loadKernel("computeCurl")->run1D(this->numParticles);
+    this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
     
 }
 
