@@ -28,7 +28,7 @@ const constant float G = 9.8f;
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 0.8f;
+const constant float H_SMOOTHING_RADIUS = 1.2f;
 
 /*
  * Vorticity Epsilon

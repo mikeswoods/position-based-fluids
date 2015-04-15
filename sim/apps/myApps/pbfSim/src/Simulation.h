@@ -188,8 +188,8 @@ class Simulation
                   ,AABB bounds
                   ,float dt = 0.033f
                   ,EigenVector3 _cellsPerAxis = EigenVector3(2,2,2)
-                  ,int numParticles = 16
-                  ,float particleRadius = 1.5f
+                  ,int numParticles = 100
+                  ,float particleRadius = 0.5f
                   ,float particleMass = 1.0f);
         virtual ~Simulation();
 
