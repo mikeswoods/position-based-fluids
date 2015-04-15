@@ -125,13 +125,22 @@ typedef struct {
     
 } _PositionDeltaContext;
 
+/*******************************************************************************
+ * Forward declarations
+ ******************************************************************************/
+
 global float rescale(float x, float a0, float a1, float b0, float b1);
+
 global int sub2ind(int i, int j, int k, int w, int h);
+
 global int3 ind2sub(int x, int w, int h);
 
-constant float poly6(float4 pos_i, float4 pos_j, float h);
-constant float4 spiky(float4 pos_i, float4 pos_j, float h);
+//constant float poly6(float4 pos_i, float4 pos_j, float h);
+
+//constant float4 spiky(float4 pos_i, float4 pos_j, float h);
+
 constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h);
+
 void callback_SPHDensityEstimator_i(int i
                                     ,const global Particle* p_i
                                     ,int j
@@ -155,23 +164,23 @@ void callback_SPHDensityEstimator_i(int i
                               ,void* data);
 
 global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
-                        ,const global GridCellOffset* gridCellOffsets
-                        ,int cellsX
-                        ,int cellsY
-                        ,int cellsZ
-                        ,int3 cellSubscript
-                        ,int* neighborCells);
+                              ,const global GridCellOffset* gridCellOffsets
+                              ,int cellsX
+                              ,int cellsY
+                              ,int cellsZ
+                              ,int3 cellSubscript
+                              ,int* neighborCells);
 
 global void forAllNeighbors(const global Particle* particles
-                     ,const global ParticlePosition* sortedParticleToCell
-                     ,const global GridCellOffset* gridCellOffsets
-                     ,int numParticles
-                     ,int cellsX
-                     ,int cellsY
-                     ,int cellsZ
-                     ,int3 cellSubscript
-                     ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
-                     ,void* accum);
+                           ,const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
+                           ,int numParticles
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,int3 cellSubscript
+                           ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
+                           ,void* accum);
 
 /*******************************************************************************
  * Utility functions
@@ -317,15 +326,15 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  *              for every neighbor pair of particles
  */
 global void forAllNeighbors(const global Particle* particles
-                    ,const global ParticlePosition* sortedParticleToCell
-                    ,const global GridCellOffset* gridCellOffsets
-                    ,int numParticles
-                    ,int cellsX
-                    ,int cellsY
-                    ,int cellsZ
-                    ,int3 cellSubscript
-                    ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
-                    ,void* accum)
+                           ,const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
+                           ,int numParticles
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ
+                           ,int3 cellSubscript
+                           ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
+                           ,void* accum)
 {
     int id = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
     const global Particle *p_i = &particles[id];
@@ -336,7 +345,7 @@ global void forAllNeighbors(const global Particle* particles
     // between p_i and for all j in [0 .. numParticles - 1], p_j:
 
     for (int j = 0; j < numParticles; j++) {
-        
+
         // Skip instances in which we'd be comparing a particle to itself:
         if (j == id) {
             continue;
@@ -440,6 +449,7 @@ global void forAllNeighbors(const global Particle* particles
  * @param float h Smoothing kernel radius
  * @returns float
  */
+/*
 constant float poly6(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
@@ -456,6 +466,7 @@ constant float poly6(float4 pos_i, float4 pos_j, float h)
 
     return A * (B * B * B);
 }
+*/
 
 /**
  * Spiky smoothing kernel
@@ -467,6 +478,7 @@ constant float poly6(float4 pos_i, float4 pos_j, float h)
  * @param float h Smoothing kernel radius
  * @returns float4
  */
+/*
 constant float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
@@ -482,6 +494,7 @@ constant float4 spiky(float4 pos_i, float4 pos_j, float h)
     float B    = (h - rBar);
     return A * (B * B) * (r / (rBar + 1.0e-3f));
 }
+*/
 
 /**
  *
@@ -512,8 +525,23 @@ void callback_SPHDensityEstimator_i(int i
     // variable accordingly:
 
     float* accumDensity = (float*)data;
+
+    // ~~~ POLY6 ~~~
+    float h    = H_SMOOTHING_RADIUS;
+    float4 r   = p_i->posStar - p_j->posStar;
+    float rBar = length(r);
+    float V    = 0.0f;
     
-    *accumDensity += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    if (rBar <= h) {
+        
+        float h9 = (h * h * h * h * h * h * h * h * h);
+        float A  = 1.566681471061f * h9;
+        float B  = (h * h) - (rBar * rBar);
+        V        = A * (B * B * B);
+    }
+
+    (*accumDensity) += V;
+    //(*accumDensity) += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -535,9 +563,23 @@ void callback_SPHGradient_i(int i
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
 
+    // ~~~ SPIKY ~~~
+    float h             = H_SMOOTHING_RADIUS;
+    float4 r           = p_i->posStar - p_j->posStar;
+    float rBar         = length(r);
+    float4 V           = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     float4* gradVector = (float4*)data;
+
+    if (rBar <= h) {
+        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
+        float h6   = (h * h * h * h * h * h);
+        float A    = 14.323944878271f * h6;
+        float B    = (h - rBar);
+        V          = A * (B * B) * (r / (rBar + 1.0e-3f));
+    }
     
-    (*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    (*gradVector) += V;
+    //(*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -559,8 +601,23 @@ void callback_SquaredSPHGradientLength_j(int i
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
     
+    // ~~~ SPIKY ~~~
+    float h                = H_SMOOTHING_RADIUS;
+    float4 r               = p_i->posStar - p_j->posStar;
+    float rBar             = length(r);
+    float4 V               = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     float* totalGradLength = (float*)data;
-    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    
+    if (rBar <= h) {
+        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
+        float h6    = (h * h * h * h * h * h);
+        float A     = 14.323944878271f * h6;
+        float B     = (h - rBar);
+        V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
+    }
+
+    //float4 gradVector    = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    float4 gradVector      = (INV_REST_DENSITY * -V);
     float gradVectorLength = length(gradVector);
     
     (*totalGradLength) += (gradVectorLength * gradVectorLength);
@@ -586,7 +643,22 @@ void callback_SquaredSPHGradientLength_j(int i
     float lambda_i = context->lambda[i];
     float lambda_j = context->lambda[j];
     
-    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    // ~~~ SPIKY ~~~
+    float h                = H_SMOOTHING_RADIUS;
+    float4 r               = p_i->posStar - p_j->posStar;
+    float rBar             = length(r);
+    float4 V               = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    if (rBar <= h) {
+        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
+        float h6    = (h * h * h * h * h * h);
+        float A     = 14.323944878271f * h6;
+        float B     = (h - rBar);
+        V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
+    }
+
+    //context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    context->posDelta += (lambda_i + lambda_j) * V;
 }
 
 /*******************************************************************************

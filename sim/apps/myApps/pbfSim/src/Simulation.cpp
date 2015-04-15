@@ -84,13 +84,11 @@ Simulation::~Simulation()
  */
 void Simulation::initializeShaders()
 {
-    /*
     if (this->shader.load("shaders/Basic")) {
-        
+        ofLogNotice() << "Loaded shader" << endl;
     } else {
-        
+        ofLogError() << "Failed to load shader!" << endl;
     }
-    */
 }
 
 /**
@@ -611,7 +609,9 @@ void Simulation::drawParticles()
         ofFill();
         ofPushMatrix();
             ofTranslate(p.pos.x, p.pos.y, p.pos.z);
-            this->partcleMesh.draw();
+            this->shader.begin();
+                this->partcleMesh.draw();
+            this->shader.end();
         ofPopMatrix();
 
         if (this->isVisualDebuggingEnabled()) {
