@@ -36,7 +36,7 @@ void ofApp::setup()
     this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
-    AABB bounds(float3(-5.0f, -10.0f, -5.0f), float3(5.0f, 10.0f, 5.0f));
+    AABB bounds(float3(-2.0f, -10.0f, -2.0f), float3(2.0f, 10.0f, 2.0f));
 
     // Instantiate the simulator:
     this->simulation =

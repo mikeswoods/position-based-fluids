@@ -8,6 +8,7 @@
 #define SIMULATION_H
 
 #include <iostream>
+#include "Constants.h"
 #include "Definitions.h"
 #include "AABB.h"
 #include "MSAOpenCL.h"
@@ -186,11 +187,12 @@ class Simulation
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,float dt = 0.033f
-                  ,EigenVector3 _cellsPerAxis = EigenVector3(2,2,2)
                   ,int numParticles = 100
-                  ,float particleRadius = 0.5f
-                  ,float particleMass = 1.0f);
+                  ,float dt = Constants::DEFAULT_DT
+                  ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
+                  ,float particleRadius = Constants::DEFAULT_PARTICLE_RADIUS
+                  ,float particleMass = Constants::DEFAULT_PARTICLE_MASS);
+
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }

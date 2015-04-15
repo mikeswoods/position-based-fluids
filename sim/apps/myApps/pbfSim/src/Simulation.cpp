@@ -42,24 +42,24 @@ ostream& operator<<(ostream& os, Particle p)
  *
  * @param [in] _openCL OpenCL manager instance
  * @param [in] _bounds Defines the boundaries of the simulation in world space
+ * @param [in] _numParticles The number of particles in the simulation
  * @param [in] _dt The time step (usually 0.1)
  * @param [in] _cellsPerAxis Cell spatial grid subdivisions per axis
- * @param [in] _numParticles The number of particles in the simulation
  * @param [in] _radiusPerParticle The mass per particle
  * @param [in] _particleMass The mass per particle
  */
 Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
+                      ,int _numParticles
                       ,float _dt
                       ,EigenVector3 _cellsPerAxis
-                      ,int _numParticles
                       ,float _particleRadius
                       ,float _particleMass) :
     openCL(_openCL),
     bounds(_bounds),
+    numParticles(_numParticles),
     dt(_dt),
     cellsPerAxis(_cellsPerAxis),
-    numParticles(_numParticles),
     particleRadius(_particleRadius),
     particleMass(_particleMass),
     frameNumber(0),
