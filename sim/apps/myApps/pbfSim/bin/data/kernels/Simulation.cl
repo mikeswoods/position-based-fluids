@@ -33,7 +33,7 @@ const constant float EPSILON_RELAXATION = 0.1f;
 /**
  * Particle rest density: 1000kg/m^3
  */
-const constant float REST_DENSITY     = 1000.0f;
+const constant float REST_DENSITY     = 10000.0f;
 const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 
 /**
@@ -861,7 +861,7 @@ kernel void computeLambda(const global Particle* particles
                    ,callback_SPHGradient_i
                    ,(void*)&gv_i);
     
-    float gv_iLength = length(gv_i);
+    float gv_iLength = length(INV_REST_DENSITY * gv_i);
     
     gradientSum += (gv_iLength * gv_iLength);
     
