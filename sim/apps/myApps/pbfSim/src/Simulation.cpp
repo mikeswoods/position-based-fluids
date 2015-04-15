@@ -12,11 +12,6 @@
 
 /******************************************************************************/
 
-// Default particle radius:
-#define DEFAULT_RADIUS 1.0f;
-
-/******************************************************************************/
-
 using namespace std;
 
 /******************************************************************************/
@@ -44,21 +39,25 @@ ostream& operator<<(ostream& os, Particle p)
  * @param [in] _openCL OpenCL manager instance
  * @param [in] _bounds Defines the boundaries of the simulation in world space
  * @param [in] _dt The time step (usually 0.1)
+ * @param [in] _cellsPerAxis Cell spatial grid subdivisions per axis
  * @param [in] _numParticles The number of particles in the simulation
- * @param [in] _massPerParticle The mass per particle
+ * @param [in] _radiusPerParticle The mass per particle
+ * @param [in] _particleMass The mass per particle
  */
 Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
                       ,float _dt
                       ,EigenVector3 _cellsPerAxis
                       ,int _numParticles
-                      ,float _massPerParticle) :
+                      ,float _particleRadius
+                      ,float _particleMass) :
     openCL(_openCL),
     bounds(_bounds),
     dt(_dt),
     cellsPerAxis(_cellsPerAxis),
     numParticles(_numParticles),
-    massPerParticle(_massPerParticle),
+    particleRadius(_particleRadius),
+    particleMass(_particleMass),
     frameNumber(0),
     flagDrawGrid(false),
     flagVisualDebugging(false)
@@ -153,10 +152,15 @@ void Simulation::initializeKernels()
     
     // KERNEL :: applyPositionDelta
     this->openCL.loadKernel("applyPositionDelta");
-    this->openCL.kernel("applyPositionDelta")->setArg(0, this->particles);
-    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaX);
-    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaY);
-    this->openCL.kernel("applyPositionDelta")->setArg(3, this->posDeltaZ);
+    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDeltaX);
+    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaY);
+    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaZ);
+    this->openCL.kernel("applyPositionDelta")->setArg(3, this->particles);
+    
+    // KERNEL ::  updatePositionAndVelocity
+    this->openCL.loadKernel("updatePositionAndVelocity");
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(0, this->particles);
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->dt);
     
     // KERNEL :: applyViscosity
     /*
@@ -207,6 +211,12 @@ void Simulation::initializeKernels()
 void Simulation::resetParticleQuantities()
 {
     for (int i = 0; i < this->numParticles; i++) {
+        
+        Particle &p = this->particles[i];
+        
+        // Clear out the particle's predicted position:
+        p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
+        
         this->density[i]   = 0.0f;
         this->lambda[i]    = 0.0f;
         this->posDeltaX[i] = 0.0f;
@@ -287,11 +297,14 @@ void Simulation::initialize()
         p.pos.y = ofRandom(p1[1], p2[1]);
         p.pos.z = ofRandom(p1[2], p2[2]);
         
+        // No predicted position:
+        p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
+        
         // All particles have uniform mass (for now):
-        p.mass = this->massPerParticle;
+        p.mass = this->particleMass;
         
         // and a uniform radius (for now):
-        p.radius = DEFAULT_RADIUS;
+        p.radius = this->particleRadius;
         
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
@@ -313,8 +326,6 @@ void Simulation::initialize()
     // Load the kernels:
 
     this->initializeKernels();
-    
-    // Perform initial bounds clamping:
 }
 
 /**
@@ -452,7 +463,7 @@ void Simulation::step()
 
     // Solver runs for N iterations:
     for (int i = 0; i < N; i++) {
-        
+
         this->calculateDensity();
         
         this->calculatePositionDelta();
@@ -462,9 +473,11 @@ void Simulation::step()
         this->handleCollisions();
     }
     
-    this->applyXSPHViscosity();
+    //this->applyXSPHViscosity();
     
-    this->applyVorticityConfinement();
+    //this->applyVorticityConfinement();
+
+    this->updatePositionAndVelocity();
     
     // Make sure the OpenCL work queue is empty before proceeding. This will
     // block until all the stuff in GPU-land is done before moving forward
@@ -585,7 +598,7 @@ void Simulation::draw()
     //ofClear(0, 0, 0);
     this->drawBounds();
 
-    if (this->drawGridEnabled() || this->isVisualDebuggingEnabled()) {
+    if (this->drawGridEnabled()) {
         this->drawGrid();
     }
 
@@ -705,7 +718,7 @@ void Simulation::handleCollisions()
  */
 void Simulation::applyXSPHViscosity()
 {
-    this->openCL.loadKernel("applyViscosity")->run1D(this->numParticles);
+    //this->openCL.loadKernel("applyViscosity")->run1D(this->numParticles);
 }
 
 /**
@@ -715,9 +728,19 @@ void Simulation::applyXSPHViscosity()
  */
 void Simulation::applyVorticityConfinement()
 {
-    this->openCL.loadKernel("computeCurl")->run1D(this->numParticles);
-    this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
-    
+    //this->openCL.loadKernel("computeCurl")->run1D(this->numParticles);
+    //this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
+}
+
+/**
+ * Updates the actualm, final position and velocity of the particles
+ * in the current simulation step
+ *
+ * @see kernels/Simulation.cl (updatePositionAndVelocity) for details
+ */
+void Simulation::updatePositionAndVelocity()
+{
+    this->openCL.kernel("updatePositionAndVelocity")->run1D(this->numParticles);
 }
 
 /******************************************************************************/

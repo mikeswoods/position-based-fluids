@@ -27,7 +27,7 @@ const constant float G = 9.8f;
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 1.2f;
+const constant float H_SMOOTHING_RADIUS = 1.3f;
 
 /*
  * Vorticity Epsilon
@@ -58,15 +58,17 @@ const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 
 typedef struct {
     
-    float4 pos;    // 4 words
+    float4 pos;     // Current particle position (x), 4 words
     
-    float4 vel;    // 4 words
+    float4 posStar; // Predicted particle position (x*), 4 words
     
-    float4 curl;   // 4 words
+    float4 vel;     // Current particle velocity (v), 4 words
     
-    float  mass;   // 1 word
+    float4 curl;    // Curl force, 4 words
+    
+    float  mass;    // Particle mass, 1 word
 
-    float  radius; // 1 word
+    float  radius;  // Particle radius, 1 word
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
@@ -81,7 +83,7 @@ typedef struct {
      */
     float  __dummy[2]; // 2 words
 
-} Particle; // total = 12 words = 64 bytes
+} Particle;
 
 // A type to represent the position of a given particle in the spatial
 // grid the simulated world is divided into
@@ -325,7 +327,7 @@ void forAllNeighbors(const global Particle* particles
                     
                     // Now, we compute the distance between the two particles:
 
-                    float r = distance(p_i->pos, p_j->pos);
+                    float r = distance(p_i->posStar, p_j->posStar);
                     
                     // If the position delta is less then the sum of the
                     // radii of both particles, then use the particle in the
@@ -335,9 +337,9 @@ void forAllNeighbors(const global Particle* particles
                     
                     if (r <= distThreshold) {
                         
-                        #ifdef DEBUG
-                            printf("  in-range: p_i [i=%d] - p_j [J=%d] = %f\n", id, J, r);
-                        #endif
+                        //#ifdef DEBUG
+                        //    printf("  in-range: p_i [i=%d] - p_j [J=%d] = %f\n", id, J, r);
+                        //#endif
                         
                         // Invoke the callback function to the particle pair
                         // (p_i, p_j), along with their respective indices,
@@ -373,11 +375,11 @@ float poly6(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
-//    
-//    if (rBar > h) {
-//        return 0.0;
-//    }
 
+    if (rBar == 0) {
+        return 0;
+    }
+    
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
     float A  = 1.566681471061 * h9;
@@ -401,10 +403,10 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-//    if (rBar > h) {
-//        return 0.0;
-//    }
-    
+    if (rBar == 0) {
+    //    return 0;
+    }
+
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
     float A    = 14.323944878271 * h6;
@@ -412,11 +414,15 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
     return A * (B * B) * (r / (rBar + 1.0e-6f));
 }
 
+/**
+ *
+ */
 float d2w_viscosity(float4 pos_i, float4 pos_j, float h)
 {
     float r = distance(pos_i, pos_j);
     return NABLA2_W_VISCOSITY_COEFF * (H_SMOOTHING_RADIUS - r);
 }
+
 /**
  * SPH density estimator for a pair of particles p_i and p_j for use as a 
  * callback function with forAllNeighbors()
@@ -438,7 +444,7 @@ void callback_SPHDensityEstimator_i(int i
 
     float* accumDensity = (float*)data;
     
-    *accumDensity += poly6(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
+    *accumDensity += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -462,7 +468,7 @@ void callback_SPHGradient_i(int i
 
     float4* gradVector = (float4*)data;
     
-    (*gradVector) += spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS);
+    (*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -485,7 +491,7 @@ void callback_SquaredSPHGradientLength_j(int i
     // variable accordingly:
     
     float* totalGradLength = (float*)data;
-    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS));
+    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
     float gradVectorLength = length(gradVector);
     
     (*totalGradLength) += (gradVectorLength * gradVectorLength);
@@ -511,7 +517,7 @@ void callback_PositionDelta_i(int i
     float lambda_i = context->lambda[i];
     float lambda_j = context->lambda[j];
     
-    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->pos, p_j->pos, H_SMOOTHING_RADIUS));
+    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
 }
 
 /*******************************************************************************
@@ -527,13 +533,18 @@ void callback_PositionDelta_i(int i
  * turbulence, etc.
  *
  *   v_i = v_i + dt + f_external(x_i)
+ *
+ * @param [in/out] Particle* particles The particles to update
+ * @param [in]     float dt The timestep
  */
-kernel void applyExternalForces(global Particle* particles, float dt)
+kernel void applyExternalForces(global Particle* particles
+                               ,float dt)
 {
     int id = get_global_id(0);
+    global Particle *p = &particles[id];
     
     // Apply the force of gravity along the y-axis:
-    particles[id].vel.y += (dt * -G);
+    p->vel.y += (dt * -G);
 }
 
 /**
@@ -542,13 +553,18 @@ kernel void applyExternalForces(global Particle* particles, float dt)
  *
  * x_i = x_i + (dt * v_i), where x_i is the position of p_i and v_i is
  * the velocity of p_i
+ *
+ * @param [in/out] Particle* particles The particles to update
+ * @param [in]     float dt The timestep
  */
-kernel void predictPosition(global Particle* particles, float dt)
+kernel void predictPosition(global Particle* particles
+                           ,float dt)
 {
     int id = get_global_id(0);
+    global Particle *p = &particles[id];
 
-    // Explicit Euler step:
-    particles[id].pos += (dt * particles[id].vel);
+    // Explicit Euler step on the predicted particle position posStar (x*)
+    p->posStar = p->pos + (dt * particles[id].vel);
 }
 
 /**
@@ -585,10 +601,11 @@ kernel void discretizeParticlePositions(const global Particle* particles
     int id = get_global_id(0);
     const global Particle *p = &particles[id];
     
-    // Now we have the discretized cell at (i, j, k):
-    int cellI = (int)round((rescale(p->pos.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1))));
-    int cellJ = (int)round((rescale(p->pos.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1))));
-    int cellK = (int)round((rescale(p->pos.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1))));
+    // Find the dicretized cell the particle will be in according to its
+    // predicted position:
+    int cellI = (int)round((rescale(p->posStar.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1))));
+    int cellJ = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1))));
+    int cellK = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1))));
 
     particleToCell[id].particleIndex = id;
     
@@ -599,14 +616,6 @@ kernel void discretizeParticlePositions(const global Particle* particles
     
     // Compute the linear index for the histogram counter
     int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
-    
-    #ifdef DEBUG
-        printf("[PARTICLE %d] :: (%f, %f, %f)\t=> (%d/%d, %d/%d, %d/%d) => %d\n",
-               id,
-               p->pos.x, p->pos.y, p->pos.z,
-               cellI, cellsX, cellJ, cellsY, cellK, cellsZ,
-               key);
-    #endif
 
     // This is needed; "cellHistogram[z] += 1" won't work here as multiple
     // threads are modifying cellHistogram simultaneously:
@@ -951,40 +960,66 @@ kernel void computePositionDelta(const global Particle* particles
                    ,cellSubscript
                    ,callback_PositionDelta_i
                    ,(void*)&pd);
-
+    
     float4 pStar = INV_REST_DENSITY * pd.posDelta;
     
     posDeltaX[id] = pStar.x;
     posDeltaY[id] = pStar.y;
     posDeltaZ[id] = pStar.z;
-    
     /*
     printf("computePositionDelta [%d] :: delta => (%f,%f,%f)\n",
            id, pStar.x, pStar.y, pStar.z);
-    */
+     */
 }
 
 /**
- * Apply position changes to all particles
+ * For all particles p_i in particles, this kernel applies the computed 
+ * position delta to the predicted positions p_i.posStar.(x|y|z), e.g. "x_i*"
+ * in the Position Based Fluids paper
+ *
+ * @param [in]  float* posDeltaX The predicted delta position in the x-axis
+ * @param [in]  float* posDeltaY The predicted delta position in the x-axis
+ * @param [in]  float* posDeltaZ The predicted delta position in the x-axis
+ * @param [out] Particle* particles The particles in the simulation to be updated
  */
-kernel void applyPositionDelta(global Particle* particles
-                              ,global float* posDeltaX
-                              ,global float* posDeltaY
-                              ,global float* posDeltaZ)
+kernel void applyPositionDelta(const global float* posDeltaX
+                              ,const global float* posDeltaY
+                              ,const global float* posDeltaZ
+                              ,global Particle* particles)
+{
+    int id = get_global_id(0);
+    global Particle *p = &particles[id];
+    
+    p->posStar.x += posDeltaX[id];
+    p->posStar.y += posDeltaY[id];
+    p->posStar.z += posDeltaZ[id];
+}
+
+/**
+ * For all particles p_i in particles, this kernel computes the final, true 
+ * position and velocity of the particle in the current simulation step
+ *
+ * @param [in/out] Particle* particles The particles in the simulation to be updated
+ * @param [in]     float dt The timestep
+ */
+kernel void updatePositionAndVelocity(global Particle* particles
+                                     ,float dt)
 {
     int id = get_global_id(0);
     
     global Particle *p = &particles[id];
     
-    p->pos.x += posDeltaX[id];
-    p->pos.y += posDeltaY[id];
-    p->pos.z += posDeltaZ[id];
+    // Update the particle's final velocity:
+    p->vel = (1.0f / dt) * (p->posStar - p->pos);
+    
+    // And finally the position:
+    p->pos = p->posStar;
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  *  Add Viscosity to each particle
- *
  */
 kernel void applyViscosity(global Particle* particles,
                            const global ParticlePosition* sortedParticleToCell,
@@ -1028,10 +1063,8 @@ kernel void applyViscosity(global Particle* particles,
     */
 }
 
-
 /**
  *  Compute the Curl for each particle
- *
  */
 kernel void computeCurl(global Particle* particles,
                         const global ParticlePosition* sortedParticleToCell,
@@ -1079,7 +1112,7 @@ kernel void applyVorticity(global Particle* particles,
                            float dt,
                            const global ParticlePosition* sortedParticleToCell,
                            const global GridCellOffset* gridCellOffsets,
-                           int cellsX, int cellsY, int cellsZ)
+                           int cellsX,int cellsY, int cellsZ)
 {
     /*
     int id = get_global_id(0);
@@ -1134,8 +1167,16 @@ kernel void resolveCollisions(global Particle* particles
 
     global Particle *p = &particles[id];
 
+    // Clamp predicted and actual positions:
+
+    // Actual positions:
     p->pos.x = clamp(p->pos.x, minExtent.x + p->radius, maxExtent.x - p->radius);
     p->pos.y = clamp(p->pos.y, minExtent.y + p->radius, maxExtent.y - p->radius);
     p->pos.z = clamp(p->pos.z, minExtent.z + p->radius, maxExtent.z - p->radius);
+
+    // Predicted positions:
+    p->posStar.x = clamp(p->posStar.x, minExtent.x + p->radius, maxExtent.x - p->radius);
+    p->posStar.y = clamp(p->posStar.y, minExtent.y + p->radius, maxExtent.y - p->radius);
+    p->posStar.z = clamp(p->posStar.z, minExtent.z + p->radius, maxExtent.z - p->radius);
 }
 

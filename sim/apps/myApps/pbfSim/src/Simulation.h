@@ -18,15 +18,17 @@
 
 typedef struct {
 
-    float4 pos;
+    float4 pos;      // Current particle position (x)
 
-    float4 vel;
+    float4 posStar;  // Predicted particle position (x*)
+
+    float4 vel;      // Current particle velocity (v)
     
-    float4 curl;
+    float4 curl;     // Curl force
     
-    float  mass;
+    float  mass;     // Particle mass
     
-    float  radius;
+    float  radius;   // Particle radius
     
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
@@ -124,10 +126,13 @@ class Simulation
     
         // Total number of cells in the system
         int numCells;
+
+        // Uniform particle radius (for now)
+        float particleRadius;
     
         // Just as the name describes
-        float massPerParticle;
-
+        float particleMass;
+    
         // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
     
         // All particles in the simulation
@@ -171,6 +176,7 @@ class Simulation
         void handleCollisions();
         void applyXSPHViscosity();
         void applyVorticityConfinement();
+        void updatePositionAndVelocity();
     
         // Drawing-related functions:
         void drawBounds() const;
@@ -182,8 +188,9 @@ class Simulation
                   ,AABB bounds
                   ,float dt = 0.025f
                   ,EigenVector3 _cellsPerAxis = EigenVector3(3, 3, 3)
-                  ,int numParticles = 15
-                  ,float massPerParticle = 1.0f);
+                  ,int numParticles = 10
+                  ,float particleRadius = 1.0f
+                  ,float particleMass = 1.0f);
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
