@@ -569,13 +569,13 @@ void Simulation::drawParticles()
         ofFill();
         ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
         
+        // Draw an outline of the particle:
+        ofSetColor(0, 0, 255);
+        ofNoFill();
+        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
+        
         if (this->isVisualDebuggingEnabled()) {
-            
-            // Draw an outline of the particle:
-            ofSetColor(0, 0, 255);
-            ofNoFill();
-            ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
-            
+
             // Label the particle with its number:
             ofSetColor(255, 255, 0);
             ofFill();

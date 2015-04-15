@@ -186,9 +186,9 @@ class Simulation
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,float dt = 0.025f
-                  ,EigenVector3 _cellsPerAxis = EigenVector3(3, 3, 3)
-                  ,int numParticles = 10
+                  ,float dt = 0.033f
+                  ,EigenVector3 _cellsPerAxis = EigenVector3(2,2,2)
+                  ,int numParticles = 60
                   ,float particleRadius = 1.0f
                   ,float particleMass = 1.0f);
         virtual ~Simulation();

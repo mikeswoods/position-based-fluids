@@ -335,7 +335,7 @@ void forAllNeighbors(const global Particle* particles
                     
                     float distThreshold = p_i->radius + p_j->radius;
                     
-                    if (r <= distThreshold) {
+                    if (r < (distThreshold - 1.0e-3)) {
                         
                         //#ifdef DEBUG
                         //    printf("  in-range: p_i [i=%d] - p_j [J=%d] = %f\n", id, J, r);
@@ -564,7 +564,7 @@ kernel void predictPosition(global Particle* particles
     global Particle *p = &particles[id];
 
     // Explicit Euler step on the predicted particle position posStar (x*)
-    p->posStar = p->pos + (dt * particles[id].vel);
+    p->posStar = p->pos + (dt * p->vel);
 }
 
 /**
