@@ -28,7 +28,7 @@ const constant float G = 9.8f;
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 1.2f;
+const constant float H_SMOOTHING_RADIUS = 1.1f;
 
 /*
  * Vorticity Epsilon
@@ -397,9 +397,13 @@ float poly6(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
 
+    if (rBar > h) {
+        return 0.0f;
+    }
+    
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
-    float A  = 1.566681471061 * h9;
+    float A  = 1.566681471061f * h9;
     float B  = (h * h) - (rBar * rBar);
 
     return A * (B * B * B);
@@ -419,10 +423,14 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
+    
+    if (rBar > h) {
+        return 0.0f;
+    }
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
-    float A    = 14.323944878271 * h6;
+    float A    = 14.323944878271f * h6;
     float B    = (h - rBar);
     return A * (B * B) * (r / (rBar + 1.0e-3f));
 }

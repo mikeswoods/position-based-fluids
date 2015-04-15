@@ -94,6 +94,9 @@ class Simulation
         // Flag for visual debugging
         bool flagVisualDebugging;
     
+        // Load shaders
+        void initializeShaders();
+    
         // Load kernels and bind parameters
         void initializeKernels();
     
@@ -110,8 +113,14 @@ class Simulation
         void sortParticlesByCell();
     
     protected:
+        // Particle mesh sphere
+        ofMesh partcleMesh;
+    
         // OpenCL manager
         msa::OpenCL& openCL;
+    
+        // Basic shader
+        ofShader shader;
     
         // Bounding volume
         AABB bounds;
@@ -187,7 +196,7 @@ class Simulation
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,int numParticles = 100
+                  ,int numParticles = 500
                   ,float dt = Constants::DEFAULT_DT
                   ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
                   ,float particleRadius = Constants::DEFAULT_PARTICLE_RADIUS
@@ -206,6 +215,10 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
+        // Particle quantities:
+        float getParticleRadius() const;
+        void setParticleRadius(float r);
+
         void reset();
         void step();
         void draw();

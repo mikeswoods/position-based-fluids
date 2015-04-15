@@ -70,12 +70,27 @@ Simulation::Simulation(msa::OpenCL& _openCL
                      * static_cast<int>(this->cellsPerAxis[1])
                      * static_cast<int>(this->cellsPerAxis[2]);
 
+    this->setParticleRadius(_particleRadius);
     this->initialize();
 }
 
 Simulation::~Simulation()
 {
     
+}
+
+/**
+ * Initializes all shaders used in the simulation
+ */
+void Simulation::initializeShaders()
+{
+    /*
+    if (this->shader.load("shaders/Basic")) {
+        
+    } else {
+        
+    }
+    */
 }
 
 /**
@@ -329,6 +344,10 @@ void Simulation::initialize()
 
     this->writeToGPU();
 
+    // Load the shaders:
+
+    this->initializeShaders();
+    
     // Load the kernels:
 
     this->initializeKernels();
@@ -377,6 +396,23 @@ void Simulation::initializeParticleSort()
         this->sortedParticleToCell[i].cellJ         = -1;
         this->sortedParticleToCell[i].cellK         = -1;
     }
+}
+
+/**
+ * Returns the uniform particle radius
+ */
+float Simulation::getParticleRadius() const
+{
+    return this->particleRadius;
+}
+
+/**
+ * Updates the uniform particle radius
+ */
+void Simulation::setParticleRadius(float r)
+{
+    this->particleRadius = r;
+    this->partcleMesh = ofMesh::sphere(this->particleRadius);
 }
 
 /**
@@ -573,13 +609,11 @@ void Simulation::drawParticles()
         // The fill:
         ofSetColor(51, 153, 255);
         ofFill();
-        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
-        
-        // Draw an outline of the particle:
-        ofSetColor(0, 0, 255);
-        ofNoFill();
-        ofDrawSphere(p.pos.x, p.pos.y, p.pos.z, p.radius);
-        
+        ofPushMatrix();
+            ofTranslate(p.pos.x, p.pos.y, p.pos.z);
+            this->partcleMesh.draw();
+        ofPopMatrix();
+
         if (this->isVisualDebuggingEnabled()) {
 
             // Label the particle with its number:
@@ -610,6 +644,7 @@ void Simulation::draw()
 
     this->drawParticles();
     
+    ofDrawAxis(2.0f);
 }
 
 /******************************************************************************/

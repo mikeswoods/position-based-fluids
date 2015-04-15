@@ -99,6 +99,8 @@
 		270A4D9D1AD7370900E21F51 /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
 		2712CA361AD76E760056EF01 /* Simulation.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Simulation.cl; path = bin/data/kernels/Simulation.cl; sourceTree = "<group>"; };
 		276C3E1E1ADEBF1C00492E07 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
+		276C3E221ADEDE9D00492E07 /* Basic.vert */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = Basic.vert; path = bin/data/shaders/Basic.vert; sourceTree = "<group>"; };
+		276C3E231ADEDEB100492E07 /* Basic.frag */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = Basic.frag; path = bin/data/shaders/Basic.frag; sourceTree = "<group>"; };
 		279B26971AD62D9500B6B554 /* AABB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AABB.cpp; sourceTree = "<group>"; };
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
 		279B26991AD62D9500B6B554 /* Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Definitions.h; sourceTree = "<group>"; };
@@ -232,6 +234,15 @@
 				2712CA361AD76E760056EF01 /* Simulation.cl */,
 			);
 			name = kernels;
+			sourceTree = "<group>";
+		};
+		276C3E211ADEDE7300492E07 /* shaders */ = {
+			isa = PBXGroup;
+			children = (
+				276C3E221ADEDE9D00492E07 /* Basic.vert */,
+				276C3E231ADEDEB100492E07 /* Basic.frag */,
+			);
+			name = shaders;
 			sourceTree = "<group>";
 		};
 		27BB07111AD7148E009F3377 /* ofxMSAOpenCL */ = {
@@ -453,6 +464,7 @@
 				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
 				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
 				E4B69E1C0A3A1BDC003C02F2 /* src */,
+				276C3E211ADEDE7300492E07 /* shaders */,
 				2712CA351AD7588E0056EF01 /* kernels */,
 				E4EEC9E9138DF44700A80321 /* openFrameworks */,
 				BB4B014C10F69532006C3DED /* addons */,
