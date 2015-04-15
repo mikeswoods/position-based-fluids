@@ -25,6 +25,20 @@
 const constant float G = 9.8f;
 
 /**
+ * Default kernel smoothing radius
+ */
+const constant float H_SMOOTHING_RADIUS = 1.2f;
+
+/*
+ * Vorticity Epsilon
+ */
+const constant float EPSILON_VORTICITY = 0.1f;
+const constant float EPSILON_VISCOSITY = 0.1f;
+const constant float H6 = H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS;
+const constant float PI = 3.14159265358979;
+const constant float NABLA2_W_VISCOSITY_COEFF = 45.0f / (PI * H6);
+
+/**
  * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
  * of the Position Based Fluids paper
  */
@@ -35,11 +49,6 @@ const constant float EPSILON_RELAXATION = 0.1f;
  */
 const constant float REST_DENSITY     = 10000.0f;
 const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
-
-/**
- * Default kernel smoothing radius
- */
-const constant float H_SMOOTHING_RADIUS = 1.25f;
 
 /*******************************************************************************
  * Types
@@ -52,6 +61,8 @@ typedef struct {
     float4 pos;    // 4 words
     
     float4 vel;    // 4 words
+    
+    float4 curl;   // 4 words
     
     float  mass;   // 1 word
 
@@ -401,6 +412,11 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
     return A * (B * B) * (r / (rBar + 1.0e-6f));
 }
 
+float d2w_viscosity(float4 pos_i, float4 pos_j, float h)
+{
+    float r = distance(pos_i, pos_j);
+    return NABLA2_W_VISCOSITY_COEFF * (H_SMOOTHING_RADIUS - r);
+}
 /**
  * SPH density estimator for a pair of particles p_i and p_j for use as a 
  * callback function with forAllNeighbors()
@@ -919,14 +935,12 @@ kernel void computePositionDelta(const global Particle* particles
 {
     int id = get_global_id(0);
 
-    const global Particle *p = &particles[id];
-    
     // Convert a linear index z into (i, j, k):
     
     int3 cellSubscript = ind2sub(id, cellsX, cellsY);
     
-    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0)
-                               , .lambda = lambda };
+    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0),
+                                 .lambda = lambda };
     
     forAllNeighbors(particles
                    ,sortedParticleToCell
@@ -965,6 +979,145 @@ kernel void applyPositionDelta(global Particle* particles
     p->pos.x += posDeltaX[id];
     p->pos.y += posDeltaY[id];
     p->pos.z += posDeltaZ[id];
+}
+
+
+/**
+ *  Add Viscosity to each particle
+ *
+ */
+kernel void applyViscosity(global Particle* particles,
+                           const global ParticlePosition* sortedParticleToCell,
+                           const global GridCellOffset* gridCellOffsets,
+                           const global float* density,
+                           int cellsX, int cellsY, int cellsZ)
+{
+    /*
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    // 27 (3x3x3) possible neighbors to search:
+    int neighbors[27];
+    
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell, gridCellOffsets,
+                                                    cellsX, cellsY, cellsZ,
+                                                    cellSubscript, neighbors);
+    
+    
+    float4 viscosity = float4(0.0f,0.0f,0.0f,0.0f);
+    float r_length;
+    int n_j;
+    // For all neighbors found for the given cell at grid subscript (i,j, k):
+    for (int j = 0; j < neighborCellCount; j++) {
+        n_j = neighbors[j];
+        if (neighbors[j] != -1 && n_j != id && density[n_j] != 0.0) {
+            r_length = length(p->pos - particles[n_j].pos);
+            if (H_SMOOTHING_RADIUS > r_length)
+            {
+                viscosity = particles[n_j].vel - p->vel;
+                viscosity *= particles[n_j].mass * d2w_viscosity(p->pos, particles[n_j].pos, H_SMOOTHING_RADIUS);
+                viscosity /= density[n_j];
+                viscosity *= EPSILON_VISCOSITY;
+                particles[id].vel += viscosity;
+            }
+        }
+    }
+    */
+}
+
+
+/**
+ *  Compute the Curl for each particle
+ *
+ */
+kernel void computeCurl(global Particle* particles,
+                        const global ParticlePosition* sortedParticleToCell,
+                        const global GridCellOffset* gridCellOffsets,
+                        int cellsX, int cellsY, int cellsZ)
+{
+    /*
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    // 27 (3x3x3) possible neighbors to search:
+    int neighbors[27];
+    
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell, gridCellOffsets,
+                                                    cellsX, cellsY, cellsZ,
+                                                    cellSubscript, neighbors);
+    
+    
+     float4 curl = float4(0.0f,0.0f,0.0f,0.0f);
+     float4 gradient, vel;
+     int n_j;
+     // For all neighbors found for the given cell at grid subscript (i,j, k):
+     for (int j = 0; j < neighborCellCount; j++) {
+         n_j = neighbors[j];
+         if (neighbors[j] != -1) {
+             vel = particles[n_j].vel - p->vel;
+             gradient = spiky(p->pos, particles[n_j].pos, H_SMOOTHING_RADIUS);
+             curl += cross(vel, gradient);
+         }
+     }
+     
+     particles[id].curl = curl;
+    */
+}
+
+
+/**
+ * Vorticity Confinement
+ *
+ */
+kernel void applyVorticity(global Particle* particles,
+                           float dt,
+                           const global ParticlePosition* sortedParticleToCell,
+                           const global GridCellOffset* gridCellOffsets,
+                           int cellsX, int cellsY, int cellsZ)
+{
+    /*
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
+    
+    // 27 (3x3x3) possible neighbors to search:
+    int neighbors[27];
+    
+    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell
+                                                    ,gridCellOffsets
+                                                    ,cellsX
+                                                    ,cellsY
+                                                    ,cellsZ
+                                                    ,cellSubscript
+                                                    ,neighbors);
+    
+    float4 r; // r is the distance to the center of the vortex
+    float4 gradVorticity = float4(0.0f,0.0f,0.0f,0.0f);
+    float gradLength;
+    int n_j;
+    // For all neighbors found for the given cell at grid subscript (i,j, k):
+    for (int j = 0; j < neighborCellCount; j++) {
+        n_j = neighbors[j];
+        if (neighbors[j] != -1) {
+            r = particles[n_j].pos - p->pos;
+            gradLength = length(particles[n_j].curl - p->curl);
+            gradVorticity += gradLength / r;
+        }
+    }
+    
+    float4 vorticity, N;
+    N = 1.0f / (length(gradVorticity) + EPSILON_VORTICITY) * gradVorticity;
+    vorticity = dt * EPSILON_RELAXATION * cross(N, p->curl);
+    particles[id].vel += vorticity;
+    */
 }
 
 /**
