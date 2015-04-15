@@ -36,7 +36,7 @@ const constant float H_SMOOTHING_RADIUS = 1.1f;
 const constant float EPSILON_VORTICITY = 0.1f;
 const constant float EPSILON_VISCOSITY = 0.1f;
 const constant float H6 = H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS;
-const constant float PI = 3.14159265358979;
+const constant float PI = 3.14159265358f;
 const constant float NABLA2_W_VISCOSITY_COEFF = 45.0f / (PI * H6);
 
 /**
@@ -125,6 +125,54 @@ typedef struct {
     
 } _PositionDeltaContext;
 
+global float rescale(float x, float a0, float a1, float b0, float b1);
+global int sub2ind(int i, int j, int k, int w, int h);
+global int3 ind2sub(int x, int w, int h);
+
+constant float poly6(float4 pos_i, float4 pos_j, float h);
+constant float4 spiky(float4 pos_i, float4 pos_j, float h);
+constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h);
+void callback_SPHDensityEstimator_i(int i
+                                    ,const global Particle* p_i
+                                    ,int j
+                                    ,const global Particle* p_j
+                                    ,void* data);
+ void callback_SPHGradient_i(int i
+                            ,const global Particle* p_i
+                            ,int j
+                            ,const global Particle* p_j
+                            ,void* data);
+
+ void callback_SquaredSPHGradientLength_j(int i
+                                         ,const global Particle* p_i
+                                         ,int j
+                                         ,const global Particle* p_j
+                                         ,void* data);
+ void callback_PositionDelta_i(int i
+                              ,const global Particle* p_i
+                              ,int j
+                              ,const global Particle* p_j
+                              ,void* data);
+
+global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
+                        ,const global GridCellOffset* gridCellOffsets
+                        ,int cellsX
+                        ,int cellsY
+                        ,int cellsZ
+                        ,int3 cellSubscript
+                        ,int* neighborCells);
+
+global void forAllNeighbors(const global Particle* particles
+                     ,const global ParticlePosition* sortedParticleToCell
+                     ,const global GridCellOffset* gridCellOffsets
+                     ,int numParticles
+                     ,int cellsX
+                     ,int cellsY
+                     ,int cellsZ
+                     ,int3 cellSubscript
+                     ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
+                     ,void* accum);
+
 /*******************************************************************************
  * Utility functions
  ******************************************************************************/
@@ -133,7 +181,7 @@ typedef struct {
  * A helper function that scales a value x in the range [a0,a1] to a new
  * range [b0,b1]
  */
-float rescale(float x, float a0, float a1, float b0, float b1)
+global float rescale(float x, float a0, float a1, float b0, float b1)
 {
     return ((x - a0) / (a1 - a0)) * (b1 - b0) + b0;
 }
@@ -147,7 +195,7 @@ float rescale(float x, float a0, float a1, float b0, float b1)
  * @param [in] int w grid width
  * @param [in] int h grid height
  */
-int sub2ind(int i, int j, int k, int w, int h)
+global int sub2ind(int i, int j, int k, int w, int h)
 {
     return i + (j * w) + k * (w * h);
 }
@@ -159,7 +207,7 @@ int sub2ind(int i, int j, int k, int w, int h)
  * @param [in] int w grid width
  * @param [in] int h grid height
  */
-int3 ind2sub(int x, int w, int h)
+global int3 ind2sub(int x, int w, int h)
 {
     return (int3)(x % w, (x / w) % h, x / (w * h));
 }
@@ -186,7 +234,7 @@ int3 ind2sub(int x, int w, int h)
  * @param [in]  int3 cellSubscript
  * @param [out] int* neighborCells
  */
-int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
+global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
                        ,const global GridCellOffset* gridCellOffsets
                        ,int cellsX
                        ,int cellsY
@@ -268,7 +316,7 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
  */
-void forAllNeighbors(const global Particle* particles
+global void forAllNeighbors(const global Particle* particles
                     ,const global ParticlePosition* sortedParticleToCell
                     ,const global GridCellOffset* gridCellOffsets
                     ,int numParticles
@@ -392,7 +440,7 @@ void forAllNeighbors(const global Particle* particles
  * @param float h Smoothing kernel radius
  * @returns float
  */
-float poly6(float4 pos_i, float4 pos_j, float h)
+constant float poly6(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
@@ -419,7 +467,7 @@ float poly6(float4 pos_i, float4 pos_j, float h)
  * @param float h Smoothing kernel radius
  * @returns float4
  */
-float4 spiky(float4 pos_i, float4 pos_j, float h)
+constant float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
@@ -438,7 +486,7 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
 /**
  *
  */
-float d2w_viscosity(float4 pos_i, float4 pos_j, float h)
+constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h)
 {
     float r = distance(pos_i, pos_j);
     return NABLA2_W_VISCOSITY_COEFF * (H_SMOOTHING_RADIUS - r);
@@ -527,7 +575,7 @@ void callback_SquaredSPHGradientLength_j(int i
  * @param int j Index of particle j
  * @param Particle* p_j Pair particle p_j
  */
-void callback_PositionDelta_i(int i
+ void callback_PositionDelta_i(int i
                              ,const global Particle* p_i
                              ,int j
                              ,const global Particle* p_j
@@ -625,9 +673,9 @@ kernel void discretizeParticlePositions(const global Particle* particles
     
     // Find the dicretized cell the particle will be in according to its
     // predicted position:
-    int cellI = (int)round((rescale(p->posStar.x, minExtent.x, maxExtent.x, 0.0, (float)(cellsX - 1))));
-    int cellJ = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1))));
-    int cellK = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1))));
+    int cellI = (int)round((rescale(p->posStar.x, minExtent.x, maxExtent.x, 0.0f, (float)(cellsX - 1))));
+    int cellJ = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0f, (float)(cellsY - 1))));
+    int cellK = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0f, (float)(cellsZ - 1))));
 
     p2c->particleIndex = id;
     
@@ -895,11 +943,11 @@ kernel void computeLambda(const global Particle* particles
 
     float C_i = (density[id] * INV_REST_DENSITY) - 1.0f;
     
-    float gradientSum = 0.0;
+    float gradientSum = 0.0f;
     
     // ==== Case (2) k = i =====================================================
 
-    float4 gv_i = (float4)(0.0, 0.0, 0.0, 0.0);
+    float4 gv_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 
     forAllNeighbors(particles
                    ,sortedParticleToCell
@@ -976,7 +1024,7 @@ kernel void computePositionDelta(const global Particle* particles
     
     int3 cellSubscript = ind2sub(id, cellsX, cellsY);
     
-    _PositionDeltaContext pd = { .posDelta = (float)(0.0, 0.0, 0.0, 0.0),
+    _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 0.0f),
                                  .lambda = lambda };
     
     forAllNeighbors(particles
