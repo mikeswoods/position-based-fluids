@@ -25,15 +25,15 @@ ostream& operator<<(ostream& os, const AABB& aabb)
 /******************************************************************************/
 
 AABB::AABB():
-    minV((float3)(0.0f, 0.0f, 0.0f)),
-    maxV((float3)(0.0f, 0.0f, 0.0f))
+    minV(float3(0.0f, 0.0f, 0.0f)),
+    maxV(float3(0.0f, 0.0f, 0.0f))
 {
     
 }
 
 AABB::AABB(float3 _p, float3 _q) :
-    minV((float3)(std::min(_p[0], _q[0]), std::min(_p[1], _q[1]), std::min(_p[2], _q[2]))),
-    maxV((float3)(std::max(_p[0], _q[0]), std::max(_p[1], _q[1]), std::max(_p[2], _q[2])))
+    minV(float3(std::min(_p[0], _q[0]), std::min(_p[1], _q[1]), std::min(_p[2], _q[2]))),
+    maxV(float3(std::max(_p[0], _q[0]), std::max(_p[1], _q[1]), std::max(_p[2], _q[2])))
 {
     
 }

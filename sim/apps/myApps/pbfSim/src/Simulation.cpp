@@ -12,6 +12,10 @@
 
 /******************************************************************************/
 
+const int SOLVER_ITERATIONS = 5;
+
+/******************************************************************************/
+
 using namespace std;
 
 /******************************************************************************/
@@ -120,10 +124,11 @@ void Simulation::initializeKernels()
     this->openCL.kernel("estimateDensity")->setArg(0, this->particles);
     this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("estimateDensity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("estimateDensity")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("estimateDensity")->setArg(6, this->density);
+    this->openCL.kernel("estimateDensity")->setArg(3, this->numParticles);
+    this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("estimateDensity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("estimateDensity")->setArg(7, this->density);
     
     // KERNEL :: computeLambda
     this->openCL.loadKernel("computeLambda");
@@ -142,13 +147,14 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computePositionDelta")->setArg(0, this->particles);
     this->openCL.kernel("computePositionDelta")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("computePositionDelta")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("computePositionDelta")->setArg(3, this->lambda);
-    this->openCL.kernel("computePositionDelta")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("computePositionDelta")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("computePositionDelta")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("computePositionDelta")->setArg(7, this->posDeltaX);
-    this->openCL.kernel("computePositionDelta")->setArg(8, this->posDeltaY);
-    this->openCL.kernel("computePositionDelta")->setArg(9, this->posDeltaZ);
+    this->openCL.kernel("computePositionDelta")->setArg(3, this->numParticles);
+    this->openCL.kernel("computePositionDelta")->setArg(4, this->lambda);
+    this->openCL.kernel("computePositionDelta")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
+    this->openCL.kernel("computePositionDelta")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
+    this->openCL.kernel("computePositionDelta")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("computePositionDelta")->setArg(8, this->posDeltaX);
+    this->openCL.kernel("computePositionDelta")->setArg(9, this->posDeltaY);
+    this->openCL.kernel("computePositionDelta")->setArg(10, this->posDeltaZ);
     
     // KERNEL :: applyPositionDelta
     this->openCL.loadKernel("applyPositionDelta");
@@ -430,7 +436,7 @@ void Simulation::step()
 {
     // Solver iterations (this will be adjustable later)
 
-    int N = 5;
+    int N = SOLVER_ITERATIONS;
     
     // We need to perform this step (zeroing out the histogram array and some
     // other data structures needed) before we compute the particle cell groups

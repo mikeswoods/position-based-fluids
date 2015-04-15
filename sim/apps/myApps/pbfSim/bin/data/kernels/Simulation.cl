@@ -14,6 +14,7 @@
  ******************************************************************************/
 
 //#define DEBUG
+#define USE_BRUTE_FORCE_SEARCH 1
 
 /*******************************************************************************
  * Constants
@@ -27,7 +28,7 @@ const constant float G = 9.8f;
 /**
  * Default kernel smoothing radius
  */
-const constant float H_SMOOTHING_RADIUS = 1.3f;
+const constant float H_SMOOTHING_RADIUS = 0.8f;
 
 /*
  * Vorticity Epsilon
@@ -45,7 +46,7 @@ const constant float NABLA2_W_VISCOSITY_COEFF = 45.0f / (PI * H6);
 const constant float EPSILON_RELAXATION = 0.1f;
 
 /**
- * Particle rest density: 1000kg/m^3
+ * Particle rest density: 1000kg/m^3 = 10,000g/m^3
  */
 const constant float REST_DENSITY     = 10000.0f;
 const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
@@ -176,9 +177,12 @@ int3 ind2sub(int x, int w, int h)
  *
  * @param [in]  sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
- * @param [in]  int cellsX
- * @param [in]  int cellsY
- * @param [in]  int cellsZ
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
  * @param [in]  int3 cellSubscript
  * @param [out] int* neighborCells
  */
@@ -252,9 +256,13 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
- * @param [in]  int cellsX
- * @param [in]  int cellsY
- * @param [in]  int cellsZ
+ * @param [in]  int numParticles The total number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
  * @param [in]  int3 cellSubscript
  * @param [in]  (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
  * @param [out] void* accum The accumulated result, passed to and update by apply
@@ -263,6 +271,7 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
 void forAllNeighbors(const global Particle* particles
                     ,const global ParticlePosition* sortedParticleToCell
                     ,const global GridCellOffset* gridCellOffsets
+                    ,int numParticles
                     ,int cellsX
                     ,int cellsY
                     ,int cellsZ
@@ -272,6 +281,29 @@ void forAllNeighbors(const global Particle* particles
 {
     int id = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
     const global Particle *p_i = &particles[id];
+    
+#ifdef USE_BRUTE_FORCE_SEARCH
+
+    // Exhaustively search the space for neighbors by computing the distance
+    // between p_i and for all j in [0 .. numParticles - 1], p_j:
+
+    for (int j = 0; j < numParticles; j++) {
+        
+        // Skip instances in which we'd be comparing a particle to itself:
+        if (j == id) {
+            continue;
+        }
+
+        const global Particle* p_j = &particles[j];
+        float d = distance(p_i->posStar, p_j->posStar);
+        float R = p_i->radius + p_j->radius;
+
+        if (d <= R) {
+            callback(id, p_i, j, p_j, accum);
+        }
+    }
+
+#else // Use fixed-radius neighbor search:
     
     // 27 (3x3x3) possible neighbors to search:
 
@@ -285,8 +317,6 @@ void forAllNeighbors(const global Particle* particles
                                                ,neighborCells);
     
     #ifdef DEBUG
-        int contributingParticles = 0;
-    
         printf("forAllNeighbors [%d] :: (%d,%d,%d) => neighboring search cells: %d\n",
                id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
                neighborCellCount);
@@ -316,8 +346,7 @@ void forAllNeighbors(const global Particle* particles
                     
                     int J = sortedParticleToCell[k].particleIndex;
                     
-                    // Skip instances in which
-                    // we'd be comparing a particle to itself:
+                    // Skip instances in which we'd be comparing a particle to itself:
                     
                     if (id == J) {
                         continue;
@@ -327,34 +356,26 @@ void forAllNeighbors(const global Particle* particles
                     
                     // Now, we compute the distance between the two particles:
 
-                    float r = distance(p_i->posStar, p_j->posStar);
+                    float d = distance(p_i->posStar, p_j->posStar);
+                    float R = p_i->radius + p_j->radius;
                     
                     // If the position delta is less then the sum of the
                     // radii of both particles, then use the particle in the
                     // density calculation:
-                    
-                    float distThreshold = p_i->radius + p_j->radius;
-                    
-                    if (r < (distThreshold - 1.0e-3)) {
-                        
-                        //#ifdef DEBUG
-                        //    printf("  in-range: p_i [i=%d] - p_j [J=%d] = %f\n", id, J, r);
-                        //#endif
+
+                    if (d <= R) {
                         
                         // Invoke the callback function to the particle pair
                         // (p_i, p_j), along with their respective indices,
                         // and accumulate the result into accum:
 
                         callback(id, p_i, J, p_j, accum);
-
-                        #ifdef DEBUG
-                            contributingParticles += 1;
-                        #endif
                     }
                 }
             }
         }
     }
+#endif
 }
 
 /*******************************************************************************
@@ -376,10 +397,6 @@ float poly6(float4 pos_i, float4 pos_j, float h)
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
 
-    if (rBar == 0) {
-        return 0;
-    }
-    
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
     float A  = 1.566681471061 * h9;
@@ -402,16 +419,12 @@ float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
-    
-    if (rBar == 0) {
-    //    return 0;
-    }
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
     float A    = 14.323944878271 * h6;
     float B    = (h - rBar);
-    return A * (B * B) * (r / (rBar + 1.0e-6f));
+    return A * (B * B) * (r / (rBar + 1.0e-3f));
 }
 
 /**
@@ -599,7 +612,8 @@ kernel void discretizeParticlePositions(const global Particle* particles
                                        ,float3 maxExtent)
 {
     int id = get_global_id(0);
-    const global Particle *p = &particles[id];
+    const global Particle *p     = &particles[id];
+    global ParticlePosition *p2c = &particleToCell[id];
     
     // Find the dicretized cell the particle will be in according to its
     // predicted position:
@@ -607,12 +621,12 @@ kernel void discretizeParticlePositions(const global Particle* particles
     int cellJ = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0, (float)(cellsY - 1))));
     int cellK = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0, (float)(cellsZ - 1))));
 
-    particleToCell[id].particleIndex = id;
+    p2c->particleIndex = id;
     
     // Set the (i,j,k) index of the cell:
-    particleToCell[id].cellI = cellI;
-    particleToCell[id].cellJ = cellJ;
-    particleToCell[id].cellK = cellK;
+    p2c->cellI = cellI;
+    p2c->cellJ = cellJ;
+    p2c->cellK = cellK;
     
     // Compute the linear index for the histogram counter
     int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
@@ -642,8 +656,8 @@ kernel void discretizeParticlePositions(const global Particle* particles
  * @param [out] gridCellOffsets An array of size [0 .. numCells-1], where
  *              each index i contains the start and length of the i-th
  *              cell in the grid as it occurs in sortedParticleToCell
- * @param [in] numParticles The total number of particles in the simulation
- * @param [in] numCells The total number of cells in the spatial grid
+ * @param [in] int numParticles The total number of particles in the simulation
+ * @param [in] int numCells The total number of cells in the spatial grid
  * @param [in] int cellsX The number of cells in the x axis of the spatial
  *             grid
  * @param [in] int cellsY The number of cells in the y axis of the spatial
@@ -773,6 +787,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
+ * @param [in]  int numParticles The number of particles in the simulation
  * @param [in]  int cellsX The number of cells in the x axis of the spatial
  *              grid
  * @param [in]  int cellsY The number of cells in the y axis of the spatial
@@ -784,6 +799,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
 void kernel estimateDensity(const global Particle* particles
                            ,const global ParticlePosition* sortedParticleToCell
                            ,const global GridCellOffset* gridCellOffsets
+                           ,int numParticles
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
@@ -804,6 +820,7 @@ void kernel estimateDensity(const global Particle* particles
     forAllNeighbors(particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
+                   ,numParticles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
@@ -879,6 +896,7 @@ kernel void computeLambda(const global Particle* particles
     forAllNeighbors(particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
+                   ,numParticles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
@@ -897,6 +915,7 @@ kernel void computeLambda(const global Particle* particles
     forAllNeighbors(particles
                     ,sortedParticleToCell
                     ,gridCellOffsets
+                    ,numParticles
                     ,cellsX
                     ,cellsY
                     ,cellsZ
@@ -934,6 +953,7 @@ kernel void computeLambda(const global Particle* particles
 kernel void computePositionDelta(const global Particle* particles
                                 ,const global ParticlePosition* sortedParticleToCell
                                 ,const global GridCellOffset* gridCellOffsets
+                                ,int numParticles
                                 ,const global float* lambda
                                 ,int cellsX
                                 ,int cellsY
@@ -954,6 +974,7 @@ kernel void computePositionDelta(const global Particle* particles
     forAllNeighbors(particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
+                   ,numParticles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
@@ -966,10 +987,6 @@ kernel void computePositionDelta(const global Particle* particles
     posDeltaX[id] = pStar.x;
     posDeltaY[id] = pStar.y;
     posDeltaZ[id] = pStar.z;
-    /*
-    printf("computePositionDelta [%d] :: delta => (%f,%f,%f)\n",
-           id, pStar.x, pStar.y, pStar.z);
-     */
 }
 
 /**
