@@ -1,5 +1,5 @@
 dependencies: \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/utils/ofThread.cpp \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/utils/ofThread.cpp \
   ../../../../libs/openFrameworks/utils/ofThread.h \
   ../../../../libs/poco/include/Poco/AtomicCounter.h \
   ../../../../libs/poco/include/Poco/Foundation.h \
@@ -23,11 +23,11 @@ dependencies: \
   ../../../../libs/openFrameworks/utils/ofConstants.h \
   ../../../../libs/glew/include/GL/glew.h \
   ../../../../libs/tess2/include/tesselator.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
   ../../../../libs/openFrameworks/types/ofColor.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
   ../../../../libs/openFrameworks/math/ofVec2f.h \
   ../../../../libs/openFrameworks/math/ofVec4f.h \
   ../../../../libs/openFrameworks/utils/ofLog.h \

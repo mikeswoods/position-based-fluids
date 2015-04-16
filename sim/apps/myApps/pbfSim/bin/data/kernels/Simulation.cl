@@ -14,7 +14,7 @@
  ******************************************************************************/
 
 //#define DEBUG
-#define USE_BRUTE_FORCE_SEARCH 1
+//#define USE_BRUTE_FORCE_SEARCH 1
 
 /*******************************************************************************
  * Constants
@@ -135,9 +135,23 @@ global int sub2ind(int i, int j, int k, int w, int h);
 
 global int3 ind2sub(int x, int w, int h);
 
-//constant float poly6(float4 pos_i, float4 pos_j, float h);
+global int getKey(const global Particle* p
+                 ,int cellsX
+                 ,int cellsY
+                 ,int cellsZ
+                 ,float3 minExtent
+                 ,float3 maxExtent);
 
-//constant float4 spiky(float4 pos_i, float4 pos_j, float h);
+global int3 getSubscript(const global Particle* p
+                        ,int cellsX
+                        ,int cellsY
+                        ,int cellsZ
+                        ,float3 minExtent
+                        ,float3 maxExtent);
+
+float poly6(float4 pos_i, float4 pos_j, float h);
+
+float4 spiky(float4 pos_i, float4 pos_j, float h);
 
 constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h);
 
@@ -178,7 +192,9 @@ global void forAllNeighbors(const global Particle* particles
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
-                           ,int3 cellSubscript
+                           ,float3 minExtent
+                           ,float3 maxExtent
+                           ,int particleId
                            ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
                            ,void* accum);
 
@@ -219,6 +235,70 @@ global int sub2ind(int i, int j, int k, int w, int h)
 global int3 ind2sub(int x, int w, int h)
 {
     return (int3)(x % w, (x / w) % h, x / (w * h));
+}
+
+/**
+ * Given a Particle, this function returns the 3D cell subscript of the cell the
+ * particle is contained in
+ *
+ * @param Particle* p The particle to find the cell key of
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
+ * @param [in] float3 minExtent The minimum extent of the simulation's
+ *             bounding box in world space
+ * @param [in] float3 maxExtent The maximum extent of the simulation's
+ *             bounding box in world space
+ * @returns int3 The 3D subscript (i,j,k) of the cell the particle is
+ *               contained in
+ */
+global int3 getSubscript(const global Particle* p
+                       ,int cellsX
+                       ,int cellsY
+                       ,int cellsZ
+                       ,float3 minExtent
+                       ,float3 maxExtent)
+{
+    // Find the discretized cell the particle will be in according to its
+    // predicted position:
+    int i = (int)round((rescale(p->posStar.x, minExtent.x, maxExtent.x, 0.0f, (float)(cellsX - 1))));
+    int j = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0f, (float)(cellsY - 1))));
+    int k = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0f, (float)(cellsZ - 1))));
+    
+    return (int3)(i, j, k);
+}
+
+/**
+ * Given a Particle, this function returns 1D cell index of the cell the 
+ * particle is contained in
+ *
+ * @param Particle* p The particle to find the cell key of
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
+ * @param [in] float3 minExtent The minimum extent of the simulation's
+ *             bounding box in world space
+ * @param [in] float3 maxExtent The maximum extent of the simulation's
+ *             bounding box in world space
+ * @returns int The 1D key of the cell the particle is contained in
+ */
+global int getKey(const global Particle* p
+                 ,int cellsX
+                 ,int cellsY
+                 ,int cellsZ
+                 ,float3 minExtent
+                 ,float3 maxExtent)
+{
+    int3 subscript = getSubscript(p, cellsX, cellsY, cellsZ, minExtent, maxExtent);
+
+    // Compute the linear index as the key:
+    return sub2ind(subscript.x, subscript.y, subscript.z, cellsX, cellsY);
 }
 
 /**
@@ -320,7 +400,14 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  int3 cellSubscript
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  int particleId The ID (index) of the particle to find the n
+ *              neighbors of. This value corresponds to the position of the 
+ *              particle in the array particles, and must be in the range
+ *              [0 .. numParticles - 1]
  * @param [in]  (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
@@ -332,12 +419,18 @@ global void forAllNeighbors(const global Particle* particles
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
-                           ,int3 cellSubscript
+                           ,float3 minExtent
+                           ,float3 maxExtent
+                           ,int particleId
                            ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
                            ,void* accum)
 {
-    int id = sub2ind(cellSubscript.x, cellSubscript.y, cellSubscript.z, cellsX, cellsY);
-    const global Particle *p_i = &particles[id];
+    // Sanity check:
+    if (particleId < 0 || particleId >= numParticles) {
+        return;
+    }
+
+    const global Particle *p_i = &particles[particleId];
     
 #ifdef USE_BRUTE_FORCE_SEARCH
 
@@ -347,7 +440,7 @@ global void forAllNeighbors(const global Particle* particles
     for (int j = 0; j < numParticles; j++) {
 
         // Skip instances in which we'd be comparing a particle to itself:
-        if (j == id) {
+        if (j == particleId) {
             continue;
         }
 
@@ -356,12 +449,16 @@ global void forAllNeighbors(const global Particle* particles
         float R = p_i->radius + p_j->radius;
 
         if (d <= R) {
-            callback(id, p_i, j, p_j, accum);
+            callback(particleId, p_i, j, p_j, accum);
         }
     }
 
 #else // Use fixed-radius neighbor search:
-    
+
+    // Given a particle, find the cell it's in based on its position:
+
+    int3 cellSubscript = getSubscript(p_i, cellsX, cellsY, cellsZ, minExtent, maxExtent);
+
     // 27 (3x3x3) possible neighbors to search:
 
     int neighborCells[27];
@@ -373,17 +470,11 @@ global void forAllNeighbors(const global Particle* particles
                                                ,cellSubscript
                                                ,neighborCells);
     
-    #ifdef DEBUG
-        printf("forAllNeighbors [%d] :: (%d,%d,%d) => neighboring search cells: %d\n",
-               id, cellSubscript.x, cellSubscript.y, cellSubscript.z,
-               neighborCellCount);
-    #endif
-    
     // For all neighbors found for the given cell at grid subscript (i,j, k):
 
     for (int j = 0; j < neighborCellCount; j++) {
         
-        // We fetch the all indices returned in neighbors and check
+        // We fetch the all indices returned in neighbors and check that
         // the corresponding entries in gridCellOffsets (if neighbors[j]
         // is valid):
         
@@ -392,7 +483,7 @@ global void forAllNeighbors(const global Particle* particles
             const global GridCellOffset* g = &gridCellOffsets[neighborCells[j]];
             
             // If the start index of the grid-cell is valid, we iterate over
-            // every neighbor we find:
+            // every particle we find in the cell:
             
             if (g->start != -1) {
                 
@@ -405,20 +496,23 @@ global void forAllNeighbors(const global Particle* particles
                     
                     // Skip instances in which we'd be comparing a particle to itself:
                     
-                    if (id == J) {
+                    if (particleId == J) {
                         continue;
                     }
                     
+                    // The current potentially neighboring particle to check
+                    // the distance of:
+                    
                     const global Particle* p_j = &particles[J];
                     
-                    // Now, we compute the distance between the two particles:
+                    // To determine if p_j is actually a neighbor of p_i, we
+                    // test if the position delta is less then the sum of the
+                    // radii of both particles. If p_j is a neighbor of p_i,
+                    // we invoke the specified callback and accumulate the
+                    // result:
 
                     float d = distance(p_i->posStar, p_j->posStar);
                     float R = p_i->radius + p_j->radius;
-                    
-                    // If the position delta is less then the sum of the
-                    // radii of both particles, then use the particle in the
-                    // density calculation:
 
                     if (d <= R) {
                         
@@ -426,7 +520,7 @@ global void forAllNeighbors(const global Particle* particles
                         // (p_i, p_j), along with their respective indices,
                         // and accumulate the result into accum:
 
-                        callback(id, p_i, J, p_j, accum);
+                        callback(particleId, p_i, J, p_j, accum);
                     }
                 }
             }
@@ -449,8 +543,7 @@ global void forAllNeighbors(const global Particle* particles
  * @param float h Smoothing kernel radius
  * @returns float
  */
-/*
-constant float poly6(float4 pos_i, float4 pos_j, float h)
+float poly6(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
@@ -466,7 +559,6 @@ constant float poly6(float4 pos_i, float4 pos_j, float h)
 
     return A * (B * B * B);
 }
-*/
 
 /**
  * Spiky smoothing kernel
@@ -478,8 +570,7 @@ constant float poly6(float4 pos_i, float4 pos_j, float h)
  * @param float h Smoothing kernel radius
  * @returns float4
  */
-/*
-constant float4 spiky(float4 pos_i, float4 pos_j, float h)
+float4 spiky(float4 pos_i, float4 pos_j, float h)
 {
     float4 r   = pos_i - pos_j;
     float rBar = length(r);
@@ -494,7 +585,6 @@ constant float4 spiky(float4 pos_i, float4 pos_j, float h)
     float B    = (h - rBar);
     return A * (B * B) * (r / (rBar + 1.0e-3f));
 }
-*/
 
 /**
  *
@@ -526,6 +616,7 @@ void callback_SPHDensityEstimator_i(int i
 
     float* accumDensity = (float*)data;
 
+    /*
     // ~~~ POLY6 ~~~
     float h    = H_SMOOTHING_RADIUS;
     float4 r   = p_i->posStar - p_j->posStar;
@@ -541,7 +632,9 @@ void callback_SPHDensityEstimator_i(int i
     }
 
     (*accumDensity) += V;
-    //(*accumDensity) += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    */
+    
+    (*accumDensity) += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -563,12 +656,15 @@ void callback_SPHGradient_i(int i
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
 
+    float4* gradVector = (float4*)data;
+    
+    /*
     // ~~~ SPIKY ~~~
     float h             = H_SMOOTHING_RADIUS;
     float4 r           = p_i->posStar - p_j->posStar;
     float rBar         = length(r);
     float4 V           = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    float4* gradVector = (float4*)data;
+    
 
     if (rBar <= h) {
         // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
@@ -579,7 +675,9 @@ void callback_SPHGradient_i(int i
     }
     
     (*gradVector) += V;
-    //(*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    */
+    
+    (*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
 }
 
 /**
@@ -601,12 +699,14 @@ void callback_SquaredSPHGradientLength_j(int i
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
     
+    float* totalGradLength = (float*)data;
+
+    /*
     // ~~~ SPIKY ~~~
     float h                = H_SMOOTHING_RADIUS;
     float4 r               = p_i->posStar - p_j->posStar;
     float rBar             = length(r);
     float4 V               = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    float* totalGradLength = (float*)data;
     
     if (rBar <= h) {
         // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
@@ -615,9 +715,10 @@ void callback_SquaredSPHGradientLength_j(int i
         float B     = (h - rBar);
         V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
     }
-
-    //float4 gradVector    = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
     float4 gradVector      = (INV_REST_DENSITY * -V);
+    */
+
+    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
     float gradVectorLength = length(gradVector);
     
     (*totalGradLength) += (gradVectorLength * gradVectorLength);
@@ -638,12 +739,16 @@ void callback_SquaredSPHGradientLength_j(int i
                              ,const global Particle* p_j
                              ,void* data)
 {
+    // Cast the void pointer to the type we expect, so we can update the
+    // variable accordingly:
+    
     _PositionDeltaContext* context = (_PositionDeltaContext*)data;
     
     float lambda_i = context->lambda[i];
     float lambda_j = context->lambda[j];
     
     // ~~~ SPIKY ~~~
+    /*
     float h                = H_SMOOTHING_RADIUS;
     float4 r               = p_i->posStar - p_j->posStar;
     float rBar             = length(r);
@@ -656,9 +761,10 @@ void callback_SquaredSPHGradientLength_j(int i
         float B     = (h - rBar);
         V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
     }
-
-    //context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
     context->posDelta += (lambda_i + lambda_j) * V;
+    */
+
+    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
 }
 
 /*******************************************************************************
@@ -739,25 +845,23 @@ kernel void discretizeParticlePositions(const global Particle* particles
                                        ,float3 minExtent
                                        ,float3 maxExtent)
 {
-    int id = get_global_id(0);
+    int id                       = get_global_id(0);
     const global Particle *p     = &particles[id];
     global ParticlePosition *p2c = &particleToCell[id];
     
-    // Find the dicretized cell the particle will be in according to its
-    // predicted position:
-    int cellI = (int)round((rescale(p->posStar.x, minExtent.x, maxExtent.x, 0.0f, (float)(cellsX - 1))));
-    int cellJ = (int)round((rescale(p->posStar.y, minExtent.y, maxExtent.y, 0.0f, (float)(cellsY - 1))));
-    int cellK = (int)round((rescale(p->posStar.z, minExtent.z, maxExtent.z, 0.0f, (float)(cellsZ - 1))));
+    // Convert the particle's position (x,y,z) to a grid cell subscript (i,j,k):
+    int3 subscript = getSubscript(p, cellsX, cellsY, cellsZ, minExtent, maxExtent);
+    
+    // Convert the particle's position (x,y,z) to a linear index key:
+    int key = getKey(p, cellsX, cellsY, cellsZ, minExtent, maxExtent);
 
     p2c->particleIndex = id;
     
     // Set the (i,j,k) index of the cell:
-    p2c->cellI = cellI;
-    p2c->cellJ = cellJ;
-    p2c->cellK = cellK;
-    
-    // Compute the linear index for the histogram counter
-    int key = sub2ind(cellI, cellJ, cellK, cellsX, cellsY);
+
+    p2c->cellI = subscript.x;
+    p2c->cellJ = subscript.y;
+    p2c->cellK = subscript.z;
 
     // This is needed; "cellHistogram[z] += 1" won't work here as multiple
     // threads are modifying cellHistogram simultaneously:
@@ -889,7 +993,9 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
     }
 
     #ifdef DEBUG
-        printf("=======================\n");
+
+        printf("=================================\n");
+        printf("[ParticlePosition]\n");
         for (int i = 0; i < numParticles; i++) {
             global ParticlePosition* spp = &sortedParticleToCell[i];
             int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
@@ -897,10 +1003,16 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
                    i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
         }
         printf("\n");
+    
+        printf("[GridCellOffset]\n");
         for (int i = 0; i < numCells; i++) {
             global GridCellOffset* gco = &gridCellOffsets[i];
             printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
         }
+        printf("\n");
+    
+    
+    
     #endif
 }
 
@@ -922,6 +1034,10 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
  * @param [out] float* density
  */
 void kernel estimateDensity(const global Particle* particles
@@ -931,14 +1047,12 @@ void kernel estimateDensity(const global Particle* particles
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
+                           ,float3 minExtent
+                           ,float3 maxExtent
                            ,global float* density)
 {
     int id = get_global_id(0);
-    
-    // Convert a linear index z into (i, j, k):
 
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
     // For all neighboring particles p_j of the current particle (specified
     // by particles[id], aka p_i), apply the function estimateDensity for
     // all (p_i, p_j), accumulating the result into the density variable:
@@ -952,7 +1066,9 @@ void kernel estimateDensity(const global Particle* particles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
-                   ,cellSubscript
+                   ,minExtent
+                   ,maxExtent
+                   ,id
                    ,callback_SPHDensityEstimator_i
                    ,(void*)&estDensity);
 
@@ -992,6 +1108,10 @@ void kernel estimateDensity(const global Particle* particles
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
  * @param [out] float* lambda The constraint lambda value
  */
 kernel void computeLambda(const global Particle* particles
@@ -1002,14 +1122,12 @@ kernel void computeLambda(const global Particle* particles
                          ,int cellsX
                          ,int cellsY
                          ,int cellsZ
+                         ,float3 minExtent
+                         ,float3 maxExtent
                          ,global float* lambda)
 {
     int id = get_global_id(0);
 
-    // Convert a linear index z into (i, j, k):
-    
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
     // Compute the constraint value C_i(p_1, ... p_n) for all neighbors [1..n]
     // of particle i:
 
@@ -1028,7 +1146,9 @@ kernel void computeLambda(const global Particle* particles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
-                   ,cellSubscript
+                   ,minExtent
+                   ,maxExtent
+                   ,id
                    ,callback_SPHGradient_i
                    ,(void*)&gv_i);
     
@@ -1047,7 +1167,9 @@ kernel void computeLambda(const global Particle* particles
                     ,cellsX
                     ,cellsY
                     ,cellsZ
-                    ,cellSubscript
+                    ,minExtent
+                    ,maxExtent
+                    ,id
                     ,callback_SquaredSPHGradientLength_j
                     ,(void*)&gv_sLengths);
     
@@ -1074,6 +1196,10 @@ kernel void computeLambda(const global Particle* particles
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
  * @param [out] float* posDeltaX position changes in X
  * @param [out] float* posDeltaY position changes in Y
  * @param [out] float* posDeltaZ position changes in Z
@@ -1086,16 +1212,14 @@ kernel void computePositionDelta(const global Particle* particles
                                 ,int cellsX
                                 ,int cellsY
                                 ,int cellsZ
+                                ,float3 minExtent
+                                ,float3 maxExtent
                                 ,global float* posDeltaX
                                 ,global float* posDeltaY
                                 ,global float* posDeltaZ)
 {
     int id = get_global_id(0);
 
-    // Convert a linear index z into (i, j, k):
-    
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
     _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 0.0f),
                                  .lambda = lambda };
     
@@ -1106,7 +1230,9 @@ kernel void computePositionDelta(const global Particle* particles
                    ,cellsX
                    ,cellsY
                    ,cellsZ
-                   ,cellSubscript
+                   ,minExtent
+                   ,maxExtent
+                   ,id
                    ,callback_PositionDelta_i
                    ,(void*)&pd);
     

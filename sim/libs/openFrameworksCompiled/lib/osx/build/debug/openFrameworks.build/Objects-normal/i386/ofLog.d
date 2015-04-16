@@ -1,5 +1,5 @@
 dependencies: \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/utils/ofLog.cpp \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/utils/ofLog.cpp \
   ../../../../libs/openFrameworks/utils/ofLog.h \
   ../../../../libs/openFrameworks/utils/ofConstants.h \
   ../../../../libs/glew/include/GL/glew.h \
@@ -14,16 +14,16 @@ dependencies: \
   ../../../../libs/poco/include/Poco/Types.h \
   ../../../../libs/poco/include/Poco/Timestamp.h \
   ../../../../libs/poco/include/Poco/File_UNIX.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
   ../../../../libs/openFrameworks/types/ofColor.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
   ../../../../libs/openFrameworks/math/ofVec2f.h \
   ../../../../libs/openFrameworks/math/ofVec4f.h \
   ../../../../libs/poco/include/Poco/Mutex.h \
   ../../../../libs/poco/include/Poco/Exception.h \
   ../../../../libs/poco/include/Poco/ScopedLock.h \
   ../../../../libs/poco/include/Poco/Mutex_POSIX.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
   ../../../../libs/poco/include/Poco/Path.h

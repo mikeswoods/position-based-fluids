@@ -1,5 +1,5 @@
 dependencies: \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/utils/ofURLFileLoader.cpp \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/utils/ofURLFileLoader.cpp \
   ../../../../libs/poco/include/Poco/Net/HTTPSession.h \
   ../../../../libs/poco/include/Poco/Net/Net.h \
   ../../../../libs/poco/include/Poco/Foundation.h \
@@ -87,14 +87,14 @@ dependencies: \
   ../../../../libs/openFrameworks/utils/ofConstants.h \
   ../../../../libs/glew/include/GL/glew.h \
   ../../../../libs/tess2/include/tesselator.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
   ../../../../libs/openFrameworks/types/ofColor.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
   ../../../../libs/openFrameworks/math/ofVec2f.h \
   ../../../../libs/openFrameworks/math/ofVec4f.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/events/ofEvents.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/events/ofEvents.h \
   ../../../../libs/openFrameworks/events/ofEventUtils.h \
   ../../../../libs/poco/include/Poco/PriorityEvent.h \
   ../../../../libs/poco/include/Poco/PriorityStrategy.h \
@@ -108,7 +108,7 @@ dependencies: \
   ../../../../libs/poco/include/Poco/File_UNIX.h \
   ../../../../libs/poco/include/Poco/Condition.h \
   ../../../../libs/poco/include/Poco/ScopedUnlock.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/app/ofAppRunner.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofRectangle.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofLog.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/app/ofAppRunner.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofRectangle.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofLog.h \
   ../../../../libs/openFrameworks/utils/ofUtils.h

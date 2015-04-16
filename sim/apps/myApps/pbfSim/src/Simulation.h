@@ -114,7 +114,7 @@ class Simulation
     
     protected:
         // Particle mesh sphere
-        ofMesh partcleMesh;
+        ofMesh particleMesh;
     
         // OpenCL manager
         msa::OpenCL& openCL;
@@ -154,8 +154,13 @@ class Simulation
         // A cell count histogram used for particle neighbor finding
         msa::OpenCLBufferManagedT<int> cellHistogram;
     
-        // A sorted version of particleToCell
+        // A sorted version of particleToCell, used to search for a given
+        // particle's neighbors
         msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
+    
+        //
+        //msa::OpenCLBufferManagedT<int>	sortedParticleToCell;
+
     
         // An array of cell start locations and spans in sortedParticleToCell
         msa::OpenCLBufferManagedT<GridCellOffset> gridCellOffsets;
@@ -174,6 +179,7 @@ class Simulation
     
         // Initialization-related functions:
         void initialize();
+        void initalizeParticleDraw();
         void resetParticleQuantities();
 
         // Simulation state-related functions:
@@ -189,14 +195,14 @@ class Simulation
         void updatePositionAndVelocity();
     
         // Drawing-related functions:
-        void drawBounds() const;
-        void drawGrid() const;
-        void drawParticles();
+        void drawBounds(const ofVec3f& cameraPosition) const;
+        void drawGrid(const ofVec3f& cameraPosition) const;
+        void drawParticles(const ofVec3f& cameraPosition);
 
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,int numParticles = 500
+                  ,int numParticles = 10
                   ,float dt = Constants::DEFAULT_DT
                   ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
                   ,float particleRadius = Constants::DEFAULT_PARTICLE_RADIUS
@@ -215,13 +221,13 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
-        // Particle quantities:
+        // Particle rendering related:
         float getParticleRadius() const;
         void setParticleRadius(float r);
 
         void reset();
         void step();
-        void draw();
+        void draw(const ofVec3f& cameraPosition);
     
         friend std::ostream& operator<<(std::ostream& os, EigenVector3 v);
 };

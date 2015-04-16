@@ -18,16 +18,16 @@
 class AABB
 {
     protected:
-        float3 minV, maxV;
+        ofVec3f minV, maxV;
 
     public:
         AABB();
-        AABB(float3 p, float3 q);
+        AABB(float3 p, ofVec3f q);
         AABB(const AABB& other);
         AABB& operator=(const AABB& other);
     
-        const float3& getMinExtent() const;
-        const float3& getMaxExtent() const;
+        const ofVec3f& getMinExtent() const;
+        const ofVec3f& getMaxExtent() const;
     
         friend std::ostream& operator<<(std::ostream& stream, const AABB& aabb);
 };

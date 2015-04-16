@@ -27,7 +27,7 @@ const float MAX_PARTICLE_MASS = 3.0f;
 /**
  * Default particle radius
  */
-const float DEFAULT_PARTICLE_RADIUS = 0.25f;
+const float DEFAULT_PARTICLE_RADIUS = 0.5f;
     
 }
     

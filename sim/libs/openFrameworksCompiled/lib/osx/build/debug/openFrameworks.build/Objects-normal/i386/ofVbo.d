@@ -1,6 +1,6 @@
 dependencies: \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/gl/ofVbo.cpp \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/gl/ofVbo.cpp \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
   ../../../../libs/openFrameworks/utils/ofConstants.h \
   ../../../../libs/glew/include/GL/glew.h \
   ../../../../libs/tess2/include/tesselator.h \
@@ -15,11 +15,11 @@ dependencies: \
   ../../../../libs/poco/include/Poco/Types.h \
   ../../../../libs/poco/include/Poco/Timestamp.h \
   ../../../../libs/poco/include/Poco/File_UNIX.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofTypes.h \
   ../../../../libs/openFrameworks/types/ofColor.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
   ../../../../libs/openFrameworks/math/ofVec2f.h \
   ../../../../libs/openFrameworks/math/ofVec4f.h \
   ../../../../libs/poco/include/Poco/Mutex.h \
@@ -28,19 +28,19 @@ dependencies: \
   ../../../../libs/poco/include/Poco/Mutex_POSIX.h \
   ../../../../libs/poco/include/Poco/Path.h \
   ../../../../libs/openFrameworks/gl/ofVbo.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/3d/ofMesh.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/gl/ofGLUtils.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofPixels.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/3d/ofMesh.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/gl/ofGLUtils.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofPixels.h \
   ../../../../libs/openFrameworks/gl/ofShader.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofBaseTypes.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofBaseTypes.h \
   ../../../../libs/openFrameworks/types/ofRectangle.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMatrix4x4.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMatrix4x4.h \
   ../../../../libs/openFrameworks/math/ofQuaternion.h \
   ../../../../libs/openFrameworks/gl/ofTexture.h \
   ../../../../libs/openFrameworks/gl/ofVboMesh.h \
   ../../../../libs/poco/include/Poco/RegularExpression.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/app/ofAppBaseWindow.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/app/ofAppBaseWindow.h \
   ../../../../libs/openFrameworks/gl/ofGLProgrammableRenderer.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofPolyline.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofGraphics.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofMatrixStack.h
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofPolyline.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/graphics/ofGraphics.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofMatrixStack.h

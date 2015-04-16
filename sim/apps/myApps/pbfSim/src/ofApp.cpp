@@ -41,16 +41,12 @@ void ofApp::setup()
     
     // This sets the camera's distance from the object
     this->camera.setDistance(25);
-    
-    float3 cameraPos = ofVec3f(this->camera.getX(), this->camera.getY(), this->camera.getZ());
-    
-    ofLogNotice() << cameraPos << endl;
 
     // Initialize from GL world:
     this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
-    AABB bounds(float3(-5.0f, -5.0f, -5.0f), float3(5.0f, 5.0f, 5.0f));
+    AABB bounds(ofVec3f(-1.0f, 0.0f, -1.0f), ofVec3f(1.0f, 5.0f, 1.0f));
 
     // Instantiate the simulator:
     this->simulation =
@@ -125,7 +121,12 @@ void ofApp::draw()
     ofBackground(0);
     
     this->camera.begin();
-    this->simulation->draw();
+
+        // Find the current position of the camera:
+        float3 cameraPos = ofVec3f(this->camera.getX(), this->camera.getY(), this->camera.getZ());
+
+        this->simulation->draw(cameraPos);
+
     this->camera.end();
     
     this->drawHeadsUpDisplay();

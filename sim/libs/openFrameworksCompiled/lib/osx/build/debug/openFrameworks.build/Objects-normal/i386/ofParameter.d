@@ -1,12 +1,12 @@
 dependencies: \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/types/ofParameter.cpp \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/types/ofParameter.cpp \
   ../../../../libs/openFrameworks/types/ofParameter.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworks/events/ofEvents.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofConstants.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworks/events/ofEvents.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofConstants.h \
   ../../../../libs/glew/include/GL/glew.h \
   ../../../../libs/tess2/include/tesselator.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/types/ofPoint.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofVec3f.h \
   ../../../../libs/openFrameworks/math/ofVec2f.h \
   ../../../../libs/openFrameworks/math/ofVec4f.h \
   ../../../../libs/openFrameworks/events/ofEventUtils.h \
@@ -49,8 +49,8 @@ dependencies: \
   ../../../../libs/openFrameworks/events/ofDelegate.h \
   ../../../../libs/openFrameworks/types/ofTypes.h \
   ../../../../libs/openFrameworks/types/ofColor.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
-  /Users/michaelomeara/Documents/UPenn/cis563/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/math/ofMath.h \
+  /Users/mike/src/projects/cis563-final-project/sim/libs/openFrameworksCompiled/project/osx/../../../openFrameworks/utils/ofUtils.h \
   ../../../../libs/openFrameworks/utils/ofLog.h \
   ../../../../libs/openFrameworks/utils/ofFileUtils.h \
   ../../../../libs/poco/include/Poco/File.h \

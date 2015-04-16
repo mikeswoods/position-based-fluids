@@ -70,7 +70,6 @@ Simulation::Simulation(msa::OpenCL& _openCL
                      * static_cast<int>(this->cellsPerAxis[1])
                      * static_cast<int>(this->cellsPerAxis[2]);
 
-    this->setParticleRadius(_particleRadius);
     this->initialize();
 }
 
@@ -96,6 +95,12 @@ void Simulation::initializeShaders()
  */
 void Simulation::initializeKernels()
 {
+    auto minExt = this->bounds.getMinExtent();
+    auto maxExt = this->bounds.getMaxExtent();
+    int  cellsX = static_cast<int>(this->cellsPerAxis[0]);
+    int  cellsY = static_cast<int>(this->cellsPerAxis[1]);
+    int  cellsZ = static_cast<int>(this->cellsPerAxis[2]);
+    
     // Read the source files for the kernels:
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
@@ -114,11 +119,11 @@ void Simulation::initializeKernels()
     this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
     this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
     this->openCL.kernel("discretizeParticlePositions")->setArg(2, this->cellHistogram);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("discretizeParticlePositions")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("discretizeParticlePositions")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("discretizeParticlePositions")->setArg(6, this->bounds.getMinExtent());
-    this->openCL.kernel("discretizeParticlePositions")->setArg(7, this->bounds.getMaxExtent());
+    this->openCL.kernel("discretizeParticlePositions")->setArg(3, cellsX);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(4, cellsY);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(5, cellsZ);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(6, minExt);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(7, maxExt);
     
     // KERNEL :: sortParticlesByCell
     this->openCL.loadKernel("sortParticlesByCell");
@@ -128,9 +133,9 @@ void Simulation::initializeKernels()
     this->openCL.kernel("sortParticlesByCell")->setArg(3, this->gridCellOffsets);
     this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numParticles);
     this->openCL.kernel("sortParticlesByCell")->setArg(5, this->numCells);
-    this->openCL.kernel("sortParticlesByCell")->setArg(6, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("sortParticlesByCell")->setArg(7, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("sortParticlesByCell")->setArg(8, static_cast<int>(this->cellsPerAxis[2]));
+    this->openCL.kernel("sortParticlesByCell")->setArg(6, cellsX);
+    this->openCL.kernel("sortParticlesByCell")->setArg(7, cellsY);
+    this->openCL.kernel("sortParticlesByCell")->setArg(8, cellsZ);
     
     // KERNEL :: estimateDensity
     this->openCL.loadKernel("estimateDensity");
@@ -138,11 +143,13 @@ void Simulation::initializeKernels()
     this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("estimateDensity")->setArg(2, this->gridCellOffsets);
     this->openCL.kernel("estimateDensity")->setArg(3, this->numParticles);
-    this->openCL.kernel("estimateDensity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("estimateDensity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("estimateDensity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("estimateDensity")->setArg(7, this->density);
-    
+    this->openCL.kernel("estimateDensity")->setArg(4, cellsX);
+    this->openCL.kernel("estimateDensity")->setArg(5, cellsY);
+    this->openCL.kernel("estimateDensity")->setArg(6, cellsZ);
+    this->openCL.kernel("estimateDensity")->setArg(7, minExt);
+    this->openCL.kernel("estimateDensity")->setArg(8, maxExt);
+    this->openCL.kernel("estimateDensity")->setArg(9, this->density);
+
     // KERNEL :: computeLambda
     this->openCL.loadKernel("computeLambda");
     this->openCL.kernel("computeLambda")->setArg(0, this->particles);
@@ -150,10 +157,12 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computeLambda")->setArg(2, this->gridCellOffsets);
     this->openCL.kernel("computeLambda")->setArg(3, this->density);
     this->openCL.kernel("computeLambda")->setArg(4, this->numParticles);
-    this->openCL.kernel("computeLambda")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("computeLambda")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("computeLambda")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("computeLambda")->setArg(8, this->lambda);
+    this->openCL.kernel("computeLambda")->setArg(5, cellsX);
+    this->openCL.kernel("computeLambda")->setArg(6, cellsY);
+    this->openCL.kernel("computeLambda")->setArg(7, cellsZ);
+    this->openCL.kernel("computeLambda")->setArg(8, minExt);
+    this->openCL.kernel("computeLambda")->setArg(9, maxExt);
+    this->openCL.kernel("computeLambda")->setArg(10, this->lambda);
     
     // KERNEL :: computePositionDelta
     this->openCL.loadKernel("computePositionDelta");
@@ -162,12 +171,14 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computePositionDelta")->setArg(2, this->gridCellOffsets);
     this->openCL.kernel("computePositionDelta")->setArg(3, this->numParticles);
     this->openCL.kernel("computePositionDelta")->setArg(4, this->lambda);
-    this->openCL.kernel("computePositionDelta")->setArg(5, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("computePositionDelta")->setArg(6, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("computePositionDelta")->setArg(7, static_cast<int>(this->cellsPerAxis[2]));
-    this->openCL.kernel("computePositionDelta")->setArg(8, this->posDeltaX);
-    this->openCL.kernel("computePositionDelta")->setArg(9, this->posDeltaY);
-    this->openCL.kernel("computePositionDelta")->setArg(10, this->posDeltaZ);
+    this->openCL.kernel("computePositionDelta")->setArg(5, cellsX);
+    this->openCL.kernel("computePositionDelta")->setArg(6, cellsY);
+    this->openCL.kernel("computePositionDelta")->setArg(7, cellsZ);
+    this->openCL.kernel("computePositionDelta")->setArg(8, minExt);
+    this->openCL.kernel("computePositionDelta")->setArg(9, maxExt);
+    this->openCL.kernel("computePositionDelta")->setArg(10, this->posDeltaX);
+    this->openCL.kernel("computePositionDelta")->setArg(11, this->posDeltaY);
+    this->openCL.kernel("computePositionDelta")->setArg(12, this->posDeltaZ);
     
     // KERNEL :: applyPositionDelta
     this->openCL.loadKernel("applyPositionDelta");
@@ -222,6 +233,15 @@ void Simulation::initializeKernels()
     this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
     this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
     
+}
+
+/**
+ * Initializes the appearance of a particle when its rendered
+ */
+void Simulation::initalizeParticleDraw()
+{
+    this->particleMesh = ofMesh::sphere(this->particleRadius);
+    this->particleMesh.setMode(OF_PRIMITIVE_POINTS);
 }
 
 /**
@@ -329,6 +349,10 @@ void Simulation::initialize()
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
     
+    // Set the particle's appearance:
+
+    this->initalizeParticleDraw();
+    
     // Set the initial state:
 
     this->resetParticleQuantities();
@@ -410,7 +434,6 @@ float Simulation::getParticleRadius() const
 void Simulation::setParticleRadius(float r)
 {
     this->particleRadius = r;
-    this->partcleMesh = ofMesh::sphere(this->particleRadius);
 }
 
 /**
@@ -538,8 +561,10 @@ void Simulation::step()
 
 /**
  * Draws the cell grid
+ *
+ * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::drawGrid() const
+void Simulation::drawGrid(const ofVec3f& cameraPosition) const
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
@@ -575,8 +600,10 @@ void Simulation::drawGrid() const
 /**
  * Draws the bounds of the simulated environment as a transparent with solid
  * lines indicating the edges of the bounding box.
+ *
+ * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::drawBounds() const
+void Simulation::drawBounds(const ofVec3f& cameraPosition) const
 {
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
@@ -597,21 +624,27 @@ void Simulation::drawBounds() const
  * Currently, draws the positions of the particles using a fixed color. 
  * Later, this may be changed so that the color of the particle reflects
  * some quantity like velocity, mass, viscosity, etc.
+ *
+ * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::drawParticles()
+void Simulation::drawParticles(const ofVec3f& cameraPosition)
 {
     for (int i = 0; i < this->numParticles; i++) {
-        
+
         Particle &p = this->particles[i];
 
         // The fill:
         ofSetColor(51, 153, 255);
         ofFill();
         ofPushMatrix();
+        
             ofTranslate(p.pos.x, p.pos.y, p.pos.z);
+
+            this->shader.setUniform3f("camerPosition", cameraPosition.x, cameraPosition.y, cameraPosition.z);
             this->shader.begin();
-                this->partcleMesh.draw();
+                this->particleMesh.draw();
             this->shader.end();
+        
         ofPopMatrix();
 
         if (this->isVisualDebuggingEnabled()) {
@@ -632,17 +665,18 @@ void Simulation::drawParticles()
  * output, including rendering the bounding box of the simulated environment,
  * all particles in the simulation, as well as any additional objects (meshs,
  * walls, etc.) that may exist.
+ *
+ * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::draw()
+void Simulation::draw(const ofVec3f& cameraPosition)
 {
-    //ofClear(0, 0, 0);
-    this->drawBounds();
+    this->drawBounds(cameraPosition);
 
     if (this->drawGridEnabled()) {
-        this->drawGrid();
+        this->drawGrid(cameraPosition);
     }
 
-    this->drawParticles();
+    this->drawParticles(cameraPosition);
     
     ofDrawAxis(2.0f);
 }
