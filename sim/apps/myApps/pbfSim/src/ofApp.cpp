@@ -46,11 +46,11 @@ void ofApp::setup()
     this->openCL.setupFromOpenGL();
     
     // Set the bounds of the simulation:
-    AABB bounds(ofVec3f(-1.0f, 0.0f, -1.0f), ofVec3f(1.0f, 5.0f, 1.0f));
+    AABB bounds(ofVec3f(-1.0f, 0.0f, -1.0f), ofVec3f(5.0f, 5.0f, 5.0f));
 
     // Instantiate the simulator:
     this->simulation =
-        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds));
+        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds, 1000));
 }
 
 /**
@@ -111,6 +111,19 @@ void ofApp::drawHeadsUpDisplay()
     if (this->isPaused()) {
         ofDrawBitmapString("Paused", hOffset, textYOffset += vSpacing);
     }
+    
+    // Status information:
+    auto bounds = this->simulation->getBounds();
+    auto minExt = bounds.getMinExtent();
+    auto maxExt = bounds.getMaxExtent();
+    // Bounds:
+    ofDrawBitmapString("Bounds: <" +
+                       ofToString(minExt.x) + "," + ofToString(minExt.y) + "," + ofToString(minExt.z) + "> <" +
+                       ofToString(maxExt.x) + "," + ofToString(maxExt.y) + "," + ofToString(maxExt.z) + ">"
+                      ,hOffset, textYOffset += vSpacing);
+    // Particle count:
+    ofDrawBitmapString("Particles: " + ofToString(this->simulation->getNumberOfParticles())
+                      ,hOffset, textYOffset += vSpacing);
 }
 
 /**

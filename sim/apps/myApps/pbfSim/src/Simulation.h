@@ -94,6 +94,10 @@ class Simulation
         // Flag for visual debugging
         bool flagVisualDebugging;
     
+        // Given a particle count, particle radius and world bounds,
+        // find the "ideal" cell count per axis
+        EigenVector3 findIdealParticleCount();
+    
         // Load shaders
         void initializeShaders();
     
@@ -157,11 +161,7 @@ class Simulation
         // A sorted version of particleToCell, used to search for a given
         // particle's neighbors
         msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
-    
-        //
-        //msa::OpenCLBufferManagedT<int>	sortedParticleToCell;
 
-    
         // An array of cell start locations and spans in sortedParticleToCell
         msa::OpenCLBufferManagedT<GridCellOffset> gridCellOffsets;
     
@@ -200,20 +200,28 @@ class Simulation
         void drawParticles(const ofVec3f& cameraPosition);
 
     public:
+        Simulation(msa::OpenCL& _openCL
+                  ,AABB bounds
+                  ,int numParticles
+                  ,float dt = Constants::DEFAULT_DT);
+    
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
-                  ,int numParticles = 10
-                  ,float dt = Constants::DEFAULT_DT
-                  ,EigenVector3 _cellsPerAxis = EigenVector3(2, 2, 2)
-                  ,float particleRadius = Constants::DEFAULT_PARTICLE_RADIUS
-                  ,float particleMass = Constants::DEFAULT_PARTICLE_MASS);
+                  ,int numParticles
+                  ,float dt
+                  ,EigenVector3 _cellsPerAxis
+                  ,float particleRadius
+                  ,float particleMass);
 
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
+        const EigenVector3& getCellsPerAxis() const { return this->cellsPerAxis; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
+        float getParticleRadius() const;
+        void setParticleRadius(float r);
     
         const bool drawGridEnabled() const { return this->flagDrawGrid; }
         void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
@@ -221,10 +229,6 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
-        // Particle rendering related:
-        float getParticleRadius() const;
-        void setParticleRadius(float r);
-
         void reset();
         void step();
         void draw(const ofVec3f& cameraPosition);

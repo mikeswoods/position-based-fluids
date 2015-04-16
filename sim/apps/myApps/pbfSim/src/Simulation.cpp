@@ -7,6 +7,7 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
+#include <cmath>
 #include "ofMain.h"
 #include "Simulation.h"
 
@@ -36,6 +37,40 @@ ostream& operator<<(ostream& os, Particle p)
 }
 
 /******************************************************************************/
+
+/**
+ * Constructs a new simulation instance
+ *
+ * @param [in] _openCL OpenCL manager instance
+ * @param [in] _bounds Defines the boundaries of the simulation in world space
+ * @param [in] _numParticles The number of particles in the simulation
+ * @param [in] _dt The time step (usually 0.1)
+ */
+Simulation::Simulation(msa::OpenCL& _openCL
+                       ,AABB _bounds
+                       ,int _numParticles
+                       ,float _dt) :
+    openCL(_openCL),
+    bounds(_bounds),
+    numParticles(_numParticles),
+    dt(_dt),
+    particleRadius(Constants::DEFAULT_PARTICLE_RADIUS),
+    particleMass(Constants::DEFAULT_PARTICLE_MASS),
+    frameNumber(0),
+    flagDrawGrid(false),
+    flagVisualDebugging(false)
+{
+    // Given the number of particles, find the ideal number of cells per axis
+    // such that no cell contains more than 4 particles
+    
+    this->cellsPerAxis = this->findIdealParticleCount();
+
+    this->numCells =   static_cast<int>(this->cellsPerAxis[0])
+                     * static_cast<int>(this->cellsPerAxis[1])
+                     * static_cast<int>(this->cellsPerAxis[2]);
+
+    this->initialize();
+}
 
 /**
  * Constructs a new simulation instance
@@ -76,6 +111,25 @@ Simulation::Simulation(msa::OpenCL& _openCL
 Simulation::~Simulation()
 {
     
+}
+
+/**
+ * Finds the ideal number of cells per axis so that the number of 
+ * particles that need to be searched is minimized
+ */
+EigenVector3 Simulation::findIdealParticleCount()
+{
+    auto minExt  = this->bounds.getMinExtent();
+    auto maxExt  = this->bounds.getMaxExtent();
+    float width  = maxExt[0] - minExt[0];
+    float height = maxExt[1] - minExt[1];
+    float depth  = maxExt[2] - minExt[2];
+
+    int cellsX   = static_cast<int>(ceil((width / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_X)));
+    int cellsY   = static_cast<int>(ceil((height / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Y)));
+    int cellsZ   = static_cast<int>(ceil((depth / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Z)));
+
+    return EigenVector3(cellsX, cellsY, cellsZ);
 }
 
 /**
@@ -271,7 +325,7 @@ void Simulation::initialize()
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
-    
+
     // Dimension the OpenCL buffer to hold the given number of particles:
 
     this->particles.initBuffer(this->numParticles);

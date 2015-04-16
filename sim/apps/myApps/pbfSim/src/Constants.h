@@ -27,7 +27,25 @@ const float MAX_PARTICLE_MASS = 3.0f;
 /**
  * Default particle radius
  */
-const float DEFAULT_PARTICLE_RADIUS = 0.5f;
+const float DEFAULT_PARTICLE_RADIUS = 0.1f;
+    
+/**
+ * Desired number of particles per cell in X. This value is used to 
+ * compute the optimal number of cells in the spatial grid per axis
+ */
+const int PARTICLES_PER_CELL_X = 2;
+
+/**
+ * Desired number of particles per cell in Y This value is used to
+ * compute the optimal number of cells in the spatial grid per axis
+ */
+const int PARTICLES_PER_CELL_Y = 2;
+
+/**
+ * Desired number of particles per cell in Z This value is used to
+ * compute the optimal number of cells in the spatial grid per axis
+ */
+const int PARTICLES_PER_CELL_Z = 2;
     
 }
     
