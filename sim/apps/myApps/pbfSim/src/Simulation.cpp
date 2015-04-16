@@ -134,6 +134,8 @@ EigenVector3 Simulation::findIdealParticleCount()
  */
 void Simulation::initializeShaders()
 {
+    this->shader.bindDefaults();
+    
     if (this->shader.load("shaders/Basic")) {
         ofLogNotice() << "Loaded shader" << endl;
     } else {
@@ -309,7 +311,6 @@ void Simulation::initializeKernels()
 void Simulation::initalizeParticleDraw()
 {
     this->particleMesh = ofMesh::sphere(this->particleRadius);
-    this->particleMesh.setMode(OF_PRIMITIVE_POINTS);
 }
 
 /**
@@ -639,8 +640,9 @@ void Simulation::drawParticles(const ofVec3f& cameraPosition)
         
             ofTranslate(p.pos.x, p.pos.y, p.pos.z);
 
-            this->shader.setUniform3f("camerPosition", cameraPosition.x, cameraPosition.y, cameraPosition.z);
             this->shader.begin();
+//                this->shader.printActiveUniforms();
+//                this->shader.printActiveAttributes();
                 this->particleMesh.draw();
             this->shader.end();
         

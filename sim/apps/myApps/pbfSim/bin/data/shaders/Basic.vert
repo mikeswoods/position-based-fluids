@@ -1,11 +1,13 @@
 #version 150
 
 uniform mat4 modelViewProjectionMatrix;
+out vec4 color;
 in vec4 position;
-//varying vec3 N; // normal
+in vec4 normal;
+//in vec4 texcoord
 
 void main()
 {
-    //N = normalize(gl_Normal);
     gl_Position = modelViewProjectionMatrix * position;
+    color = normalize(normal);
 }

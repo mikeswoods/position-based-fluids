@@ -75,7 +75,7 @@ void ofApp::setup(){
     opencl.kernel("updateParticle")->setArg(2, mousePos);//.getPtr(), sizeof(float2));
     opencl.kernel("updateParticle")->setArg(3, dimensions);//.getPtr(), sizeof(float2));
     
-    glPointSize(1);
+    glPointSize(4);
 }
 
 
@@ -91,7 +91,7 @@ void ofApp::update(){
     
     opencl.kernel("updateParticle")->setArg(2, mousePos);//.getPtr(), sizeof(float2));
     opencl.kernel("updateParticle")->setArg(3, dimensions);//.getPtr(), sizeof(float2) );
-    glFlush();
+    //glFlush();
     
     opencl.kernel("updateParticle")->run1D(NUM_PARTICLES);
 }
