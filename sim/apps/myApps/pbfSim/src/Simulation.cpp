@@ -9,11 +9,8 @@
 
 #include <cmath>
 #include "ofMain.h"
+#include "Constants.h"
 #include "Simulation.h"
-
-/******************************************************************************/
-
-const int SOLVER_ITERATIONS = 5;
 
 /******************************************************************************/
 
@@ -158,6 +155,23 @@ void Simulation::initializeKernels()
     // Read the source files for the kernels:
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
+    
+    // KERNEL :: resetParticleQuantities
+    this->openCL.loadKernel("resetParticleQuantities");
+    this->openCL.kernel("resetParticleQuantities")->setArg(0, this->particles);
+    this->openCL.kernel("resetParticleQuantities")->setArg(1, this->particleToCell);
+    this->openCL.kernel("resetParticleQuantities")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("resetParticleQuantities")->setArg(3, this->density);
+    this->openCL.kernel("resetParticleQuantities")->setArg(4, this->lambda);
+    this->openCL.kernel("resetParticleQuantities")->setArg(5, this->posDeltaX);
+    this->openCL.kernel("resetParticleQuantities")->setArg(6, this->posDeltaY);
+    this->openCL.kernel("resetParticleQuantities")->setArg(7, this->posDeltaZ);
+    
+    // KERNEL :: resetCellQuantities
+    this->openCL.loadKernel("resetCellQuantities");
+    this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
+    this->openCL.kernel("resetCellQuantities")->setArg(1, this->gridCellOffsets);
+    
     // KERNEL :: applyExternalForces
     this->openCL.loadKernel("applyExternalForces");
     this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
@@ -299,26 +313,6 @@ void Simulation::initalizeParticleDraw()
 }
 
 /**
- * Resets various particle quantities, like density, etc.
- */
-void Simulation::resetParticleQuantities()
-{
-    for (int i = 0; i < this->numParticles; i++) {
-        
-        Particle &p = this->particles[i];
-        
-        // Clear out the particle's predicted position:
-        p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
-        
-        this->density[i]   = 0.0f;
-        this->lambda[i]    = 0.0f;
-        this->posDeltaX[i] = 0.0f;
-        this->posDeltaY[i] = 0.0f;
-        this->posDeltaZ[i] = 0.0f;
-    }
-}
-
-/**
  * Initializes the simulation
  */
 void Simulation::initialize()
@@ -406,14 +400,6 @@ void Simulation::initialize()
     // Set the particle's appearance:
 
     this->initalizeParticleDraw();
-    
-    // Set the initial state:
-
-    this->resetParticleQuantities();
-    
-    // Needed for particle grouping/"binning" by cell later:
-
-    this->initializeParticleSort();
 
     // Dump the initial quantities assigned to the particles to the GPU, so we
     // can use them in GPU-land/OpenCL
@@ -440,38 +426,6 @@ void Simulation::groupParticlesByCell()
 {
     this->discretizeParticlePositions();
     this->sortParticlesByCell();
-}
-
-/**
- * Initializes the datastructures needed to group particles by cell. This
- * mostly involves zeroing out the structures and/or setting marker values
- * like -1 to indicate unset entries in the requisite arrays, etc.
- */
-void Simulation::initializeParticleSort()
-{
-    // Zero out the histogram counts and grid cell offsets:
-    for (int i = 0; i < this->numCells; i++) {
-
-        this->cellHistogram[i] = 0;
-
-        this->gridCellOffsets[i].start  = -1;
-        this->gridCellOffsets[i].length = -1;
-    }
-
-    // as well as the particle to cell mappings:
-    for (int i = 0; i < this->numParticles; i++) {
-
-        // Particle index; -1 indicates unset
-        this->particleToCell[i].particleIndex       = -1;
-        this->particleToCell[i].cellI               = -1;
-        this->particleToCell[i].cellJ               = -1;
-        this->particleToCell[i].cellK               = -1;
-        
-        this->sortedParticleToCell[i].particleIndex = -1;
-        this->sortedParticleToCell[i].cellI         = -1;
-        this->sortedParticleToCell[i].cellJ         = -1;
-        this->sortedParticleToCell[i].cellK         = -1;
-    }
 }
 
 /**
@@ -547,21 +501,12 @@ void Simulation::step()
 {
     // Solver iterations (this will be adjustable later)
 
-    int N = SOLVER_ITERATIONS;
+    int N = Constants::SOLVER_ITERATIONS;
+
+    // Intialize the simulation step:
     
-    // We need to perform this step (zeroing out the histogram array and some
-    // other data structures needed) before we compute the particle cell groups
-    // because the zeroed structures will be written back to the GPU on the
-    // next line, i.e. writeToGPU()
-
-    this->initializeParticleSort();
-
-    this->resetParticleQuantities();
+    this->resetQuantities();
     
-    // Dump whatever changes occurred in host-land to the GPU:
-
-    this->writeToGPU();
-
     // Where the actual work is done: the sequence of substeps follows
     // more-or-less from the listing "Algorithm 1 Simulation Loop" in the
     // paper "Position Based Fluids". The main difference is that we are using
@@ -607,7 +552,7 @@ void Simulation::step()
     // in our C++ program:
 
     this->readFromGPU();
-
+    
     // Finally, bump up the frame counter:
 
     this->frameNumber++;
@@ -736,6 +681,15 @@ void Simulation::draw(const ofVec3f& cameraPosition)
 }
 
 /******************************************************************************/
+
+/**
+ * Resets various particle quantities, like density, etc.
+ */
+void Simulation::resetQuantities()
+{
+    this->openCL.kernel("resetParticleQuantities")->run1D(this->numParticles);
+    this->openCL.kernel("resetCellQuantities")->run1D(this->numCells);
+}
 
 /**
  * Applies external forces to the particles in the simulation.

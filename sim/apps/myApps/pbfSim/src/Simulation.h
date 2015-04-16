@@ -111,7 +111,6 @@ class Simulation
         void writeToGPU();
     
         // Individual functions needed for grouping particles into bins/cells
-        void initializeParticleSort();
         void computeCellHistogram();
         void discretizeParticlePositions();
         void sortParticlesByCell();
@@ -180,9 +179,9 @@ class Simulation
         // Initialization-related functions:
         void initialize();
         void initalizeParticleDraw();
-        void resetParticleQuantities();
 
         // Simulation state-related functions:
+        void resetQuantities();
         void applyExternalForces();
         void predictPositions();
         void groupParticlesByCell();

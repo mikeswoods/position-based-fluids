@@ -776,6 +776,59 @@ void callback_SquaredSPHGradientLength_j(int i
  ******************************************************************************/
 
 /**
+ * For all particles p_i in particles, this kernel resets all associated
+ * quantities, like density, etc.
+ */
+kernel void resetParticleQuantities(global Particle* particles
+                                   ,global ParticlePosition* particleToCell
+                                   ,global ParticlePosition* sortedParticleToCell
+                                   ,global float* density
+                                   ,global float* lambda
+                                   ,global float* posDeltaX
+                                   ,global float* posDeltaY
+                                   ,global float* posDeltaZ)
+{
+    int id = get_global_id(0);
+    global Particle *p           = &particles[id];
+    global ParticlePosition *pp  = &particleToCell[id];
+    global ParticlePosition *spp = &sortedParticleToCell[id];
+
+    // Particle index; -1 indicates unset
+    pp->particleIndex = -1;
+    pp->cellI = pp->cellJ = pp->cellK = -1;
+
+    spp->particleIndex = -1;
+    spp->cellI = spp->cellJ = spp->cellK = -1;
+
+    p->posStar.x  = 0.0f;
+    p->posStar.y  = 0.0f;
+    p->posStar.z  = 0.0f;
+
+    density[id]   = 0.0f;
+
+    lambda[id]    = 0.0f;
+    
+    posDeltaX[id] = 0.0f;
+    posDeltaY[id] = 0.0f;
+    posDeltaZ[id] = 0.0f;
+}
+
+/**
+ * For all cells in the spatial grid, this kernel resets all associated 
+ * quantities
+ */
+kernel void resetCellQuantities(global int* cellHistogram
+                               ,global GridCellOffset* gridCellOffsets)
+{
+    int id = get_global_id(0);
+
+    cellHistogram[id] = 0;
+
+    gridCellOffsets[id].start  = -1;
+    gridCellOffsets[id].length = -1;
+}
+
+/**
  * For all particles p_i in particles, this kernel applies external forces to the
  * velocity of p_i
  *

@@ -10,6 +10,11 @@
 namespace Constants {
 
 /**
+ * Number of iterations the Jacobi solver will run for
+ */
+const int SOLVER_ITERATIONS = 6;
+    
+/**
  * Default time step = 1/30 of a second
  */
 const float DEFAULT_DT = 0.033f;
