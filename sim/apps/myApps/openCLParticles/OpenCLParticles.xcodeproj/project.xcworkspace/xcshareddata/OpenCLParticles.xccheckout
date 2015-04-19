@@ -22,7 +22,7 @@
 		<key>4B6503966D59BA118C97A8B4391F35949E80ACFF</key>
 		<string>../../../../../..</string>
 		<key>C7E391CFF5296CF602CBAAAAB6CD1964A75BF819</key>
-		<string>../../../../../..sim/addons/ofxMSAOpenCL/</string>
+		<string>../../../../../..sim/addons/ofxMSAOpenCL</string>
 	</dict>
 	<key>IDESourceControlProjectURL</key>
 	<string>github.com:mikeswoods/cis563-final-project.git</string>

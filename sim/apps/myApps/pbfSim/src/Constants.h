@@ -7,13 +7,20 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define SIMPLE_SCENE 1
+
 namespace Constants {
 
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 6;
-    
+const int SOLVER_ITERATIONS = 5;
+   
+/**
+ * Default number of particles in the simulation
+ */
+const int DEFAULT_NUM_PARTICLES = 2500;
+
 /**
  * Default time step = 1/30 of a second
  */

@@ -13,7 +13,6 @@
  * Preprocessor directives
  ******************************************************************************/
 
-//#define DEBUG
 //#define USE_BRUTE_FORCE_SEARCH 1
 
 /*******************************************************************************
@@ -26,26 +25,6 @@
 const constant float G = 9.8f;
 
 /**
- * Default kernel smoothing radius
- */
-const constant float H_SMOOTHING_RADIUS = 1.15f;
-
-/*
- * Vorticity Epsilon
- */
-const constant float EPSILON_VORTICITY = 0.1f;
-const constant float EPSILON_VISCOSITY = 0.1f;
-const constant float H6 = H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS*H_SMOOTHING_RADIUS;
-const constant float PI = 3.14159265358f;
-const constant float NABLA2_W_VISCOSITY_COEFF = 45.0f / (PI * H6);
-
-/**
- * Epsilon value, as described in the section 3 "Enforcing Incompressibility"
- * of the Position Based Fluids paper
- */
-const constant float EPSILON_RELAXATION = 0.66f;
-
-/**
  * Particle rest density: 1000kg/m^3 = 10,000g/m^3
  */
 const constant float REST_DENSITY     = 10000.0f;
@@ -54,6 +33,32 @@ const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 /*******************************************************************************
  * Types
  ******************************************************************************/
+
+// Tuneable parameters for the simulation:
+
+typedef struct {
+    
+    float particleRadius;      // Particle radius
+    
+    float particleMass;        // Particle mass
+    
+    float smoothingRadius;     // Kernel smoothing radius
+    
+    float relaxation;          // Pressure relaxation coefficient (epsilon)
+    
+    float artificialPressureK; // Artificial pressure coefficient K
+    
+    float epsilonVorticity;    // Vorticity coefficient
+    
+    float epsilonViscosity;    // Viscosity coefficient
+    
+    float __padding1;
+    
+    int artificialPressureN;   // Artificial pressure coefficient N
+    
+    int __padding2[3];
+    
+} Parameters;
 
 // A particle type:
 
@@ -82,7 +87,7 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    float  __dummy[2]; // 2 words
+    float  __padding[2]; // 2 words
 
 } Particle;
 
@@ -109,7 +114,7 @@ typedef struct {
     
     int length;
     
-    int __dummy[2]; // Padding
+    int __padding[2]; // Padding
     
 } GridCellOffset;
 
@@ -122,6 +127,8 @@ typedef struct {
     
     const global float* lambda;   // A pointer to the lambda array with
                                   // [0 .. numParticles - 1] indices
+    
+    const global float* __padding[3];
     
 } _PositionDeltaContext;
 
@@ -149,29 +156,33 @@ global int3 getSubscript(const global Particle* p
                         ,float3 minExtent
                         ,float3 maxExtent);
 
-float poly6(float4 pos_i, float4 pos_j, float h);
+float poly6(float4 r, float h);
 
-float4 spiky(float4 pos_i, float4 pos_j, float h);
+float4 spiky(float4 r, float h);
 
-constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h);
+void callback_SPHDensityEstimator_i(const global Parameters* parameters
+                                   ,int i
+                                   ,const global Particle* p_i
+                                   ,int j
+                                   ,const global Particle* p_j
+                                   ,void* data);
 
-void callback_SPHDensityEstimator_i(int i
-                                    ,const global Particle* p_i
-                                    ,int j
-                                    ,const global Particle* p_j
-                                    ,void* data);
- void callback_SPHGradient_i(int i
+ void callback_SPHGradient_i(const global Parameters* parameters
+                            ,int i
                             ,const global Particle* p_i
                             ,int j
                             ,const global Particle* p_j
                             ,void* data);
 
- void callback_SquaredSPHGradientLength_j(int i
+ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
+                                         ,int i
                                          ,const global Particle* p_i
                                          ,int j
                                          ,const global Particle* p_j
                                          ,void* data);
- void callback_PositionDelta_i(int i
+
+ void callback_PositionDelta_i(const global Parameters* parameters
+                              ,int i
                               ,const global Particle* p_i
                               ,int j
                               ,const global Particle* p_j
@@ -185,7 +196,8 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
                               ,int3 cellSubscript
                               ,int* neighborCells);
 
-global void forAllNeighbors(const global Particle* particles
+global void forAllNeighbors(const global Parameters* parameters
+                           ,const global Particle* particles
                            ,const global ParticlePosition* sortedParticleToCell
                            ,const global GridCellOffset* gridCellOffsets
                            ,int numParticles
@@ -195,7 +207,7 @@ global void forAllNeighbors(const global Particle* particles
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
-                           ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
+                           ,void (*callback)(const global Parameters*, int, const global Particle*, int, const global Particle*, void* accum)
                            ,void* accum);
 
 /*******************************************************************************
@@ -312,7 +324,7 @@ global int getKey(const global Particle* p
  * corresponding entry for cell (i',j',k') in gridCellOffsets has a cell 
  * start index != -1.
  *
- * @param [in]  sortedParticleToCell
+ * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
  * @param [in]  int cellsX The number of cells in the x axis of the spatial
  *              grid
@@ -324,12 +336,12 @@ global int getKey(const global Particle* p
  * @param [out] int* neighborCells
  */
 global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
-                       ,const global GridCellOffset* gridCellOffsets
-                       ,int cellsX
-                       ,int cellsY
-                       ,int cellsZ
-                       ,int3 cellSubscript
-                       ,int* neighborCells)
+                              ,const global GridCellOffset* gridCellOffsets
+                              ,int cellsX
+                              ,int cellsY
+                              ,int cellsZ
+                              ,int3 cellSubscript
+                              ,int* neighborCells)
 {
     int i = cellSubscript.x;
     int j = cellSubscript.y;
@@ -390,6 +402,7 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  * function to all particle pairs (p_i, p_j), accumulating the result and
  * returning it
  *
+ * @param [in]  Parameters* parameters
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
@@ -412,7 +425,8 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
  */
-global void forAllNeighbors(const global Particle* particles
+global void forAllNeighbors(const global Parameters* parameters
+                           ,const global Particle* particles
                            ,const global ParticlePosition* sortedParticleToCell
                            ,const global GridCellOffset* gridCellOffsets
                            ,int numParticles
@@ -422,7 +436,7 @@ global void forAllNeighbors(const global Particle* particles
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
-                           ,void (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
+                           ,void (*callback)(const global Parameters*, int, const global Particle*, int, const global Particle*, void* accum)
                            ,void* accum)
 {
     // Sanity check:
@@ -448,7 +462,7 @@ global void forAllNeighbors(const global Particle* particles
         float d = distance(p_i->posStar, p_j->posStar);
         float R = p_i->radius + p_j->radius;
 
-        if (d <= R) {
+        if (R >= d) {
             callback(particleId, p_i, j, p_j, accum);
         }
     }
@@ -514,13 +528,13 @@ global void forAllNeighbors(const global Particle* particles
                     float d = distance(p_i->posStar, p_j->posStar);
                     float R = p_i->radius + p_j->radius;
 
-                    if (d <= R) {
+                    if (R >= d) {
                         
                         // Invoke the callback function to the particle pair
                         // (p_i, p_j), along with their respective indices,
                         // and accumulate the result into accum:
 
-                        callback(particleId, p_i, J, p_j, accum);
+                        callback(parameters, particleId, p_i, J, p_j, accum);
                     }
                 }
             }
@@ -538,25 +552,21 @@ global void forAllNeighbors(const global Particle* particles
  *
  * From the PBF slides SIGGRAPH 2013, pg. 13
  *
- * @param float4 Particle i position
- * @param float4 particle j position
- * @param float h Smoothing kernel radius
+ * @param [in] float4 r distance
+ * @param [in] float h Smoothing kernel radius
  * @returns float
  */
-float poly6(float4 pos_i, float4 pos_j, float h)
+float poly6(float4 r, float h)
 {
-    float4 r   = pos_i - pos_j;
     float rBar = length(r);
 
-    /*
-    if (rBar <= 0.0f || rBar > h) {
+    if (rBar > h) {
         return 0.0f;
     }
-    */
     
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
-    float A  = 1.566681471061f * h9;
+    float A  = 1.566681471061f / h9;
     float B  = (h * h) - (rBar * rBar);
 
     return A * (B * B * B);
@@ -567,49 +577,40 @@ float poly6(float4 pos_i, float4 pos_j, float h)
  *
  * From the PBF slides SIGGRAPH 2013, pg. 13
  *
- * @param float4 Particle i position
- * @param float4 particle j position
- * @param float h Smoothing kernel radius
+ * @param [in] float4 r distance
+ * @param [in] float h Smoothing kernel radius
  * @returns float4
  */
-float4 spiky(float4 pos_i, float4 pos_j, float h)
+float4 spiky(float4 r, float h)
 {
-    float4 r   = pos_i - pos_j;
     float rBar = length(r);
     
-    /*
-    if (rBar <= 0.0f || rBar > h) {
-        return 0.0f;
+    if (rBar > h) {
+        return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     }
-    */
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
-    float A    = 14.323944878271f * h6;
+    float A    = 14.323944878271f / h6;
     float B    = (h - rBar);
-    return A * (B * B) * (r / (rBar + 1.0e-3f));
-}
-
-/**
- *
- */
-constant float d2w_viscosity(float4 pos_i, float4 pos_j, float h)
-{
-    float r = distance(pos_i, pos_j);
-    return NABLA2_W_VISCOSITY_COEFF * (H_SMOOTHING_RADIUS - r);
+    float4 out = A * (B * B) * (r / (rBar + 0.001f));
+    out[3] = 0.0f;
+    return out;
 }
 
 /**
  * SPH density estimator for a pair of particles p_i and p_j for use as a 
  * callback function with forAllNeighbors()
  *
- * @param int i Index of particle i
- * @param Particle* p_i Pair particle p_i
- * @param int j Index of particle j
- * @param Particle* p_j Pair particle p_j
- * @param void* The data to update (generally a float of accumulated densities)
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i Index of particle i
+ * @param [in] Particle* p_i Pair particle p_i
+ * @param [in] int j Index of particle j
+ * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] void* The data to update (generally a float of accumulated densities)
  */
-void callback_SPHDensityEstimator_i(int i
+void callback_SPHDensityEstimator_i(const global Parameters* parameters
+                                   ,int i
                                    ,const global Particle* p_i
                                    ,int j
                                    ,const global Particle* p_j
@@ -617,41 +618,24 @@ void callback_SPHDensityEstimator_i(int i
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
-
+    
     float* accumDensity = (float*)data;
-
-    /*
-    // ~~~ POLY6 ~~~
-    float h    = H_SMOOTHING_RADIUS;
-    float4 r   = p_i->posStar - p_j->posStar;
-    float rBar = length(r);
-    float V    = 0.0f;
-    
-    if (rBar <= h) {
-        
-        float h9 = (h * h * h * h * h * h * h * h * h);
-        float A  = 1.566681471061f * h9;
-        float B  = (h * h) - (rBar * rBar);
-        V        = A * (B * B * B);
-    }
-
-    (*accumDensity) += V;
-    */
-    
-    (*accumDensity) += poly6(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    (*accumDensity) += poly6(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
 
 /**
  * A callback function that computes the SPH gradient of a constraint 
  * function C_i, w.r.t a particle p_j for the case when i = j
  *
- * @param int i Index of particle i
- * @param Particle* p_i Pair particle p_i
- * @param int j Index of particle j
- * @param Particle* p_j Pair particle p_j
- * @param void* The data to update (generally a float4 gradient vector)
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i Index of particle i
+ * @param [in] Particle* p_i Pair particle p_i
+ * @param [in] int j Index of particle j
+ * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] void* The data to update (generally a float4 gradient vector)
  */
-void callback_SPHGradient_i(int i
+void callback_SPHGradient_i(const global Parameters* parameters
+                           ,int i
                            ,const global Particle* p_i
                            ,int j
                            ,const global Particle* p_j
@@ -661,40 +645,22 @@ void callback_SPHGradient_i(int i
     // variable accordingly:
 
     float4* gradVector = (float4*)data;
-    
-    /*
-    // ~~~ SPIKY ~~~
-    float h             = H_SMOOTHING_RADIUS;
-    float4 r           = p_i->posStar - p_j->posStar;
-    float rBar         = length(r);
-    float4 V           = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    
-
-    if (rBar <= h) {
-        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
-        float h6   = (h * h * h * h * h * h);
-        float A    = 14.323944878271f * h6;
-        float B    = (h - rBar);
-        V          = A * (B * B) * (r / (rBar + 1.0e-3f));
-    }
-    
-    (*gradVector) += V;
-    */
-    
-    (*gradVector) += spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS);
+    (*gradVector) += spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
 
 /**
  * A callback function that computes the squared length of the SPH gradient 
  * of a constraint function C_i, w.r.t a particle p_j for the case when i != j
  *
- * @param int i Index of particle i
- * @param Particle* p_i Pair particle p_i
- * @param int j Index of particle j
- * @param Particle* p_j Pair particle p_j
- * @param void* The data to update (generally a float4 gradient vector)
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i Index of particle i
+ * @param [in] Particle* p_i Pair particle p_i
+ * @param [in] int j Index of particle j
+ * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] void* The data to update (generally a float4 gradient vector)
  */
-void callback_SquaredSPHGradientLength_j(int i
+void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
+                                        ,int i
                                         ,const global Particle* p_i
                                         ,int j
                                         ,const global Particle* p_j
@@ -704,25 +670,7 @@ void callback_SquaredSPHGradientLength_j(int i
     // variable accordingly:
     
     float* totalGradLength = (float*)data;
-
-    /*
-    // ~~~ SPIKY ~~~
-    float h                = H_SMOOTHING_RADIUS;
-    float4 r               = p_i->posStar - p_j->posStar;
-    float rBar             = length(r);
-    float4 V               = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    
-    if (rBar <= h) {
-        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
-        float h6    = (h * h * h * h * h * h);
-        float A     = 14.323944878271f * h6;
-        float B     = (h - rBar);
-        V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
-    }
-    float4 gradVector      = (INV_REST_DENSITY * -V);
-    */
-
-    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius));
     float gradVectorLength = length(gradVector);
     
     (*totalGradLength) += (gradVectorLength * gradVectorLength);
@@ -732,16 +680,18 @@ void callback_SquaredSPHGradientLength_j(int i
  * A callback function that computes the position delta of a particle p_i 
  * given a neighbor particle p_j
  *
- * @param int i Index of particle i
- * @param Particle* p_i Pair particle p_i
- * @param int j Index of particle j
- * @param Particle* p_j Pair particle p_j
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i Index of particle i
+ * @param [in] Particle* p_i Pair particle p_i
+ * @param [in] int j Index of particle j
+ * @param [in] Particle* p_j Pair particle p_j
  */
- void callback_PositionDelta_i(int i
-                             ,const global Particle* p_i
-                             ,int j
-                             ,const global Particle* p_j
-                             ,void* data)
+ void callback_PositionDelta_i(const global Parameters* parameters
+                              ,int i
+                              ,const global Particle* p_i
+                              ,int j
+                              ,const global Particle* p_j
+                              ,void* data)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
@@ -750,25 +700,21 @@ void callback_SquaredSPHGradientLength_j(int i
     
     float lambda_i = context->lambda[i];
     float lambda_j = context->lambda[j];
-    
-    // ~~~ SPIKY ~~~
-    /*
-    float h                = H_SMOOTHING_RADIUS;
-    float4 r               = p_i->posStar - p_j->posStar;
-    float rBar             = length(r);
-    float4 V               = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    
-    if (rBar <= h) {
-        // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
-        float h6    = (h * h * h * h * h * h);
-        float A     = 14.323944878271f * h6;
-        float B     = (h - rBar);
-        V          +=  (A * (B * B) * (r / (rBar + 1.0e-3f)));
-    }
-    context->posDelta += (lambda_i + lambda_j) * V;
-    */
 
-    context->posDelta += ((lambda_i + lambda_j) * spiky(p_i->posStar, p_j->posStar, H_SMOOTHING_RADIUS));
+    // Introduce the artificial pressure corrector:
+    
+    float h         = parameters->smoothingRadius;
+    float4 r        = p_i->posStar - p_j->posStar;
+    float4 q        = (r * 0.5f) * 0.3f * h;
+    float4 gradient = spiky(r, h);
+    float n         = poly6(r, h);
+    float d         = poly6(q, h);
+    if (d == 0.0f) {
+        d = 1.0e-4f;
+    }
+    float sCorr = -parameters->artificialPressureK * pow(n / d, parameters->artificialPressureN);
+    
+    context->posDelta += ((lambda_i + lambda_j /*+ sCorr*/) * gradient);
 }
 
 /*******************************************************************************
@@ -939,12 +885,13 @@ kernel void discretizeParticlePositions(const global Particle* particles
  *
  * @see discretizeParticlePositions
  *
- * @param [in] particleToCell
- * @param [in/out] cellHistogram
- * @param [out] sortedParticleToCell
- * @param [out] gridCellOffsets An array of size [0 .. numCells-1], where
- *              each index i contains the start and length of the i-th
- *              cell in the grid as it occurs in sortedParticleToCell
+ * @param [in]     ParticlePosition* particleToCell
+ * @param [in/out] int* cellHistogram
+ * @param [out]    ParticlePosition* sortedParticleToCell
+ * @param [out]    GridCellOffset* gridCellOffsets An array of size 
+ *                 [0 .. numCells-1], where each index i contains the start and 
+ *                 length of the i-th cell in the grid as it occurs in 
+ *                 sortedParticleToCell
  * @param [in] int numParticles The total number of particles in the simulation
  * @param [in] int numCells The total number of cells in the spatial grid
  * @param [in] int cellsX The number of cells in the x axis of the spatial
@@ -1049,8 +996,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         gridCellOffsets[nextKey].length = lengthCount;
     }
 
-    #ifdef DEBUG
-
+    /*
         printf("=================================\n");
         printf("[ParticlePosition]\n");
         for (int i = 0; i < numParticles; i++) {
@@ -1067,10 +1013,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
             printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
         }
         printf("\n");
-    
-    
-    
-    #endif
+    */
 }
 
 /**
@@ -1081,6 +1024,7 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  * j-th particle, p_i - p_j is the position delta between the particles p_i and
  * p_j and h is the smoothing radius
  *
+ * @param [in]  Parameters* parameters
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
@@ -1097,7 +1041,8 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
  *              bounding box in world space
  * @param [out] float* density
  */
-void kernel estimateDensity(const global Particle* particles
+void kernel estimateDensity(const global Parameters* parameters
+                           ,const global Particle* particles
                            ,const global ParticlePosition* sortedParticleToCell
                            ,const global GridCellOffset* gridCellOffsets
                            ,int numParticles
@@ -1116,7 +1061,8 @@ void kernel estimateDensity(const global Particle* particles
 
     float estDensity = 0.0f;
     
-    forAllNeighbors(particles
+    forAllNeighbors(parameters
+                   ,particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
                    ,numParticles
@@ -1130,10 +1076,6 @@ void kernel estimateDensity(const global Particle* particles
                    ,(void*)&estDensity);
 
     density[id] = estDensity;
-    
-    #ifdef DEBUG
-        printf("estimateDensity [%d] :: density = %f\n", id, density[id]);
-    #endif
 }
 
 /**
@@ -1153,6 +1095,7 @@ void kernel estimateDensity(const global Particle* particles
  * NOTE:
  * This corresponds to Figure (1) in the section "Enforcing Incompressibility"
  *
+ * @param [in]  Parameters* parameters Simulation parameters
  * @param [in]  const Particle* particles The particles in the simulation
  * @param [in]  const ParticlePosition* sortedParticleToCell
  * @param [in]  const GridCellOffset* gridCellOffsets
@@ -1171,7 +1114,8 @@ void kernel estimateDensity(const global Particle* particles
  *              bounding box in world space
  * @param [out] float* lambda The constraint lambda value
  */
-kernel void computeLambda(const global Particle* particles
+kernel void computeLambda(const global Parameters* parameters
+                         ,const global Particle* particles
                          ,const global ParticlePosition* sortedParticleToCell
                          ,const global GridCellOffset* gridCellOffsets
                          ,const global float* density
@@ -1196,7 +1140,8 @@ kernel void computeLambda(const global Particle* particles
 
     float4 gv_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 
-    forAllNeighbors(particles
+    forAllNeighbors(parameters
+                   ,particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
                    ,numParticles
@@ -1217,30 +1162,32 @@ kernel void computeLambda(const global Particle* particles
     
     float gv_sLengths = 0.0f;
     
-    forAllNeighbors(particles
-                    ,sortedParticleToCell
-                    ,gridCellOffsets
-                    ,numParticles
-                    ,cellsX
-                    ,cellsY
-                    ,cellsZ
-                    ,minExtent
-                    ,maxExtent
-                    ,id
-                    ,callback_SquaredSPHGradientLength_j
-                    ,(void*)&gv_sLengths);
+    forAllNeighbors(parameters
+                   ,particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,numParticles
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,minExtent
+                   ,maxExtent
+                   ,id
+                   ,callback_SquaredSPHGradientLength_j
+                   ,(void*)&gv_sLengths);
     
     gradientSum += gv_sLengths;
     
     // ==== lambda_i ===========================================================
 
-    lambda[id] = -(C_i / (gradientSum + EPSILON_RELAXATION));
+    lambda[id] = -(C_i / (gradientSum + parameters->relaxation));
 }
 
 /**
  * For all particles p_i in particles, this kernel computes the position
  * delta of p_i, p_i*
  *
+ * @param [in]  Parameters* parameters Simulation parameters
  * @param [in]  const Particle* particles The particles in the simulation
  * @param [in]  const ParticlePosition* sortedParticleToCell
  * @param [in]  const GridCellOffset* gridCellOffsets
@@ -1261,7 +1208,8 @@ kernel void computeLambda(const global Particle* particles
  * @param [out] float* posDeltaY position changes in Y
  * @param [out] float* posDeltaZ position changes in Z
  */
-kernel void computePositionDelta(const global Particle* particles
+kernel void computePositionDelta(const global Parameters* parameters
+                                ,const global Particle* particles
                                 ,const global ParticlePosition* sortedParticleToCell
                                 ,const global GridCellOffset* gridCellOffsets
                                 ,int numParticles
@@ -1280,7 +1228,8 @@ kernel void computePositionDelta(const global Particle* particles
     _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 0.0f),
                                  .lambda = lambda };
     
-    forAllNeighbors(particles
+    forAllNeighbors(parameters
+                   ,particles
                    ,sortedParticleToCell
                    ,gridCellOffsets
                    ,numParticles
@@ -1355,40 +1304,7 @@ kernel void applyViscosity(global Particle* particles,
                            const global float* density,
                            int cellsX, int cellsY, int cellsZ)
 {
-    /*
-    int id = get_global_id(0);
-    
-    global Particle *p = &particles[id];
-    
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
-    // 27 (3x3x3) possible neighbors to search:
-    int neighbors[27];
-    
-    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell, gridCellOffsets,
-                                                    cellsX, cellsY, cellsZ,
-                                                    cellSubscript, neighbors);
-    
-    
-    float4 viscosity = float4(0.0f,0.0f,0.0f,0.0f);
-    float r_length;
-    int n_j;
-    // For all neighbors found for the given cell at grid subscript (i,j, k):
-    for (int j = 0; j < neighborCellCount; j++) {
-        n_j = neighbors[j];
-        if (neighbors[j] != -1 && n_j != id && density[n_j] != 0.0) {
-            r_length = length(p->pos - particles[n_j].pos);
-            if (H_SMOOTHING_RADIUS > r_length)
-            {
-                viscosity = particles[n_j].vel - p->vel;
-                viscosity *= particles[n_j].mass * d2w_viscosity(p->pos, particles[n_j].pos, H_SMOOTHING_RADIUS);
-                viscosity /= density[n_j];
-                viscosity *= EPSILON_VISCOSITY;
-                particles[id].vel += viscosity;
-            }
-        }
-    }
-    */
+
 }
 
 /**
@@ -1399,36 +1315,7 @@ kernel void computeCurl(global Particle* particles,
                         const global GridCellOffset* gridCellOffsets,
                         int cellsX, int cellsY, int cellsZ)
 {
-    /*
-    int id = get_global_id(0);
-    
-    global Particle *p = &particles[id];
-    
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
-    // 27 (3x3x3) possible neighbors to search:
-    int neighbors[27];
-    
-    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell, gridCellOffsets,
-                                                    cellsX, cellsY, cellsZ,
-                                                    cellSubscript, neighbors);
-    
-    
-     float4 curl = float4(0.0f,0.0f,0.0f,0.0f);
-     float4 gradient, vel;
-     int n_j;
-     // For all neighbors found for the given cell at grid subscript (i,j, k):
-     for (int j = 0; j < neighborCellCount; j++) {
-         n_j = neighbors[j];
-         if (neighbors[j] != -1) {
-             vel = particles[n_j].vel - p->vel;
-             gradient = spiky(p->pos, particles[n_j].pos, H_SMOOTHING_RADIUS);
-             curl += cross(vel, gradient);
-         }
-     }
-     
-     particles[id].curl = curl;
-    */
+
 }
 
 
@@ -1442,43 +1329,7 @@ kernel void applyVorticity(global Particle* particles,
                            const global GridCellOffset* gridCellOffsets,
                            int cellsX,int cellsY, int cellsZ)
 {
-    /*
-    int id = get_global_id(0);
-    
-    global Particle *p = &particles[id];
-    
-    int3 cellSubscript = ind2sub(id, cellsX, cellsY);
-    
-    // 27 (3x3x3) possible neighbors to search:
-    int neighbors[27];
-    
-    int neighborCellCount = getNeighborsBySubscript(sortedParticleToCell
-                                                    ,gridCellOffsets
-                                                    ,cellsX
-                                                    ,cellsY
-                                                    ,cellsZ
-                                                    ,cellSubscript
-                                                    ,neighbors);
-    
-    float4 r; // r is the distance to the center of the vortex
-    float4 gradVorticity = float4(0.0f,0.0f,0.0f,0.0f);
-    float gradLength;
-    int n_j;
-    // For all neighbors found for the given cell at grid subscript (i,j, k):
-    for (int j = 0; j < neighborCellCount; j++) {
-        n_j = neighbors[j];
-        if (neighbors[j] != -1) {
-            r = particles[n_j].pos - p->pos;
-            gradLength = length(particles[n_j].curl - p->curl);
-            gradVorticity += gradLength / r;
-        }
-    }
-    
-    float4 vorticity, N;
-    N = 1.0f / (length(gradVorticity) + EPSILON_VORTICITY) * gradVorticity;
-    vorticity = dt * EPSILON_RELAXATION * cross(N, p->curl);
-    particles[id].vel += vorticity;
-    */
+
 }
 
 /**

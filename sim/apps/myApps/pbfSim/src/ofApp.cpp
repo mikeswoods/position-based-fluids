@@ -33,24 +33,38 @@ void ofApp::setup()
     this->advanceStep = false;
     
 	ofSetLogLevel(OF_LOG_VERBOSE);
-    ofSetVerticalSync(true);
-    
+
     // This uses depth information for occlusion
     // rather than always drawing things on top of each other
     ofEnableDepthTest();
     
     // This sets the camera's distance from the object
-    this->camera.setDistance(25);
+    this->camera.setDistance(15);
+   // this->camera.set
 
     // Initialize from GL world:
     this->openCL.setupFromOpenGL();
+
+#ifdef SIMPLE_SCENE
+    AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
+    int numParticles = 50;
     
-    // Set the bounds of the simulation:
-    AABB bounds(ofVec3f(-1.0f, 0.0f, -1.0f), ofVec3f(5.0f, 5.0f, 5.0f));
+    Parameters parameters;
+    parameters.particleRadius = 0.5f;
+    ofSetVerticalSync(true);
+#else
+    AABB bounds(ofVec3f(-5.0f, 0.0f, 0.0f), ofVec3f(5.0f, 10.0f, 2.0f));
+    int numParticles = Constants::DEFAULT_NUM_PARTICLES;
+    Parameters parameters;
+    parameters.particleRadius = 0.1f;
+    ofSetVerticalSync(false);
+#endif
 
     // Instantiate the simulator:
-    this->simulation =
-        std::shared_ptr<Simulation>(new Simulation(this->openCL, bounds, 1000));
+    this->simulation = std::shared_ptr<Simulation>(new Simulation(this->openCL
+                                                                 ,bounds
+                                                                 ,numParticles
+                                                                 ,parameters));
 }
 
 /**
@@ -121,6 +135,12 @@ void ofApp::drawHeadsUpDisplay()
                        ofToString(minExt.x) + "," + ofToString(minExt.y) + "," + ofToString(minExt.z) + "> <" +
                        ofToString(maxExt.x) + "," + ofToString(maxExt.y) + "," + ofToString(maxExt.z) + ">"
                       ,hOffset, textYOffset += vSpacing);
+    // Cell count:
+    auto cellsPerAxis = this->simulation->getCellsPerAxis();
+    ofDrawBitmapString("Cells per axis: <" +
+                       ofToString(cellsPerAxis[0]) + "," + ofToString(cellsPerAxis[1]) + "," + ofToString(cellsPerAxis[2]) + ">"
+                       ,hOffset, textYOffset += vSpacing);
+    
     // Particle count:
     ofDrawBitmapString("Particles: " + ofToString(this->simulation->getNumberOfParticles())
                       ,hOffset, textYOffset += vSpacing);
@@ -184,14 +204,6 @@ void ofApp::keyPressed(int key)
                 this->advanceStep = true;
             }
         break;
-        // Set particle radius
-        case 'z':
-            {
-                float r = readParticleRadius(this->simulation->getParticleRadius());
-                this->simulation->setParticleRadius(r);
-                this->simulation->reset();
-            }
-            break;
         // Reset
         case 'r':
             {

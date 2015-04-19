@@ -13,27 +13,25 @@
 #include "ofApp.h"
 #include "MSAOpenCL.h"
 
-#define NUM_PARTICLES (1000000)
+#define NUM_PARTICLES (100000)
 
 
 typedef struct{
-    float2 vel;
+    float4 pos;
+    float4 vel;
     float mass;
-    float dummy;		// need this to make sure the float2 vel is aligned to a 16 byte boundary
+    float dummy[3];		// need this to make sure the float2 vel is aligned to a 16 byte boundary
 } Particle;
 
 
-float2 mousePos;
-float2 dimensions;
+float4 mousePos;
+float4 dimensions;
 
 
 msa::OpenCL opencl;
 
 // vector of Particles on host and corresponding clBuffer on device
 msa::OpenCLBufferManagedT<Particle>	particles;
-
-// vector of particle positions on host and corresponding clBuffer, and vbo on device
-msa::OpenCLBufferManagedT<float2> particlePos;
 
 GLuint vbo;
 
@@ -46,36 +44,34 @@ void ofApp::setup(){
     opencl.setupFromOpenGL();
     
     // create vbo
-    glGenBuffersARB(1, &vbo);
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, vbo);
-    glBufferDataARB(GL_ARRAY_BUFFER_ARB, sizeof(float2) * NUM_PARTICLES, 0, GL_DYNAMIC_COPY_ARB);
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * NUM_PARTICLES, 0, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     // init host and CL buffers
-    particles.initBuffer(NUM_PARTICLES);
-    particlePos.initFromGLObject(vbo, NUM_PARTICLES);
+    particles.initFromGLObject(vbo, NUM_PARTICLES);
     
     // init data
     
     for(int i=0; i<NUM_PARTICLES; i++) {
         Particle &p = particles[i];
+        p.pos.x = ofRandomWidth();
+        p.pos.y = ofRandomHeight();
         p.vel.x = 0;
-        p.mass = ofRandom(0.5, 1);
-        particlePos[i].set(ofRandomWidth(), ofRandomHeight());
+        p.mass  = ofRandom(0.5, 1);
     }
     
     particles.writeToDevice();
-    particlePos.writeToDevice(); ///< uploads buffer data to shared CL/GL memory, so the vbo and the cl buffer are written in one go, since they occupy the same memory locations.
     
     opencl.loadProgramFromFile("MSAOpenCL/Particle.cl");
     opencl.loadKernel("updateParticle");
     
     opencl.kernel("updateParticle")->setArg(0, particles);
-    opencl.kernel("updateParticle")->setArg(1, particlePos);
-    opencl.kernel("updateParticle")->setArg(2, mousePos);//.getPtr(), sizeof(float2));
-    opencl.kernel("updateParticle")->setArg(3, dimensions);//.getPtr(), sizeof(float2));
+    opencl.kernel("updateParticle")->setArg(1, mousePos);//.getPtr(), sizeof(float2));
+    opencl.kernel("updateParticle")->setArg(2, dimensions);//.getPtr(), sizeof(float2));
     
-    glPointSize(4);
+    glPointSize(5);
 }
 
 
@@ -89,9 +85,9 @@ void ofApp::update(){
     dimensions.x = ofGetWidth();
     dimensions.y = ofGetHeight();
     
-    opencl.kernel("updateParticle")->setArg(2, mousePos);//.getPtr(), sizeof(float2));
-    opencl.kernel("updateParticle")->setArg(3, dimensions);//.getPtr(), sizeof(float2) );
-    //glFlush();
+    opencl.kernel("updateParticle")->setArg(1, mousePos);//.getPtr(), sizeof(float2));
+    opencl.kernel("updateParticle")->setArg(2, dimensions);//.getPtr(), sizeof(float2) );
+    glFlush();
     
     opencl.kernel("updateParticle")->run1D(NUM_PARTICLES);
 }
@@ -102,14 +98,14 @@ void ofApp::draw(){
     opencl.finish();
     
     glColor3f(1.0f, 1.0f, 1.0f);
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
     
     opencl.finish();
     
-    glEnableClientState(GL_VERTEX_ARRAY);
+    //glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(2, GL_FLOAT, 0, 0);
     glDrawArrays(GL_POINTS, 0, NUM_PARTICLES);
-    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
     glColor3f(1, 1, 1);

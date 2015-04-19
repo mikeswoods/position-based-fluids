@@ -33,6 +33,21 @@ ostream& operator<<(ostream& os, Particle p)
               << "}";
 }
 
+ostream& operator<<(ostream& os, Parameters p)
+{
+    os << "Parameters {" << endl
+       << "  particleRadius:\t"      << p.particleRadius      << endl
+       << "  particleMass:\t"        << p.particleMass        << endl
+       << "  smoothingRadius:\t"     << p.smoothingRadius     << endl
+       << "  relaxation:\t"          << p.relaxation          << endl
+       << "  artificialPressureK:\t" << p.artificialPressureK << endl
+       << "  artificialPressureN:\t" << p.artificialPressureN << endl
+       << "  epsilonVorticity:\t"    << p.epsilonVorticity    << endl
+       << "  epsilonViscosity:\t"    << p.epsilonViscosity    << endl
+       << "}";
+    return os;
+}
+
 /******************************************************************************/
 
 /**
@@ -41,31 +56,22 @@ ostream& operator<<(ostream& os, Particle p)
  * @param [in] _openCL OpenCL manager instance
  * @param [in] _bounds Defines the boundaries of the simulation in world space
  * @param [in] _numParticles The number of particles in the simulation
- * @param [in] _dt The time step (usually 0.1)
+ * @param [in] _parameters Simulation parameters
  */
 Simulation::Simulation(msa::OpenCL& _openCL
-                       ,AABB _bounds
-                       ,int _numParticles
-                       ,float _dt) :
+                      ,AABB _bounds
+                      ,int _numParticles
+                      ,Parameters _parameters) :
+    particleVBO(0),
     openCL(_openCL),
     bounds(_bounds),
     numParticles(_numParticles),
-    dt(_dt),
-    particleRadius(Constants::DEFAULT_PARTICLE_RADIUS),
-    particleMass(Constants::DEFAULT_PARTICLE_MASS),
+    dt(Constants::DEFAULT_DT),
+    parameterData(_parameters),
     frameNumber(0),
     flagDrawGrid(false),
     flagVisualDebugging(false)
 {
-    // Given the number of particles, find the ideal number of cells per axis
-    // such that no cell contains more than 4 particles
-    
-    this->cellsPerAxis = this->findIdealParticleCount();
-
-    this->numCells =   static_cast<int>(this->cellsPerAxis[0])
-                     * static_cast<int>(this->cellsPerAxis[1])
-                     * static_cast<int>(this->cellsPerAxis[2]);
-
     this->initialize();
 }
 
@@ -75,33 +81,27 @@ Simulation::Simulation(msa::OpenCL& _openCL
  * @param [in] _openCL OpenCL manager instance
  * @param [in] _bounds Defines the boundaries of the simulation in world space
  * @param [in] _numParticles The number of particles in the simulation
- * @param [in] _dt The time step (usually 0.1)
+ * @param [in] _dt The time step (usually 1/30)
  * @param [in] _cellsPerAxis Cell spatial grid subdivisions per axis
- * @param [in] _radiusPerParticle The mass per particle
- * @param [in] _particleMass The mass per particle
+ * @param [in] _parameters Simulation parameters
  */
 Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
                       ,int _numParticles
                       ,float _dt
                       ,EigenVector3 _cellsPerAxis
-                      ,float _particleRadius
-                      ,float _particleMass) :
+                      ,Parameters _parameters) :
+    particleVBO(0),
     openCL(_openCL),
     bounds(_bounds),
     numParticles(_numParticles),
     dt(_dt),
     cellsPerAxis(_cellsPerAxis),
-    particleRadius(_particleRadius),
-    particleMass(_particleMass),
+    parameterData(_parameters),
     frameNumber(0),
     flagDrawGrid(false),
     flagVisualDebugging(false)
 {
-    this->numCells =   static_cast<int>(this->cellsPerAxis[0])
-                     * static_cast<int>(this->cellsPerAxis[1])
-                     * static_cast<int>(this->cellsPerAxis[2]);
-
     this->initialize();
 }
 
@@ -121,197 +121,16 @@ EigenVector3 Simulation::findIdealParticleCount()
     float width  = maxExt[0] - minExt[0];
     float height = maxExt[1] - minExt[1];
     float depth  = maxExt[2] - minExt[2];
-
-    int cellsX   = static_cast<int>(ceil((width / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_X)));
-    int cellsY   = static_cast<int>(ceil((height / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Y)));
-    int cellsZ   = static_cast<int>(ceil((depth / this->particleRadius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Z)));
+    float radius = this->getParameters().particleRadius;
+    
+    int cellsX   = static_cast<int>(ceil((width / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_X)));
+    int cellsY   = static_cast<int>(ceil((height / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Y)));
+    int cellsZ   = static_cast<int>(ceil((depth / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Z)));
 
     return EigenVector3(cellsX, cellsY, cellsZ);
 }
 
-/**
- * Initializes all shaders used in the simulation
- */
-void Simulation::initializeShaders()
-{
-    this->shader.bindDefaults();
-    
-    if (this->shader.load("shaders/Basic")) {
-        ofLogNotice() << "Loaded shader" << endl;
-    } else {
-        ofLogError() << "Failed to load shader!" << endl;
-    }
-}
-
-/**
- * Loads all of the OpenCL kernels that will be used for during the simulation
- */
-void Simulation::initializeKernels()
-{
-    auto minExt = this->bounds.getMinExtent();
-    auto maxExt = this->bounds.getMaxExtent();
-    int  cellsX = static_cast<int>(this->cellsPerAxis[0]);
-    int  cellsY = static_cast<int>(this->cellsPerAxis[1]);
-    int  cellsZ = static_cast<int>(this->cellsPerAxis[2]);
-    
-    // Read the source files for the kernels:
-    this->openCL.loadProgramFromFile("kernels/Simulation.cl");
-    
-    
-    // KERNEL :: resetParticleQuantities
-    this->openCL.loadKernel("resetParticleQuantities");
-    this->openCL.kernel("resetParticleQuantities")->setArg(0, this->particles);
-    this->openCL.kernel("resetParticleQuantities")->setArg(1, this->particleToCell);
-    this->openCL.kernel("resetParticleQuantities")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("resetParticleQuantities")->setArg(3, this->density);
-    this->openCL.kernel("resetParticleQuantities")->setArg(4, this->lambda);
-    this->openCL.kernel("resetParticleQuantities")->setArg(5, this->posDeltaX);
-    this->openCL.kernel("resetParticleQuantities")->setArg(6, this->posDeltaY);
-    this->openCL.kernel("resetParticleQuantities")->setArg(7, this->posDeltaZ);
-    
-    // KERNEL :: resetCellQuantities
-    this->openCL.loadKernel("resetCellQuantities");
-    this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
-    this->openCL.kernel("resetCellQuantities")->setArg(1, this->gridCellOffsets);
-    
-    // KERNEL :: applyExternalForces
-    this->openCL.loadKernel("applyExternalForces");
-    this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
-    this->openCL.kernel("applyExternalForces")->setArg(1, this->dt);
-    
-    // KERNEL :: predictPosition
-    this->openCL.loadKernel("predictPosition");
-    this->openCL.kernel("predictPosition")->setArg(0, this->particles);
-    this->openCL.kernel("predictPosition")->setArg(1, this->dt);
-    
-    // KERNEL :: discretizeParticlePositions
-    this->openCL.loadKernel("discretizeParticlePositions");
-    this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(2, this->cellHistogram);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(3, cellsX);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(4, cellsY);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(5, cellsZ);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(6, minExt);
-    this->openCL.kernel("discretizeParticlePositions")->setArg(7, maxExt);
-    
-    // KERNEL :: sortParticlesByCell
-    this->openCL.loadKernel("sortParticlesByCell");
-    this->openCL.kernel("sortParticlesByCell")->setArg(0, this->particleToCell);
-    this->openCL.kernel("sortParticlesByCell")->setArg(1, this->cellHistogram);
-    this->openCL.kernel("sortParticlesByCell")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("sortParticlesByCell")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numParticles);
-    this->openCL.kernel("sortParticlesByCell")->setArg(5, this->numCells);
-    this->openCL.kernel("sortParticlesByCell")->setArg(6, cellsX);
-    this->openCL.kernel("sortParticlesByCell")->setArg(7, cellsY);
-    this->openCL.kernel("sortParticlesByCell")->setArg(8, cellsZ);
-    
-    // KERNEL :: estimateDensity
-    this->openCL.loadKernel("estimateDensity");
-    this->openCL.kernel("estimateDensity")->setArg(0, this->particles);
-    this->openCL.kernel("estimateDensity")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("estimateDensity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("estimateDensity")->setArg(3, this->numParticles);
-    this->openCL.kernel("estimateDensity")->setArg(4, cellsX);
-    this->openCL.kernel("estimateDensity")->setArg(5, cellsY);
-    this->openCL.kernel("estimateDensity")->setArg(6, cellsZ);
-    this->openCL.kernel("estimateDensity")->setArg(7, minExt);
-    this->openCL.kernel("estimateDensity")->setArg(8, maxExt);
-    this->openCL.kernel("estimateDensity")->setArg(9, this->density);
-
-    // KERNEL :: computeLambda
-    this->openCL.loadKernel("computeLambda");
-    this->openCL.kernel("computeLambda")->setArg(0, this->particles);
-    this->openCL.kernel("computeLambda")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("computeLambda")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("computeLambda")->setArg(3, this->density);
-    this->openCL.kernel("computeLambda")->setArg(4, this->numParticles);
-    this->openCL.kernel("computeLambda")->setArg(5, cellsX);
-    this->openCL.kernel("computeLambda")->setArg(6, cellsY);
-    this->openCL.kernel("computeLambda")->setArg(7, cellsZ);
-    this->openCL.kernel("computeLambda")->setArg(8, minExt);
-    this->openCL.kernel("computeLambda")->setArg(9, maxExt);
-    this->openCL.kernel("computeLambda")->setArg(10, this->lambda);
-    
-    // KERNEL :: computePositionDelta
-    this->openCL.loadKernel("computePositionDelta");
-    this->openCL.kernel("computePositionDelta")->setArg(0, this->particles);
-    this->openCL.kernel("computePositionDelta")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("computePositionDelta")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("computePositionDelta")->setArg(3, this->numParticles);
-    this->openCL.kernel("computePositionDelta")->setArg(4, this->lambda);
-    this->openCL.kernel("computePositionDelta")->setArg(5, cellsX);
-    this->openCL.kernel("computePositionDelta")->setArg(6, cellsY);
-    this->openCL.kernel("computePositionDelta")->setArg(7, cellsZ);
-    this->openCL.kernel("computePositionDelta")->setArg(8, minExt);
-    this->openCL.kernel("computePositionDelta")->setArg(9, maxExt);
-    this->openCL.kernel("computePositionDelta")->setArg(10, this->posDeltaX);
-    this->openCL.kernel("computePositionDelta")->setArg(11, this->posDeltaY);
-    this->openCL.kernel("computePositionDelta")->setArg(12, this->posDeltaZ);
-    
-    // KERNEL :: applyPositionDelta
-    this->openCL.loadKernel("applyPositionDelta");
-    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDeltaX);
-    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaY);
-    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaZ);
-    this->openCL.kernel("applyPositionDelta")->setArg(3, this->particles);
-    
-    // KERNEL ::  updatePositionAndVelocity
-    this->openCL.loadKernel("updatePositionAndVelocity");
-    this->openCL.kernel("updatePositionAndVelocity")->setArg(0, this->particles);
-    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->dt);
-    
-    // KERNEL :: applyViscosity
-    /*
-    this->openCL.loadKernel("applyViscosity");
-    this->openCL.kernel("applyViscosity")->setArg(0, this->particles);
-    this->openCL.kernel("applyViscosity")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("applyViscosity")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("applyViscosity")->setArg(3, this->density);
-    this->openCL.kernel("applyViscosity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("applyViscosity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("applyViscosity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-    */
-    
-    // KERNEL :: computeCurl
-    /*
-    this->openCL.loadKernel("computeCurl");
-    this->openCL.kernel("computeCurl")->setArg(0, this->particles);
-    this->openCL.kernel("computeCurl")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("computeCurl")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("computeCurl")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("computeCurl")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("computeCurl")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
-    */
-    
-    // KERNEL :: applyVorticity
-    /*
-    this->openCL.loadKernel("applyVorticity");
-    this->openCL.kernel("applyVorticity")->setArg(0, this->particles);
-    this->openCL.kernel("applyVorticity")->setArg(1, this->dt);
-    this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
-    this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
-    this->openCL.kernel("applyVorticity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-    */
-    
-    // KERNEL :: resolveCollisions
-    this->openCL.loadKernel("resolveCollisions");
-    this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
-    this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
-    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
-    
-}
-
-/**
- * Initializes the appearance of a particle when its rendered
- */
-void Simulation::initalizeParticleDraw()
-{
-    this->particleMesh = ofMesh::sphere(this->particleRadius);
-}
+/******************************************************************************/
 
 /**
  * Initializes the simulation
@@ -321,9 +140,31 @@ void Simulation::initialize()
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
 
+    
+    // Initialize a buffer to hold dynamic simulation related parameters:
+    this->parameters.initBuffer(1);
+    this->parameters[0] = this->parameterData;
+    
+    // Given the number of particles, find the ideal number of cells per axis
+    // such that no cell contains more than 4 particles
+    
+    this->cellsPerAxis = this->findIdealParticleCount();
+    
+    this->numCells      =   static_cast<int>(this->cellsPerAxis[0])
+                          * static_cast<int>(this->cellsPerAxis[1])
+                          * static_cast<int>(this->cellsPerAxis[2]);
+
+    // Set up OpenGL VAOs, VBOs, and shader programs:
+    
+    this->initializeOpenGL();
+    
+    // Set the particle's appearance:
+    
+    this->initalizeParticleDraw();
+    
     // Dimension the OpenCL buffer to hold the given number of particles:
 
-    this->particles.initBuffer(this->numParticles);
+    this->particles.initFromGLObject(this->particleVBO, this->numParticles);
     
     // particleToCell contains [0 .. this->numParticles - 1] entries, where
     // each ParticlePosition instance (index is not important) maps
@@ -389,60 +230,217 @@ void Simulation::initialize()
         p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
         
         // All particles have uniform mass (for now):
-        p.mass = this->particleMass;
+        p.mass = this->getParameters().particleMass;
         
         // and a uniform radius (for now):
-        p.radius = this->particleRadius;
+        p.radius = this->getParameters().particleRadius;
         
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
-    
-    // Set the particle's appearance:
 
-    this->initalizeParticleDraw();
-
-    // Dump the initial quantities assigned to the particles to the GPU, so we
-    // can use them in GPU-land/OpenCL
-
-    this->writeToGPU();
-
-    // Load the shaders:
-
-    this->initializeShaders();
-    
     // Load the kernels:
 
     this->initializeKernels();
+
+    // Finally, dump the initial quantities assigned to the particles to the
+    // GPU, so we can use them in GPU-land/OpenCL
+
+    this->writeToGPU();
 }
 
 /**
- * This implementation is based off of the method described in
- * "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID" by
- * Hoetzlein, 2014 that uses counting sort as an alternative to radix sort.
- *
- * See http://on-demand.gputechconf.com/gtc/2014/presentations/S4117-fast-fixed-radius-nearest-neighbor-gpu.pdf
+ * Initializes all shared OpenGL objects used in the simulation
  */
-void Simulation::groupParticlesByCell()
+void Simulation::initializeOpenGL()
 {
-    this->discretizeParticlePositions();
-    this->sortParticlesByCell();
+    // The VBOs for the particles:
+ 
+    glGenBuffers(1, &this->particleVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, this->particleVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * this->numParticles, (void*)0, GL_DYNAMIC_DRAW);
+    
+    // Set up the shaders:
+    
+    this->shader.bindDefaults();
+    
+    if (this->shader.load("shaders/Basic")) {
+        ofLogNotice() << "Loaded shader" << endl;
+    } else {
+        ofLogError() << "Failed to load shader!" << endl;
+    }
 }
 
 /**
- * Returns the uniform particle radius
+ * Loads all of the OpenCL kernels that will be used for during the simulation
  */
-float Simulation::getParticleRadius() const
+void Simulation::initializeKernels()
 {
-    return this->particleRadius;
+    auto minExt = this->bounds.getMinExtent();
+    auto maxExt = this->bounds.getMaxExtent();
+    int  cellsX = static_cast<int>(this->cellsPerAxis[0]);
+    int  cellsY = static_cast<int>(this->cellsPerAxis[1]);
+    int  cellsZ = static_cast<int>(this->cellsPerAxis[2]);
+    
+    // Read the source files for the kernels:
+    this->openCL.loadProgramFromFile("kernels/Simulation.cl");
+    
+    // KERNEL :: resetParticleQuantities
+    this->openCL.loadKernel("resetParticleQuantities");
+    this->openCL.kernel("resetParticleQuantities")->setArg(0, this->particles);
+    this->openCL.kernel("resetParticleQuantities")->setArg(1, this->particleToCell);
+    this->openCL.kernel("resetParticleQuantities")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("resetParticleQuantities")->setArg(3, this->density);
+    this->openCL.kernel("resetParticleQuantities")->setArg(4, this->lambda);
+    this->openCL.kernel("resetParticleQuantities")->setArg(5, this->posDeltaX);
+    this->openCL.kernel("resetParticleQuantities")->setArg(6, this->posDeltaY);
+    this->openCL.kernel("resetParticleQuantities")->setArg(7, this->posDeltaZ);
+    
+    // KERNEL :: resetCellQuantities
+    this->openCL.loadKernel("resetCellQuantities");
+    this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
+    this->openCL.kernel("resetCellQuantities")->setArg(1, this->gridCellOffsets);
+    
+    // KERNEL :: applyExternalForces
+    this->openCL.loadKernel("applyExternalForces");
+    this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
+    this->openCL.kernel("applyExternalForces")->setArg(1, this->dt);
+    
+    // KERNEL :: predictPosition
+    this->openCL.loadKernel("predictPosition");
+    this->openCL.kernel("predictPosition")->setArg(0, this->particles);
+    this->openCL.kernel("predictPosition")->setArg(1, this->dt);
+    
+    // KERNEL :: discretizeParticlePositions
+    this->openCL.loadKernel("discretizeParticlePositions");
+    this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(2, this->cellHistogram);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(3, cellsX);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(4, cellsY);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(5, cellsZ);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(6, minExt);
+    this->openCL.kernel("discretizeParticlePositions")->setArg(7, maxExt);
+    
+    // KERNEL :: sortParticlesByCell
+    this->openCL.loadKernel("sortParticlesByCell");
+    this->openCL.kernel("sortParticlesByCell")->setArg(0, this->particleToCell);
+    this->openCL.kernel("sortParticlesByCell")->setArg(1, this->cellHistogram);
+    this->openCL.kernel("sortParticlesByCell")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("sortParticlesByCell")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("sortParticlesByCell")->setArg(4, this->numParticles);
+    this->openCL.kernel("sortParticlesByCell")->setArg(5, this->numCells);
+    this->openCL.kernel("sortParticlesByCell")->setArg(6, cellsX);
+    this->openCL.kernel("sortParticlesByCell")->setArg(7, cellsY);
+    this->openCL.kernel("sortParticlesByCell")->setArg(8, cellsZ);
+    
+    // KERNEL :: estimateDensity
+    this->openCL.loadKernel("estimateDensity");
+    this->openCL.kernel("estimateDensity")->setArg(0, this->parameters);
+    this->openCL.kernel("estimateDensity")->setArg(1, this->particles);
+    this->openCL.kernel("estimateDensity")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("estimateDensity")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("estimateDensity")->setArg(4, this->numParticles);
+    this->openCL.kernel("estimateDensity")->setArg(5, cellsX);
+    this->openCL.kernel("estimateDensity")->setArg(6, cellsY);
+    this->openCL.kernel("estimateDensity")->setArg(7, cellsZ);
+    this->openCL.kernel("estimateDensity")->setArg(8, minExt);
+    this->openCL.kernel("estimateDensity")->setArg(9, maxExt);
+    this->openCL.kernel("estimateDensity")->setArg(10, this->density);
+    
+    // KERNEL :: computeLambda
+    this->openCL.loadKernel("computeLambda");
+    this->openCL.kernel("computeLambda")->setArg(0, this->parameters);
+    this->openCL.kernel("computeLambda")->setArg(1, this->particles);
+    this->openCL.kernel("computeLambda")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("computeLambda")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("computeLambda")->setArg(4, this->density);
+    this->openCL.kernel("computeLambda")->setArg(5, this->numParticles);
+    this->openCL.kernel("computeLambda")->setArg(6, cellsX);
+    this->openCL.kernel("computeLambda")->setArg(7, cellsY);
+    this->openCL.kernel("computeLambda")->setArg(8, cellsZ);
+    this->openCL.kernel("computeLambda")->setArg(9, minExt);
+    this->openCL.kernel("computeLambda")->setArg(10, maxExt);
+    this->openCL.kernel("computeLambda")->setArg(11, this->lambda);
+    
+    // KERNEL :: computePositionDelta
+    this->openCL.loadKernel("computePositionDelta");
+    this->openCL.kernel("computePositionDelta")->setArg(0, this->parameters);
+    this->openCL.kernel("computePositionDelta")->setArg(1, this->particles);
+    this->openCL.kernel("computePositionDelta")->setArg(2, this->sortedParticleToCell);
+    this->openCL.kernel("computePositionDelta")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("computePositionDelta")->setArg(4, this->numParticles);
+    this->openCL.kernel("computePositionDelta")->setArg(5, this->lambda);
+    this->openCL.kernel("computePositionDelta")->setArg(6, cellsX);
+    this->openCL.kernel("computePositionDelta")->setArg(7, cellsY);
+    this->openCL.kernel("computePositionDelta")->setArg(8, cellsZ);
+    this->openCL.kernel("computePositionDelta")->setArg(9, minExt);
+    this->openCL.kernel("computePositionDelta")->setArg(10, maxExt);
+    this->openCL.kernel("computePositionDelta")->setArg(11, this->posDeltaX);
+    this->openCL.kernel("computePositionDelta")->setArg(12, this->posDeltaY);
+    this->openCL.kernel("computePositionDelta")->setArg(13, this->posDeltaZ);
+    
+    // KERNEL :: applyPositionDelta
+    this->openCL.loadKernel("applyPositionDelta");
+    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDeltaX);
+    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaY);
+    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaZ);
+    this->openCL.kernel("applyPositionDelta")->setArg(3, this->particles);
+    
+    // KERNEL ::  updatePositionAndVelocity
+    this->openCL.loadKernel("updatePositionAndVelocity");
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(0, this->particles);
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->dt);
+    
+    // KERNEL :: applyViscosity
+    /*
+     this->openCL.loadKernel("applyViscosity");
+     this->openCL.kernel("applyViscosity")->setArg(0, this->particles);
+     this->openCL.kernel("applyViscosity")->setArg(1, this->sortedParticleToCell);
+     this->openCL.kernel("applyViscosity")->setArg(2, this->gridCellOffsets);
+     this->openCL.kernel("applyViscosity")->setArg(3, this->density);
+     this->openCL.kernel("applyViscosity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+     this->openCL.kernel("applyViscosity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+     this->openCL.kernel("applyViscosity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+     */
+    
+    // KERNEL :: computeCurl
+    /*
+     this->openCL.loadKernel("computeCurl");
+     this->openCL.kernel("computeCurl")->setArg(0, this->particles);
+     this->openCL.kernel("computeCurl")->setArg(1, this->sortedParticleToCell);
+     this->openCL.kernel("computeCurl")->setArg(2, this->gridCellOffsets);
+     this->openCL.kernel("computeCurl")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
+     this->openCL.kernel("computeCurl")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
+     this->openCL.kernel("computeCurl")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
+     */
+    
+    // KERNEL :: applyVorticity
+    /*
+     this->openCL.loadKernel("applyVorticity");
+     this->openCL.kernel("applyVorticity")->setArg(0, this->particles);
+     this->openCL.kernel("applyVorticity")->setArg(1, this->dt);
+     this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
+     this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
+     this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
+     this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
+     this->openCL.kernel("applyVorticity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
+     */
+    
+    // KERNEL :: resolveCollisions
+    this->openCL.loadKernel("resolveCollisions");
+    this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
+    this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
+    
 }
 
 /**
- * Updates the uniform particle radius
+ * Initializes the appearance of a particle when its rendered
  */
-void Simulation::setParticleRadius(float r)
+void Simulation::initalizeParticleDraw()
 {
-    this->particleRadius = r;
+    this->particleMesh = ofMesh::sphere(this->getParameters().particleRadius);
 }
 
 /**
@@ -454,6 +452,8 @@ void Simulation::reset()
     
     this->initialize();
 }
+
+/******************************************************************************/
 
 /**
  * Moves data from GPU buffers back to the host
@@ -489,6 +489,8 @@ void Simulation::writeToGPU()
     this->posDeltaY.writeToDevice();
     this->posDeltaZ.writeToDevice();
 }
+
+/******************************************************************************/
 
 /**
  * Moves the state of the simulation forward one time step according to the
@@ -539,7 +541,7 @@ void Simulation::step()
     //this->applyXSPHViscosity();
     
     //this->applyVorticityConfinement();
-
+    
     this->updatePositionAndVelocity();
     
     // Make sure the OpenCL work queue is empty before proceeding. This will
@@ -558,6 +560,8 @@ void Simulation::step()
 
     this->frameNumber++;
 }
+
+/******************************************************************************/
 
 /**
  * Draws the cell grid
@@ -641,8 +645,6 @@ void Simulation::drawParticles(const ofVec3f& cameraPosition)
             ofTranslate(p.pos.x, p.pos.y, p.pos.z);
 
             this->shader.begin();
-//                this->shader.printActiveUniforms();
-//                this->shader.printActiveAttributes();
                 this->particleMesh.draw();
             this->shader.end();
         
@@ -683,6 +685,20 @@ void Simulation::draw(const ofVec3f& cameraPosition)
 }
 
 /******************************************************************************/
+
+/**
+ * This implementation is based off of the method described in
+ * "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID" by
+ * Hoetzlein, 2014 that uses counting sort as an alternative to radix sort.
+ *
+ * See http://on-demand.gputechconf.com/gtc/2014/presentations/S4117-fast-fixed-radius-nearest-neighbor-gpu.pdf
+ */
+void Simulation::groupParticlesByCell()
+{
+    this->discretizeParticlePositions();
+    
+    this->sortParticlesByCell();
+}
 
 /**
  * Resets various particle quantities, like density, etc.
@@ -753,6 +769,8 @@ void Simulation::sortParticlesByCell()
  */
 void Simulation::calculateDensity()
 {
+    // Rebind the parameters in case they changed:
+    this->openCL.kernel("estimateDensity")->setArg(0, this->parameters);
     this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
 }
 
@@ -765,7 +783,12 @@ void Simulation::calculateDensity()
  */
 void Simulation::calculatePositionDelta()
 {
+    // Rebind the parameters in case they changed:
+    this->openCL.kernel("computeLambda")->setArg(0, this->parameters);
     this->openCL.kernel("computeLambda")->run1D(this->numParticles);
+    
+    // Rebind the parameters in case they changed:
+    this->openCL.kernel("computePositionDelta")->setArg(0, this->parameters);
     this->openCL.kernel("computePositionDelta")->run1D(this->numParticles);
 }
 

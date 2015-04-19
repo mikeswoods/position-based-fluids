@@ -42,7 +42,7 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    float  __dummy[2]; // Padding
+    float  __padding[2]; // Padding
 
 } Particle;
 
@@ -69,9 +69,58 @@ typedef struct {
     
     int length;
     
-    int __dummy[2]; // Padding
+    int __padding[2]; // Padding
     
 } GridCellOffset;
+
+// Tuneable parameters for the simulation:
+
+typedef struct Parameters {
+
+    float particleRadius;      // Particle radius
+    
+    float particleMass;        // Particle mass
+    
+    float smoothingRadius;     // Kernel smoothing radius
+    
+    float relaxation;          // Pressure relaxation coefficient (epsilon), as
+                               // described in the section 3 "Enforcing Incompressibility"
+                               // of the Position Based Fluids paper
+    float artificialPressureK; // Artificial pressure coefficient K
+    
+    float epsilonVorticity;    // Vorticity coefficient
+    
+    float epsilonViscosity;    // Viscosity coefficient
+    
+    float __padding1[3];
+
+    int artificialPressureN;   // Artificial pressure coefficient N
+
+    int __padding2[3];
+
+    /**
+     * Good parameter values when particle radius = 0.5
+     *
+     * H_SMOOTHING_RADIUS    = 1.1f;
+     * ARTIFICIAL_PRESSURE_K = 0.001f;
+     * ARTIFICIAL_PRESSURE_N = 4;
+     * EPSILON_RELAXATION    = 0.005f;
+     */
+    Parameters()
+    {
+        this->particleRadius       = 0.5f;
+        this->particleMass         = 1.0f;
+        this->smoothingRadius      = 1.1f;
+        this->relaxation           = 0.005f;
+        this->artificialPressureK  = 0.001f;
+        this->epsilonVorticity     = 0.1f;
+        this->epsilonViscosity     = 0.1f;
+        this->artificialPressureN  = 4;
+    }
+    
+    friend std::ostream& operator<<(std::ostream& os, Parameters p);
+    
+} Parameters;
 
 /******************************************************************************/
 
@@ -85,8 +134,14 @@ typedef struct {
 class Simulation
 {
     private:
+        // Particle VBO:
+        GLuint particleVBO;
+    
         // Count of the current frame number
         unsigned int frameNumber;
+
+        // Total number of cells in the system
+        int numCells;
     
         // Flag to draw the spatial grid
         bool flagDrawGrid;
@@ -98,22 +153,11 @@ class Simulation
         // find the "ideal" cell count per axis
         EigenVector3 findIdealParticleCount();
     
-        // Load shaders
-        void initializeShaders();
-    
-        // Load kernels and bind parameters
-        void initializeKernels();
-    
         // Moves data from GPU buffers back to the host
         void readFromGPU();
     
         // Writes data from the host to buffers on the GPU (device)
         void writeToGPU();
-    
-        // Individual functions needed for grouping particles into bins/cells
-        void computeCellHistogram();
-        void discretizeParticlePositions();
-        void sortParticlesByCell();
     
     protected:
         // Particle mesh sphere
@@ -133,20 +177,13 @@ class Simulation
     
         // Cells per axis for spatial subdivision:
         EigenVector3 cellsPerAxis;
-    
+
         // Total number of particles in the system
         int numParticles;
-    
-        // Total number of cells in the system
-        int numCells;
 
-        // Uniform particle radius (for now)
-        float particleRadius;
-    
-        // Just as the name describes
-        float particleMass;
-    
-        // Host managed buffer of particles; adapted from the of ofxMSAOpenCL
+        // Simulation parameters to pass to the kernels
+        Parameters parameterData;
+        msa::OpenCLBufferManagedT<Parameters> parameters;
     
         // All particles in the simulation
         msa::OpenCLBufferManagedT<Particle>	particles;
@@ -178,8 +215,15 @@ class Simulation
     
         // Initialization-related functions:
         void initialize();
+        void initializeKernels();
+        void initializeOpenGL();
         void initalizeParticleDraw();
 
+        // Particle sorting functions:
+        void computeCellHistogram();
+        void discretizeParticlePositions();
+        void sortParticlesByCell();
+    
         // Simulation state-related functions:
         void resetQuantities();
         void applyExternalForces();
@@ -199,18 +243,17 @@ class Simulation
         void drawParticles(const ofVec3f& cameraPosition);
 
     public:
-        Simulation(msa::OpenCL& _openCL
+        Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,int numParticles
-                  ,float dt = Constants::DEFAULT_DT);
+                  ,Parameters parameters);
     
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
                   ,int numParticles
                   ,float dt
-                  ,EigenVector3 _cellsPerAxis
-                  ,float particleRadius
-                  ,float particleMass);
+                  ,EigenVector3 cellsPerAxis
+                  ,Parameters parameters);
 
         virtual ~Simulation();
 
@@ -219,9 +262,8 @@ class Simulation
         const EigenVector3& getCellsPerAxis() const { return this->cellsPerAxis; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
-        float getParticleRadius() const;
-        void setParticleRadius(float r);
-    
+        Parameters& getParameters() { return this->parameters[0]; }
+
         const bool drawGridEnabled() const { return this->flagDrawGrid; }
         void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
     
