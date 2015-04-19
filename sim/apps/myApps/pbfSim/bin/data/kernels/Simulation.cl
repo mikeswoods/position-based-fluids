@@ -76,10 +76,6 @@ typedef struct {
     float4 vel;     // Current particle velocity (v), 4 words
     
     float4 curl;    // Curl force, 4 words
-    
-    float  mass;    // Particle mass, 1 word
-
-    float  radius;  // Particle radius, 1 word
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
@@ -92,7 +88,7 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    float  __padding[2]; // 2 words
+    //float  __padding[2]; // 2 words
 
 } Particle;
 
@@ -451,6 +447,10 @@ global void forAllNeighbors(const global Parameters* parameters
 
     const global Particle *p_i = &particles[particleId];
     
+    // Neighbor radius threshold:
+    
+    float R2 = 2.0f * parameters->particleRadius;
+    
     // Keep track of the number of neighbors seen so far. If/when this
     // number exceeds CHECK_MAX_NEIGHBORS, we can bail out of the neighbor
     // search loop
@@ -461,7 +461,7 @@ global void forAllNeighbors(const global Parameters* parameters
 
     // Exhaustively search the space for neighbors by computing the distance
     // between p_i and for all j in [0 .. numParticles - 1], p_j:
-    
+
     for (int j = 0; j < numParticles; j++) {
 
         // Skip instances in which we'd be comparing a particle to itself:
@@ -471,9 +471,8 @@ global void forAllNeighbors(const global Parameters* parameters
 
         const global Particle* p_j = &particles[j];
         float d = distance(p_i->posStar, p_j->posStar);
-        float R = p_i->radius + p_j->radius;
 
-        if (R >= d) {
+        if (R2 >= d) {
             
             if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
                 return;
@@ -544,9 +543,8 @@ global void forAllNeighbors(const global Parameters* parameters
                     // result:
 
                     float d = distance(p_i->posStar, p_j->posStar);
-                    float R = p_i->radius + p_j->radius;
 
-                    if (R >= d) {
+                    if (R2 >= d) {
                         
                         if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
                             return;
@@ -1323,11 +1321,13 @@ kernel void updatePositionAndVelocity(global Particle* particles
 /**
  *  Add Viscosity to each particle
  */
-kernel void applyViscosity(global Particle* particles,
-                           const global ParticlePosition* sortedParticleToCell,
-                           const global GridCellOffset* gridCellOffsets,
-                           const global float* density,
-                           int cellsX, int cellsY, int cellsZ)
+kernel void applyViscosity(global Particle* particles
+                          ,const global ParticlePosition* sortedParticleToCell
+                          ,const global GridCellOffset* gridCellOffsets
+                          ,const global float* density
+                          ,int cellsX
+                          ,int cellsY
+                          ,int cellsZ)
 {
 
 }
@@ -1335,10 +1335,12 @@ kernel void applyViscosity(global Particle* particles,
 /**
  *  Compute the Curl for each particle
  */
-kernel void computeCurl(global Particle* particles,
-                        const global ParticlePosition* sortedParticleToCell,
-                        const global GridCellOffset* gridCellOffsets,
-                        int cellsX, int cellsY, int cellsZ)
+kernel void computeCurl(global Particle* particles
+                       ,const global ParticlePosition* sortedParticleToCell
+                       ,const global GridCellOffset* gridCellOffsets
+                       ,int cellsX
+                       ,int cellsY
+                       ,int cellsZ)
 {
 
 }
@@ -1348,11 +1350,13 @@ kernel void computeCurl(global Particle* particles,
  * Vorticity Confinement
  *
  */
-kernel void applyVorticity(global Particle* particles,
-                           float dt,
-                           const global ParticlePosition* sortedParticleToCell,
-                           const global GridCellOffset* gridCellOffsets,
-                           int cellsX,int cellsY, int cellsZ)
+kernel void applyVorticity(global Particle* particles
+                          ,float dt
+                          ,const global ParticlePosition* sortedParticleToCell
+                          ,const global GridCellOffset* gridCellOffsets
+                          ,int cellsX
+                          ,int cellsY
+                          ,int cellsZ)
 {
 
 }
@@ -1362,8 +1366,16 @@ kernel void applyVorticity(global Particle* particles,
  * the positions of the particles accordingly
  * 
  * TODO: For now, this just clamps the particle to the world bounds
+ *
+ * @param [in]     Parameters* parameters Simulation parameters
+ * @param [in/out] const Particle* particles The particles in the simulation
+ * @param [in]     float3 minExtent The minimum extent of the simulation's
+ *                 bounding box in world space
+ * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ *                 bounding box in world space
  */
-kernel void resolveCollisions(global Particle* particles
+kernel void resolveCollisions(const global Parameters* parameters
+                             ,global Particle* particles
                              ,float3 minExtent
                              ,float3 maxExtent)
 {
@@ -1373,14 +1385,16 @@ kernel void resolveCollisions(global Particle* particles
 
     // Clamp predicted and actual positions:
 
+    float R = parameters->particleRadius;
+    
     // Actual positions:
-    p->pos.x = clamp(p->pos.x, minExtent.x + p->radius, maxExtent.x - p->radius);
-    p->pos.y = clamp(p->pos.y, minExtent.y + p->radius, maxExtent.y - p->radius);
-    p->pos.z = clamp(p->pos.z, minExtent.z + p->radius, maxExtent.z - p->radius);
+    p->pos.x = clamp(p->pos.x, minExtent.x + R, maxExtent.x - R);
+    p->pos.y = clamp(p->pos.y, minExtent.y + R, maxExtent.y - R);
+    p->pos.z = clamp(p->pos.z, minExtent.z + R, maxExtent.z - R);
 
     // Predicted positions:
-    p->posStar.x = clamp(p->posStar.x, minExtent.x + p->radius, maxExtent.x - p->radius);
-    p->posStar.y = clamp(p->posStar.y, minExtent.y + p->radius, maxExtent.y - p->radius);
-    p->posStar.z = clamp(p->posStar.z, minExtent.z + p->radius, maxExtent.z - p->radius);
+    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
+    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
+    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
 }
 

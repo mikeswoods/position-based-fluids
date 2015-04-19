@@ -26,11 +26,7 @@ typedef struct {
     float4 vel;      // Current particle velocity (v)
     
     float4 curl;     // Curl force
-    
-    float  mass;     // Particle mass
-    
-    float  radius;   // Particle radius
-    
+
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
      * for x86 memory access along 16 byte intervals.
@@ -42,7 +38,7 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    float  __padding[2]; // Padding
+    //float  __padding[2]; // Padding
 
 } Particle;
 

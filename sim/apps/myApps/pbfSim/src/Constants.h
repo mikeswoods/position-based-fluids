@@ -7,6 +7,17 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+
+/******************************************************************************/
+
+// If defined, a simple test scene will be used for rendering
+//#define SIMPLE_SCENE 1
+
+// If defined, no drawing will take place
+//#define DISABLE_DRAWING 1
+
+/******************************************************************************/
+
 namespace Constants {
 
 /**

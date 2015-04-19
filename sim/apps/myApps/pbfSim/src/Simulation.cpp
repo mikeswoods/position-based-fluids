@@ -28,8 +28,6 @@ ostream& operator<<(ostream& os, Particle p)
     return os << "Particle {" << endl
               << "  pos: <" << p.pos.x << "," << p.pos.y << "," << p.pos.z << ">" << endl
               << "  vel: <" << p.vel.x << "," << p.vel.y << "," << p.vel.z << ">" << endl
-              << "  mass: " << p.mass << endl
-              << " radiusL " << p.radius << endl
               << "}";
 }
 
@@ -116,16 +114,19 @@ Simulation::~Simulation()
  */
 EigenVector3 Simulation::findIdealParticleCount()
 {
-    auto minExt  = this->bounds.getMinExtent();
-    auto maxExt  = this->bounds.getMaxExtent();
-    float width  = maxExt[0] - minExt[0];
-    float height = maxExt[1] - minExt[1];
-    float depth  = maxExt[2] - minExt[2];
-    float radius = this->getParameters().particleRadius;
+    auto minExt   = this->bounds.getMinExtent();
+    auto maxExt   = this->bounds.getMaxExtent();
+    float width   = maxExt[0] - minExt[0];
+    float height  = maxExt[1] - minExt[1];
+    float depth   = maxExt[2] - minExt[2];
+    float radius  = this->getParameters().particleRadius;
+    float subDivX = static_cast<float>(Constants::PARTICLES_PER_CELL_X) / radius;
+    float subDivY = static_cast<float>(Constants::PARTICLES_PER_CELL_Y) / radius;
+    float subDivZ = static_cast<float>(Constants::PARTICLES_PER_CELL_Z) / radius;
     
-    int cellsX   = static_cast<int>(ceil((width / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_X)));
-    int cellsY   = static_cast<int>(ceil((height / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Y)));
-    int cellsZ   = static_cast<int>(ceil((depth / radius) / static_cast<float>(Constants::PARTICLES_PER_CELL_Z)));
+    int cellsX   = static_cast<int>(ceil((width / radius) / subDivX));
+    int cellsY   = static_cast<int>(ceil((height / radius) / subDivY));
+    int cellsZ   = static_cast<int>(ceil((depth / radius) / subDivZ));
 
     return EigenVector3(cellsX, cellsY, cellsZ);
 }
@@ -139,7 +140,6 @@ void Simulation::initialize()
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
-
     
     // Initialize a buffer to hold dynamic simulation related parameters:
     this->parameters.initBuffer(1);
@@ -228,13 +228,7 @@ void Simulation::initialize()
         
         // No predicted position:
         p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
-        
-        // All particles have uniform mass (for now):
-        p.mass = this->getParameters().particleMass;
-        
-        // and a uniform radius (for now):
-        p.radius = this->getParameters().particleRadius;
-        
+
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
@@ -429,9 +423,10 @@ void Simulation::initializeKernels()
     
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
-    this->openCL.kernel("resolveCollisions")->setArg(0, this->particles);
-    this->openCL.kernel("resolveCollisions")->setArg(1, this->bounds.getMinExtent());
-    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMaxExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(0, this->parameters);
+    this->openCL.kernel("resolveCollisions")->setArg(1, this->particles);
+    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMinExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(3, this->bounds.getMaxExtent());
     
 }
 
@@ -554,7 +549,9 @@ void Simulation::step()
     // Read the changes back from the GPU so we can manipulate the values
     // in our C++ program:
 
+    #ifndef DISABLE_DRAWING
     this->readFromGPU();
+    #endif
     
     // Finally, bump up the frame counter:
 
@@ -679,7 +676,9 @@ void Simulation::draw(const ofVec3f& cameraPosition)
         this->drawGrid(cameraPosition);
     }
 
+    #ifndef DISABLE_DRAWING
     this->drawParticles(cameraPosition);
+    #endif
     
     ofDrawAxis(2.0f);
 }
@@ -810,6 +809,8 @@ void Simulation::applyPositionDelta()
  */
 void Simulation::handleCollisions()
 {
+    // Rebind the parameters in case they changed:
+    this->openCL.kernel("resolveCollisions")->setArg(0, this->parameters);
     this->openCL.kernel("resolveCollisions")->run1D(this->numParticles);
 }
 
