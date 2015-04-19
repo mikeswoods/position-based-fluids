@@ -112,10 +112,10 @@ typedef struct Parameters {
         this->particleMass         = 1.0f;
         this->smoothingRadius      = 1.1f;
         this->relaxation           = 0.005f;
-        this->artificialPressureK  = 0.001f;
+        this->artificialPressureK  = 0.1f;
+        this->artificialPressureN  = 5;
         this->epsilonVorticity     = 0.1f;
         this->epsilonViscosity     = 0.1f;
-        this->artificialPressureN  = 4;
     }
     
     friend std::ostream& operator<<(std::ostream& os, Parameters p);

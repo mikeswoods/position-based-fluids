@@ -17,6 +17,10 @@
 
 /******************************************************************************/
 
+//#define SIMPLE_SCENE 1
+
+/******************************************************************************/
+
 static float readParticleRadius(float currentSize);
 
 /******************************************************************************/
@@ -39,7 +43,7 @@ void ofApp::setup()
     ofEnableDepthTest();
     
     // This sets the camera's distance from the object
-    this->camera.setDistance(15);
+    this->camera.setDistance(50);
    // this->camera.set
 
     // Initialize from GL world:
@@ -53,10 +57,10 @@ void ofApp::setup()
     parameters.particleRadius = 0.5f;
     ofSetVerticalSync(true);
 #else
-    AABB bounds(ofVec3f(-5.0f, 0.0f, 0.0f), ofVec3f(5.0f, 10.0f, 2.0f));
-    int numParticles = Constants::DEFAULT_NUM_PARTICLES;
+    AABB bounds(ofVec3f(-30.0f, 0.0f, -5.0f), ofVec3f(30.0f, 30.0f, 5.0f));
+    int numParticles = 2500;
     Parameters parameters;
-    parameters.particleRadius = 0.1f;
+    parameters.particleRadius = 0.5f;
     ofSetVerticalSync(false);
 #endif
 
@@ -271,12 +275,12 @@ void ofApp::dragEvent(ofDragInfo dragInfo)
 
 float readParticleRadius(float currentSize)
 {
-    string maxSizeStr     = ofToString(Constants::MAX_PARTICLE_MASS);
+    string maxSizeStr     = ofToString(Constants::MAX_PARTICLE_RADIUS);
     string currentSizeStr = ofToString(currentSize);
     
     string input = ofSystemTextBoxDialog("Particle size? (> 0.0], max = " + maxSizeStr + ")", currentSizeStr);
     float r = ofToFloat(input);
-    r = std::min(std::max(0.0f, r), Constants::MAX_PARTICLE_MASS);
+    r = std::min(std::max(0.0f, r), Constants::MAX_PARTICLE_RADIUS);
     return r == 0.0f ? Constants::DEFAULT_PARTICLE_RADIUS : r;
 }
 

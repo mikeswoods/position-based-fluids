@@ -7,14 +7,12 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define SIMPLE_SCENE 1
-
 namespace Constants {
 
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 5;
+const int SOLVER_ITERATIONS = 3;
    
 /**
  * Default number of particles in the simulation
@@ -27,14 +25,9 @@ const int DEFAULT_NUM_PARTICLES = 2500;
 const float DEFAULT_DT = 0.033f;
 
 /**
- * Default particle mass
+ * Max particle radius
  */
-const float DEFAULT_PARTICLE_MASS = 1.0f;
-
-/**
- * Max particle mass
- */
-const float MAX_PARTICLE_MASS = 3.0f;
+const float MAX_PARTICLE_RADIUS = 3.0f;
     
 /**
  * Default particle radius

@@ -20,6 +20,11 @@
  ******************************************************************************/
 
 /**
+ * The maximum number of neighbors to examine for a given particle:
+ */
+const constant int CHECK_MAX_NEIGHBORS = 8;
+
+/**
  * Acceleration force due to gravity: 9.8 m/s
  */
 const constant float G = 9.8f;
@@ -446,11 +451,17 @@ global void forAllNeighbors(const global Parameters* parameters
 
     const global Particle *p_i = &particles[particleId];
     
+    // Keep track of the number of neighbors seen so far. If/when this
+    // number exceeds CHECK_MAX_NEIGHBORS, we can bail out of the neighbor
+    // search loop
+
+    int neighborsSeen = 0;
+    
 #ifdef USE_BRUTE_FORCE_SEARCH
 
     // Exhaustively search the space for neighbors by computing the distance
     // between p_i and for all j in [0 .. numParticles - 1], p_j:
-
+    
     for (int j = 0; j < numParticles; j++) {
 
         // Skip instances in which we'd be comparing a particle to itself:
@@ -463,7 +474,14 @@ global void forAllNeighbors(const global Parameters* parameters
         float R = p_i->radius + p_j->radius;
 
         if (R >= d) {
+            
+            if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
+                return;
+            }
+            
             callback(particleId, p_i, j, p_j, accum);
+
+            neighborsSeen++;
         }
     }
 
@@ -530,11 +548,17 @@ global void forAllNeighbors(const global Parameters* parameters
 
                     if (R >= d) {
                         
+                        if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
+                            return;
+                        }
+
                         // Invoke the callback function to the particle pair
                         // (p_i, p_j), along with their respective indices,
                         // and accumulate the result into accum:
 
                         callback(parameters, particleId, p_i, J, p_j, accum);
+                    
+                        neighborsSeen++;
                     }
                 }
             }
@@ -704,8 +728,9 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
+    float dQ        = 0.2f * h;
     float4 r        = p_i->posStar - p_j->posStar;
-    float4 q        = (r * 0.5f) * 0.3f * h;
+    float4 q        = dQ * ((float4)(1.0, 1.0, 1.0, 0.0f) + p_i->posStar);
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
     float d         = poly6(q, h);
@@ -714,7 +739,7 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     }
     float sCorr = -parameters->artificialPressureK * pow(n / d, parameters->artificialPressureN);
     
-    context->posDelta += ((lambda_i + lambda_j /*+ sCorr*/) * gradient);
+    context->posDelta += ((lambda_i + lambda_j + sCorr) * gradient);
 }
 
 /*******************************************************************************
