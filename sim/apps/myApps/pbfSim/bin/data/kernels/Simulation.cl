@@ -75,7 +75,7 @@ typedef struct {
     
     float4 vel;     // Current particle velocity (v), 4 words
     
-    float4 velStar; // Updated particle velocity from XSPH viscosity (v*), 4 words
+    float4 velDelta; // Velocity delta from XSPH viscosity (v*), 4 words
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
@@ -743,12 +743,14 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
-    float dQ        = 0.2f * h;
+    float dQ        = 0.3f * h;
     float4 r        = p_i->posStar - p_j->posStar;
-    float4 q        = dQ * ((float4)(1.0, 1.0, 1.0, 0.0f) + p_i->posStar);
+    float4 q        = dQ * ((float4)(1.0f, 1.0f, 1.0f, 1.0f) + p_i->posStar);
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    float d         = poly6(q, h);
+    //float d         = poly6(q, h);
+    float d = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
+    
     if (d == 0.0f) {
         d = 1.0e-4f;
     }
@@ -836,12 +838,9 @@ kernel void resetParticleQuantities(global Particle* particles
     spp->cellI = spp->cellJ = spp->cellK = -1;
 
     p->posStar   = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    p->velStar   = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-
+    p->velDelta  = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     density[id]  = 0.0f;
-
     lambda[id]   = 0.0f;
-    
     posDelta[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
@@ -1398,8 +1397,7 @@ kernel void updateVelocity(global Particle* particles
     // Update the particle's final velocity based on the actual (x) and
     // predicted (x*) positions:
     
-    p->vel     = (1.0f / dt) * (p->posStar - p->pos);
-    p->velStar = p->vel;
+    p->vel = (1.0f / dt) * (p->posStar - p->pos);
 }
 
 /**
@@ -1487,23 +1485,7 @@ kernel void applyVorticity(const global Parameters* parameters
                           ,float3 maxExtent)
 {
     int id = get_global_id(0);
-    
-    // Curl for particle i:
-    float4 omega_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 
-    forAllNeighbors(parameters
-                    ,particles
-                    ,sortedParticleToCell
-                    ,gridCellOffsets
-                    ,numParticles
-                    ,cellsX
-                    ,cellsY
-                    ,cellsZ
-                    ,minExtent
-                    ,maxExtent
-                    ,id
-                    ,callback_Curl_i
-                    ,(void*)&omega_i);
     
 }
 
@@ -1556,9 +1538,8 @@ kernel void applyXSPHViscosity(const global Parameters* parameters
                    ,id
                    ,callback_XPSHViscosity_i
                    ,(void*)&v_i_sum);
-    
-    //p->velStar = p->vel + (parameters->viscosityCoeff * v_i_sum);
-    p->vel += (parameters->viscosityCoeff * v_i_sum);
+
+    p->velDelta = (parameters->viscosityCoeff * v_i_sum);
 }
 
 /**
@@ -1580,7 +1561,7 @@ kernel void updatePosition(global Particle* particles
     // Update the particle's final velocity based on the actual (x) and
     // predicted (x*) positions:
 
-    p->vel = p->velStar;
+    p->vel += p->velDelta;
     
     // And finally the position:
     

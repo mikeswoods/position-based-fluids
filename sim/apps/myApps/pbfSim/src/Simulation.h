@@ -24,7 +24,7 @@ typedef struct {
 
     float4 vel;      // Current particle velocity (v)
     
-    float4 velStar;  // Updated particle velocity from XSPH viscosity (v*), 4 words
+    float4 velDelta; // Velocity delta from XSPH viscosity (v*), 4 words
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
@@ -107,10 +107,11 @@ typedef struct Parameters {
         this->particleMass         = 1.0f;
         this->smoothingRadius      = 1.1f;
         this->relaxation           = 0.005f;
-        this->artificialPressureK  = 0.1f;
-        this->artificialPressureN  = 5;
+        //this->artificialPressureK  = 0.1f;
+        this->artificialPressureK  = 0.001f;
+        this->artificialPressureN  = 4;
         this->epsilonVorticity     = 0.1f;
-        this->viscosityCoeff       = 1.0f;
+        this->viscosityCoeff       = 0.01f;
     }
 
     friend std::ostream& operator<<(std::ostream& os, Parameters p);
