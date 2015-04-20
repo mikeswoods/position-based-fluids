@@ -2,22 +2,14 @@
 
 uniform vec3 cameraPosition;
 
-// Set by OpenFrameworks
 uniform vec4 globalColor;
 in vec4  color;
 out vec4 outputColor;
 
-/*
-void main()
-{
-    //outputColor = globalColor;
-    outputColor = color;
-}
-*/
-
-//uniform vec3 Color;
-//uniform vec3 lightDir;
-
+/**
+ * Adapted from http://mmmovania.blogspot.de/2011/01/point-sprites-as-spheres-in-opengl33.html
+ * Copyright (C) 2011 - Movania Muhammad Mobeen
+ */
 void main(void)
 {
     vec3 lightDir = vec3(10.0, -10.0, 10.0);

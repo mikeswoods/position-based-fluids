@@ -283,18 +283,15 @@ void Simulation::initializeOpenGL()
     // Nothing to do
 
 #else
-    
+
     // Set up how our particles are going to be displayed as points:
     glPointSize(10.0f);
-    glEnable(GL_POINT_SMOOTH);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    this->particleVertices.setVertexData((const float*)0      // No need to explicitly upload anything, since it'll be zeros anyway
-                                        ,4                    // Our points are represented by a 4D homogenous point (x,y,z,w)
+    this->particleVertices.setVertexData((const float*)0     // No need to explicitly upload anything, since it'll be zeros anyway
+                                        ,4                   // Our points are represented by a 4D homogenous point (x,y,z,w)
                                         ,this->numParticles
                                         ,GL_STATIC_DRAW
-                                        ,sizeof(float) * 4 ); // Each point is 4 floats
+                                        ,sizeof(float) * 4); // Each point is 4 floats
     
     // Copy the normal data from the sphere to fake a spherical shape
     // in the shaders later:
@@ -423,6 +420,19 @@ void Simulation::initializeKernels()
     this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->renderPos);
     this->openCL.kernel("updatePositionAndVelocity")->setArg(2, this->dt);
     
+    // KERNEL :: applyVorticity
+    this->openCL.loadKernel("applyVorticity");
+    this->openCL.kernel("applyVorticity")->setArg(0, this->parameters);
+    this->openCL.kernel("applyVorticity")->setArg(1, this->particles);
+    this->openCL.kernel("applyVorticity")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
+    this->openCL.kernel("applyVorticity")->setArg(4, this->numParticles);
+    this->openCL.kernel("applyVorticity")->setArg(5, cellsX);
+    this->openCL.kernel("applyVorticity")->setArg(6, cellsY);
+    this->openCL.kernel("applyVorticity")->setArg(7, cellsZ);
+    this->openCL.kernel("applyVorticity")->setArg(8, minExt);
+    this->openCL.kernel("applyVorticity")->setArg(9, maxExt);
+
     // KERNEL :: applyViscosity
     /*
      this->openCL.loadKernel("applyViscosity");
@@ -434,19 +444,7 @@ void Simulation::initializeKernels()
      this->openCL.kernel("applyViscosity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
      this->openCL.kernel("applyViscosity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
      */
-    
-    // KERNEL :: applyVorticity
-    /*
-     this->openCL.loadKernel("applyVorticity");
-     this->openCL.kernel("applyVorticity")->setArg(0, this->particles);
-     this->openCL.kernel("applyVorticity")->setArg(1, this->dt);
-     this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
-     this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
-     this->openCL.kernel("applyVorticity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
-     this->openCL.kernel("applyVorticity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
-     this->openCL.kernel("applyVorticity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-     */
-    
+
     // KERNEL :: resolveCollisions
     this->openCL.loadKernel("resolveCollisions");
     this->openCL.kernel("resolveCollisions")->setArg(0, this->parameters);
@@ -556,10 +554,14 @@ void Simulation::step()
     // in our C++ program:
 
 #ifdef DRAW_PARTICLES_AS_SPHERES
+
     this->readFromGPU();
+
 #else
+
     // If rendering particles using GL_POINTS, we don't need to read anything
     // back from the GPU
+
 #endif
 
     // Finally, bump up the frame counter:
@@ -822,13 +824,13 @@ void Simulation::handleCollisions()
 }
 
 /**
- * [TODO]
+ * Applies the vorticity confinement force
  *
- * Apply vorticity confinement
+ * @see kernels/Simulation.cl (applyVorticity) for details
  */
 void Simulation::applyVorticityConfinement()
 {
-    //this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
+    this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
 }
 
 /**

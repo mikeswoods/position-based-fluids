@@ -189,6 +189,13 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
                               ,const global Particle* p_j
                               ,void* data);
 
+void callback_Vorticity_i(const global Parameters* parameters
+                         ,int i
+                         ,const global Particle* p_i
+                         ,int j
+                         ,const global Particle* p_j
+                         ,void* data);
+
 global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
                               ,const global GridCellOffset* gridCellOffsets
                               ,int cellsX
@@ -570,13 +577,13 @@ global void forAllNeighbors(const global Parameters* parameters
  ******************************************************************************/
 
 /**
- * Poly6 smoothing kernel
+ * Computed the poly6 scalar smoothing kernel
  *
  * From the PBF slides SIGGRAPH 2013, pg. 13
  *
  * @param [in] float4 r distance
  * @param [in] float h Smoothing kernel radius
- * @returns float
+ * @returns float The computed scalar value
  */
 float poly6(float4 r, float h)
 {
@@ -595,13 +602,13 @@ float poly6(float4 r, float h)
 }
 
 /**
- * Spiky smoothing kernel
+ * Computes the spiky smoothing kernel gradient
  *
  * From the PBF slides SIGGRAPH 2013, pg. 13
  *
  * @param [in] float4 r distance
  * @param [in] float h Smoothing kernel radius
- * @returns float4
+ * @returns float4 The computed gradient in (x,y,z,w)
  */
 float4 spiky(float4 r, float h)
 {
@@ -625,10 +632,10 @@ float4 spiky(float4 r, float h)
  * callback function with forAllNeighbors()
  *
  * @param [in] Parameters* parameters Simulation parameters
- * @param [in] int i Index of particle i
- * @param [in] Particle* p_i Pair particle p_i
- * @param [in] int j Index of particle j
- * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
  * @param [in] void* The data to update (generally a float of accumulated densities)
  */
 void callback_SPHDensityEstimator_i(const global Parameters* parameters
@@ -642,6 +649,7 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
     // variable accordingly:
     
     float* accumDensity = (float*)data;
+
     (*accumDensity) += poly6(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
 
@@ -650,10 +658,10 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
  * function C_i, w.r.t a particle p_j for the case when i = j
  *
  * @param [in] Parameters* parameters Simulation parameters
- * @param [in] int i Index of particle i
- * @param [in] Particle* p_i Pair particle p_i
- * @param [in] int j Index of particle j
- * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
  * @param [in] void* The data to update (generally a float4 gradient vector)
  */
 void callback_SPHGradient_i(const global Parameters* parameters
@@ -667,6 +675,7 @@ void callback_SPHGradient_i(const global Parameters* parameters
     // variable accordingly:
 
     float4* gradVector = (float4*)data;
+
     (*gradVector) += spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
 
@@ -675,10 +684,10 @@ void callback_SPHGradient_i(const global Parameters* parameters
  * of a constraint function C_i, w.r.t a particle p_j for the case when i != j
  *
  * @param [in] Parameters* parameters Simulation parameters
- * @param [in] int i Index of particle i
- * @param [in] Particle* p_i Pair particle p_i
- * @param [in] int j Index of particle j
- * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
  * @param [in] void* The data to update (generally a float4 gradient vector)
  */
 void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
@@ -692,6 +701,7 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // variable accordingly:
     
     float* totalGradLength = (float*)data;
+
     float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius));
     float gradVectorLength = length(gradVector);
     
@@ -703,10 +713,10 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
  * given a neighbor particle p_j
  *
  * @param [in] Parameters* parameters Simulation parameters
- * @param [in] int i Index of particle i
- * @param [in] Particle* p_i Pair particle p_i
- * @param [in] int j Index of particle j
- * @param [in] Particle* p_j Pair particle p_j
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
  */
  void callback_PositionDelta_i(const global Parameters* parameters
                               ,int i
@@ -735,9 +745,35 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     if (d == 0.0f) {
         d = 1.0e-4f;
     }
+
     float sCorr = -parameters->artificialPressureK * pow(n / d, parameters->artificialPressureN);
     
     context->posDelta += ((lambda_i + lambda_j + sCorr) * gradient);
+}
+
+/**
+ * A callback function that computes the vorticity force acting on a given
+ * particle, p_i
+ *
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ */
+void callback_Vorticity_i(const global Parameters* parameters
+                         ,int i
+                         ,const global Particle* p_i
+                         ,int j
+                         ,const global Particle* p_j
+                         ,void* data)
+{
+    float4* omega_i = (float4*)data;
+
+    float4 v_ij        = p_i->vel - p_j->vel;
+    float4 gradient_ij = spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
+
+    (*omega_i) += cross(v_ij, gradient_ij);
 }
 
 /*******************************************************************************
@@ -1319,15 +1355,34 @@ kernel void updatePositionAndVelocity(global Particle* particles
  * Vorticity Confinement
  *
  */
-kernel void applyVorticity(global Particle* particles
-                           ,float dt
-                           ,const global ParticlePosition* sortedParticleToCell
-                           ,const global GridCellOffset* gridCellOffsets
-                           ,int cellsX
-                           ,int cellsY
-                           ,int cellsZ)
+kernel void applyVorticity(const global Parameters* parameters
+                          ,const global Particle* particles
+                          ,const global ParticlePosition* sortedParticleToCell
+                          ,const global GridCellOffset* gridCellOffsets
+                          ,int numParticles
+                          ,int cellsX
+                          ,int cellsY
+                          ,int cellsZ
+                          ,float3 minExtent
+                          ,float3 maxExtent)
 {
+    int id = get_global_id(0);
     
+    float4 omega_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+
+    forAllNeighbors(parameters
+                    ,particles
+                    ,sortedParticleToCell
+                    ,gridCellOffsets
+                    ,numParticles
+                    ,cellsX
+                    ,cellsY
+                    ,cellsZ
+                    ,minExtent
+                    ,maxExtent
+                    ,id
+                    ,callback_Vorticity_i
+                    ,(void*)&omega_i);
 }
 
 /**
