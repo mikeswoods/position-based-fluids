@@ -13,7 +13,6 @@
 #include <sstream>
 #include "ofApp.h"
 #include "Constants.h"
-#include "Definitions.h"
 
 /******************************************************************************/
 
@@ -97,8 +96,11 @@ void ofApp::update()
  * Draws a "heads up display" that shows the status of the simulation, as well
  * as some other pieces of pertinent information
  */
-void ofApp::drawHeadsUpDisplay()
+void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
 {
+    ofVec3f cameraPos = camera.getPosition();
+    ofVec3f targetPos = camera.getTarget().getPosition();
+    
     // Show the current frame rate and frame count
     ofSetColor(255);
     ofFill();
@@ -106,6 +108,16 @@ void ofApp::drawHeadsUpDisplay()
     int hOffset     = 10;
     int vSpacing    = 15;
     int textYOffset = vSpacing;
+    
+    // Paused flag
+    if (this->isPaused()) {
+        ofSetColor(0, 255, 0);
+        ofFill();
+        ofDrawBitmapString("Paused", hOffset, textYOffset += vSpacing);
+    }
+    
+    ofSetColor(255);
+    ofFill();
     
     // FPS
     string fpsText = ofToString(ofGetFrameRate()) + " fps";
@@ -127,16 +139,26 @@ void ofApp::drawHeadsUpDisplay()
     for (auto i = hotkeys.begin(); i != hotkeys.end(); i++) {
         ofDrawBitmapString(*i, hOffset, textYOffset += vSpacing);
     }
-    
-    // Paused flag
-    if (this->isPaused()) {
-        ofDrawBitmapString("Paused", hOffset, textYOffset += vSpacing);
-    }
 
     // Status information:
     auto bounds = this->simulation->getBounds();
     auto minExt = bounds.getMinExtent();
     auto maxExt = bounds.getMaxExtent();
+    
+    // Camera Position:
+    ofDrawBitmapString("Camera position: <" + ofToString(cameraPos.x) +
+                                        "," + ofToString(cameraPos.y) +
+                                        "," + ofToString(cameraPos.z) + ">"
+                      ,hOffset
+                      ,textYOffset += vSpacing);
+
+    // Camera target:
+    ofDrawBitmapString("Camera target: <" + ofToString(targetPos.x) +
+                                      "," + ofToString(targetPos.y) +
+                                      "," + ofToString(targetPos.z) + ">"
+                       ,hOffset
+                       ,textYOffset += vSpacing);
+
     // Bounds:
     ofDrawBitmapString("Bounds: <" +
                        ofToString(minExt.x) + "," + ofToString(minExt.y) + "," + ofToString(minExt.z) + "> <" +
@@ -162,14 +184,11 @@ void ofApp::draw()
     
     this->camera.begin();
 
-        // Find the current position of the camera:
-        float3 cameraPos = ofVec3f(this->camera.getX(), this->camera.getY(), this->camera.getZ());
-
-        this->simulation->draw(cameraPos);
+        this->simulation->draw(this->camera);
 
     this->camera.end();
     
-    this->drawHeadsUpDisplay();
+    this->drawHeadsUpDisplay(this->camera);
 }
 
 /*******************************************************************************

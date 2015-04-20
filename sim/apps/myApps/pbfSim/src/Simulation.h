@@ -9,7 +9,6 @@
 
 #include <iostream>
 #include "Constants.h"
-#include "Definitions.h"
 #include "AABB.h"
 #include "MSAOpenCL.h"
 
@@ -144,8 +143,8 @@ class Simulation
     
         // Given a particle count, particle radius and world bounds,
         // find the "ideal" cell count per axis
-        EigenVector3 findIdealParticleCount();
-    
+        ofVec3f findIdealParticleCount();
+
         // Moves data from GPU buffers back to the host
         void readFromGPU();
     
@@ -172,7 +171,7 @@ class Simulation
         float dt;
     
         // Cells per axis for spatial subdivision:
-        EigenVector3 cellsPerAxis;
+        ofVec3f cellsPerAxis;
 
         // Total number of particles in the system
         int numParticles;
@@ -234,9 +233,9 @@ class Simulation
         void updatePositionAndVelocity();
     
         // Drawing-related functions:
-        void drawBounds(const ofVec3f& cameraPosition) const;
-        void drawGrid(const ofVec3f& cameraPosition) const;
-        void drawParticles(const ofVec3f& cameraPosition);
+        void drawBounds(const ofCamera& camera) const;
+        void drawGrid(const ofCamera& camera) const;
+        void drawParticles(const ofCamera& camera);
 
     public:
         Simulation(msa::OpenCL& openCL
@@ -248,14 +247,14 @@ class Simulation
                   ,AABB bounds
                   ,int numParticles
                   ,float dt
-                  ,EigenVector3 cellsPerAxis
+                  ,ofVec3f cellsPerAxis
                   ,Parameters parameters);
 
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
         const AABB& getBounds() const { return this->bounds; }
-        const EigenVector3& getCellsPerAxis() const { return this->cellsPerAxis; }
+        const ofVec3f& getCellsPerAxis() const { return this->cellsPerAxis; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
         Parameters& getParameters() { return this->parameters[0]; }
@@ -267,9 +266,7 @@ class Simulation
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
         void step();
-        void draw(const ofVec3f& cameraPosition);
-    
-        friend std::ostream& operator<<(std::ostream& os, EigenVector3 v);
+        void draw(const ofCamera& camera);
 };
 
 #endif

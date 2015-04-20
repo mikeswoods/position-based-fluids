@@ -109,7 +109,6 @@
 		276C3E1E1ADEBF1C00492E07 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
 		279B26971AD62D9500B6B554 /* AABB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AABB.cpp; sourceTree = "<group>"; };
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
-		279B26991AD62D9500B6B554 /* Definitions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Definitions.h; sourceTree = "<group>"; };
 		279B269A1AD62D9500B6B554 /* Simulation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Simulation.cpp; sourceTree = "<group>"; };
 		279B269B1AD62D9500B6B554 /* Simulation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Simulation.h; sourceTree = "<group>"; };
 		27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCL.cpp; sourceTree = "<group>"; };
@@ -488,7 +487,6 @@
 			children = (
 				279B26971AD62D9500B6B554 /* AABB.cpp */,
 				279B26981AD62D9500B6B554 /* AABB.h */,
-				279B26991AD62D9500B6B554 /* Definitions.h */,
 				279B269A1AD62D9500B6B554 /* Simulation.cpp */,
 				279B269B1AD62D9500B6B554 /* Simulation.h */,
 				E4B69E1D0A3A1BDC003C02F2 /* main.cpp */,

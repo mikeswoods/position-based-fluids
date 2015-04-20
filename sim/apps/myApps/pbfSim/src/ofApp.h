@@ -17,7 +17,7 @@ class ofApp : public ofBaseApp
         msa::OpenCL openCL;
         std::shared_ptr<Simulation> simulation;
     
-        void drawHeadsUpDisplay();
+        void drawHeadsUpDisplay(ofEasyCam& camera) const;
     
 	public:
 		void setup();

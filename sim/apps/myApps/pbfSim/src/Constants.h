@@ -64,6 +64,11 @@ const int PARTICLES_PER_CELL_Y = 2;
  */
 const int PARTICLES_PER_CELL_Z = 2;
 
+/**
+ * Particle render radius in OpenGL when using point-based particles:
+ */
+const float OPENGL_POINT_PARTICLE_RADIUS = 25.0f;
+
 }
     
 #endif

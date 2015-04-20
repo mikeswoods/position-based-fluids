@@ -11,7 +11,6 @@
 
 #include <iostream>
 #include "MSAOpenCL.h"
-#include "Definitions.h"
 
 /******************************************************************************/
 

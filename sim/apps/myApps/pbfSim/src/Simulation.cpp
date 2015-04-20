@@ -7,6 +7,7 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include "ofMain.h"
 #include "Constants.h"
@@ -17,11 +18,6 @@
 using namespace std;
 
 /******************************************************************************/
-
-ostream& operator<<(ostream& os, EigenVector3 v)
-{
-    return os << "<" << v[0] << "," << v[1] << "," << v[2] << ">";
-}
 
 ostream& operator<<(ostream& os, Particle p)
 {
@@ -86,7 +82,7 @@ Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
                       ,int _numParticles
                       ,float _dt
-                      ,EigenVector3 _cellsPerAxis
+                      ,ofVec3f _cellsPerAxis
                       ,Parameters _parameters) :
     openCL(_openCL),
     bounds(_bounds),
@@ -106,15 +102,17 @@ Simulation::~Simulation()
     
 }
 
+/******************************************************************************/
+
 /**
- * Finds the ideal number of cells per axis so that the number of 
+ * Finds the ideal number of cells per axis so that the number of
  * particles that need to be searched is minimized
  */
-EigenVector3 Simulation::findIdealParticleCount()
+ofVec3f Simulation::findIdealParticleCount()
 {
     auto minExt   = this->bounds.getMinExtent();
     auto maxExt   = this->bounds.getMaxExtent();
-
+    
     float width   = maxExt[0] - minExt[0];
     float height  = maxExt[1] - minExt[1];
     float depth   = maxExt[2] - minExt[2];
@@ -126,8 +124,41 @@ EigenVector3 Simulation::findIdealParticleCount()
     int cellsX   = static_cast<int>(ceil((width / radius) / subDivX));
     int cellsY   = static_cast<int>(ceil((height / radius) / subDivY));
     int cellsZ   = static_cast<int>(ceil((depth / radius) / subDivZ));
+    
+    return ofVec3f(cellsX, cellsY, cellsZ);
+}
 
-    return EigenVector3(cellsX, cellsY, cellsZ);
+/**
+ * Moves data from GPU buffers back to the host
+ */
+void Simulation::readFromGPU()
+{
+    this->particles.readFromDevice();
+    this->particleToCell.readFromDevice();
+    this->cellHistogram.readFromDevice();
+    this->sortedParticleToCell.readFromDevice();
+    this->gridCellOffsets.readFromDevice();
+    this->density.readFromDevice();
+    this->lambda.readFromDevice();
+    this->posDelta.readFromDevice();
+    this->renderPos.readFromDevice();
+}
+
+/**
+ * Writes data from the host to buffers on the GPU (i.e. the "device" in
+ * OpenCL parlance)
+ */
+void Simulation::writeToGPU()
+{
+    this->particles.writeToDevice();
+    this->particleToCell.writeToDevice();
+    this->cellHistogram.writeToDevice();
+    this->sortedParticleToCell.writeToDevice();
+    this->gridCellOffsets.writeToDevice();
+    this->density.writeToDevice();
+    this->lambda.writeToDevice();
+    this->posDelta.writeToDevice();
+    this->renderPos.writeToDevice();
 }
 
 /******************************************************************************/
@@ -285,7 +316,7 @@ void Simulation::initializeOpenGL()
 #else
 
     // Set up how our particles are going to be displayed as points:
-    glPointSize(10.0f);
+    glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
     
     this->particleVertices.setVertexData((const float*)0     // No need to explicitly upload anything, since it'll be zeros anyway
                                         ,4                   // Our points are represented by a 4D homogenous point (x,y,z,w)
@@ -457,41 +488,6 @@ void Simulation::initializeKernels()
 /******************************************************************************/
 
 /**
- * Moves data from GPU buffers back to the host
- */
-void Simulation::readFromGPU()
-{
-    this->particles.readFromDevice();
-    this->particleToCell.readFromDevice();
-    this->cellHistogram.readFromDevice();
-    this->sortedParticleToCell.readFromDevice();
-    this->gridCellOffsets.readFromDevice();
-    this->density.readFromDevice();
-    this->lambda.readFromDevice();
-    this->posDelta.readFromDevice();
-    this->renderPos.readFromDevice();
-}
-
-/**
- * Writes data from the host to buffers on the GPU (i.e. the "device" in 
- * OpenCL parlance)
- */
-void Simulation::writeToGPU()
-{
-    this->particles.writeToDevice();
-    this->particleToCell.writeToDevice();
-    this->cellHistogram.writeToDevice();
-    this->sortedParticleToCell.writeToDevice();
-    this->gridCellOffsets.writeToDevice();
-    this->density.writeToDevice();
-    this->lambda.writeToDevice();
-    this->posDelta.writeToDevice();
-    this->renderPos.writeToDevice();
-}
-
-/******************************************************************************/
-
-/**
  * Moves the state of the simulation forward one time step according to the
  * time step value, dt, passed to the constrcutor
  *
@@ -576,7 +572,7 @@ void Simulation::step()
  *
  * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::drawGrid(const ofVec3f& cameraPosition) const
+void Simulation::drawGrid(const ofCamera& camera) const
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
@@ -613,9 +609,9 @@ void Simulation::drawGrid(const ofVec3f& cameraPosition) const
  * Draws the bounds of the simulated environment as a transparent with solid
  * lines indicating the edges of the bounding box.
  *
- * @param [in] The current world position of the camera cameraPosition
+ * @param [in] The current scene camera
  */
-void Simulation::drawBounds(const ofVec3f& cameraPosition) const
+void Simulation::drawBounds(const ofCamera& camera) const
 {
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
@@ -638,11 +634,12 @@ void Simulation::drawBounds(const ofVec3f& cameraPosition) const
  * Later, this may be changed so that the color of the particle reflects
  * some quantity like velocity, mass, viscosity, etc.
  *
- * @param [in] The current world position of the camera cameraPosition
+ * @param [in] The current scene camera
  */
-void Simulation::drawParticles(const ofVec3f& cameraPosition)
+void Simulation::drawParticles(const ofCamera& camera)
 {
 #if DRAW_PARTICLES_AS_SPHERES
+
     this->shader.begin();
         for (int i = 0; i < this->numParticles; i++) {
             
@@ -664,10 +661,17 @@ void Simulation::drawParticles(const ofVec3f& cameraPosition)
             }
         }
     this->shader.end();
+
 #else
+
+    auto cp = camera.getPosition();
+    
     this->shader.begin();
+        this->shader.setUniform1f("particleRadius", Constants::OPENGL_POINT_PARTICLE_RADIUS);
+        this->shader.setUniform3f("cameraPosition", cp.x, cp.y, cp.z);
         this->particleVertices.draw(GL_POINTS, 0, this->numParticles);
     this->shader.end();
+
 #endif
 }
 
@@ -677,17 +681,17 @@ void Simulation::drawParticles(const ofVec3f& cameraPosition)
  * all particles in the simulation, as well as any additional objects (meshs,
  * walls, etc.) that may exist.
  *
- * @param [in] The current world position of the camera cameraPosition
+ * @param [in] The current scene camera
  */
-void Simulation::draw(const ofVec3f& cameraPosition)
+void Simulation::draw(const ofCamera& camera)
 {
-    this->drawBounds(cameraPosition);
+    this->drawBounds(camera);
 
     if (this->drawGridEnabled()) {
-        this->drawGrid(cameraPosition);
+        this->drawGrid(camera);
     }
 
-    this->drawParticles(cameraPosition);
+    this->drawParticles(camera);
     
     ofDrawAxis(2.0f);
 }
