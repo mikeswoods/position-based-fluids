@@ -60,7 +60,6 @@ Simulation::Simulation(msa::OpenCL& _openCL
                       ,AABB _bounds
                       ,int _numParticles
                       ,Parameters _parameters) :
-    particleVBO(0),
     openCL(_openCL),
     bounds(_bounds),
     numParticles(_numParticles),
@@ -89,7 +88,6 @@ Simulation::Simulation(msa::OpenCL& _openCL
                       ,float _dt
                       ,EigenVector3 _cellsPerAxis
                       ,Parameters _parameters) :
-    particleVBO(0),
     openCL(_openCL),
     bounds(_bounds),
     numParticles(_numParticles),
@@ -116,6 +114,7 @@ EigenVector3 Simulation::findIdealParticleCount()
 {
     auto minExt   = this->bounds.getMinExtent();
     auto maxExt   = this->bounds.getMaxExtent();
+
     float width   = maxExt[0] - minExt[0];
     float height  = maxExt[1] - minExt[1];
     float depth   = maxExt[2] - minExt[2];
@@ -157,14 +156,17 @@ void Simulation::initialize()
     // Set up OpenGL VAOs, VBOs, and shader programs:
     
     this->initializeOpenGL();
-    
-    // Set the particle's appearance:
-    
-    this->initalizeParticleDraw();
-    
-    // Dimension the OpenCL buffer to hold the given number of particles:
 
-    this->particles.initFromGLObject(this->particleVBO, this->numParticles);
+    // Dimension the OpenCL buffer to hold the given number of particles and
+    // the render positions
+
+    this->particles.initBuffer(this->numParticles);
+
+#ifdef DRAW_PARTICLES_AS_SPHERES
+    this->renderPos.initBuffer(this->numParticles);
+#else
+    this->renderPos.initFromGLObject(this->particleVertices.getVertId(), this->numParticles);
+#endif
     
     // particleToCell contains [0 .. this->numParticles - 1] entries, where
     // each ParticlePosition instance (index is not important) maps
@@ -211,9 +213,7 @@ void Simulation::initialize()
     this->lambda.initBuffer(this->numParticles);
     
     // For particle position correction in the solver:
-    this->posDeltaX.initBuffer(this->numParticles);
-    this->posDeltaY.initBuffer(this->numParticles);
-    this->posDeltaZ.initBuffer(this->numParticles);
+    this->posDelta.initBuffer(this->numParticles);
     
     // Set up initial positions and velocities for the particles:
     
@@ -248,21 +248,34 @@ void Simulation::initialize()
  */
 void Simulation::initializeOpenGL()
 {
-    // The VBOs for the particles:
- 
-    glGenBuffers(1, &this->particleVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, this->particleVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * this->numParticles, (void*)0, GL_DYNAMIC_DRAW);
+    // Set up the particle geometry for instancing:
+    
+    this->particleMesh = ofMesh::sphere(this->getParameters().particleRadius);
     
     // Set up the shaders:
     
-    this->shader.bindDefaults();
-    
-    if (this->shader.load("shaders/Basic")) {
+    if (this->shader.load("shaders/Basic.vert", "shaders/Basic.frag")) {
         ofLogNotice() << "Loaded shader" << endl;
     } else {
         ofLogError() << "Failed to load shader!" << endl;
     }
+    
+    // Bind default symbols:
+
+    this->shader.bindDefaults();
+    
+    // Add zero'd vertex data for the VBO which will be updated from
+    // OpenCL:
+    
+#ifdef DRAW_PARTICLES_AS_SPHERES
+    // Nothing to do
+#else
+    this->particleVertices.setVertexData((const float*)0      // No need to explicitly upload anything, since it'll be zeros anyway
+                                        ,4                    // Our points are represented by a 4D homogenous point (x,y,z,w)
+                                        ,this->numParticles
+                                        ,GL_STATIC_DRAW
+                                        ,sizeof(float) * 4 ); // Each point is 4 floats
+#endif
 }
 
 /**
@@ -272,6 +285,7 @@ void Simulation::initializeKernels()
 {
     auto minExt = this->bounds.getMinExtent();
     auto maxExt = this->bounds.getMaxExtent();
+
     int  cellsX = static_cast<int>(this->cellsPerAxis[0]);
     int  cellsY = static_cast<int>(this->cellsPerAxis[1]);
     int  cellsZ = static_cast<int>(this->cellsPerAxis[2]);
@@ -286,9 +300,7 @@ void Simulation::initializeKernels()
     this->openCL.kernel("resetParticleQuantities")->setArg(2, this->sortedParticleToCell);
     this->openCL.kernel("resetParticleQuantities")->setArg(3, this->density);
     this->openCL.kernel("resetParticleQuantities")->setArg(4, this->lambda);
-    this->openCL.kernel("resetParticleQuantities")->setArg(5, this->posDeltaX);
-    this->openCL.kernel("resetParticleQuantities")->setArg(6, this->posDeltaY);
-    this->openCL.kernel("resetParticleQuantities")->setArg(7, this->posDeltaZ);
+    this->openCL.kernel("resetParticleQuantities")->setArg(5, this->posDelta);
     
     // KERNEL :: resetCellQuantities
     this->openCL.loadKernel("resetCellQuantities");
@@ -370,21 +382,18 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computePositionDelta")->setArg(8, cellsZ);
     this->openCL.kernel("computePositionDelta")->setArg(9, minExt);
     this->openCL.kernel("computePositionDelta")->setArg(10, maxExt);
-    this->openCL.kernel("computePositionDelta")->setArg(11, this->posDeltaX);
-    this->openCL.kernel("computePositionDelta")->setArg(12, this->posDeltaY);
-    this->openCL.kernel("computePositionDelta")->setArg(13, this->posDeltaZ);
+    this->openCL.kernel("computePositionDelta")->setArg(11, this->posDelta);
     
     // KERNEL :: applyPositionDelta
     this->openCL.loadKernel("applyPositionDelta");
-    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDeltaX);
-    this->openCL.kernel("applyPositionDelta")->setArg(1, this->posDeltaY);
-    this->openCL.kernel("applyPositionDelta")->setArg(2, this->posDeltaZ);
-    this->openCL.kernel("applyPositionDelta")->setArg(3, this->particles);
+    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDelta);
+    this->openCL.kernel("applyPositionDelta")->setArg(1, this->particles);
     
     // KERNEL ::  updatePositionAndVelocity
     this->openCL.loadKernel("updatePositionAndVelocity");
     this->openCL.kernel("updatePositionAndVelocity")->setArg(0, this->particles);
-    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->dt);
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->renderPos);
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(2, this->dt);
     
     // KERNEL :: applyViscosity
     /*
@@ -396,17 +405,6 @@ void Simulation::initializeKernels()
      this->openCL.kernel("applyViscosity")->setArg(4, static_cast<int>(this->cellsPerAxis[0]));
      this->openCL.kernel("applyViscosity")->setArg(5, static_cast<int>(this->cellsPerAxis[1]));
      this->openCL.kernel("applyViscosity")->setArg(6, static_cast<int>(this->cellsPerAxis[2]));
-     */
-    
-    // KERNEL :: computeCurl
-    /*
-     this->openCL.loadKernel("computeCurl");
-     this->openCL.kernel("computeCurl")->setArg(0, this->particles);
-     this->openCL.kernel("computeCurl")->setArg(1, this->sortedParticleToCell);
-     this->openCL.kernel("computeCurl")->setArg(2, this->gridCellOffsets);
-     this->openCL.kernel("computeCurl")->setArg(3, static_cast<int>(this->cellsPerAxis[0]));
-     this->openCL.kernel("computeCurl")->setArg(4, static_cast<int>(this->cellsPerAxis[1]));
-     this->openCL.kernel("computeCurl")->setArg(5, static_cast<int>(this->cellsPerAxis[2]));
      */
     
     // KERNEL :: applyVorticity
@@ -430,24 +428,6 @@ void Simulation::initializeKernels()
     
 }
 
-/**
- * Initializes the appearance of a particle when its rendered
- */
-void Simulation::initalizeParticleDraw()
-{
-    this->particleMesh = ofMesh::sphere(this->getParameters().particleRadius);
-}
-
-/**
- * Resets the state of the simulation
- */
-void Simulation::reset()
-{
-    this->frameNumber = 0;
-    
-    this->initialize();
-}
-
 /******************************************************************************/
 
 /**
@@ -462,9 +442,8 @@ void Simulation::readFromGPU()
     this->gridCellOffsets.readFromDevice();
     this->density.readFromDevice();
     this->lambda.readFromDevice();
-    this->posDeltaX.readFromDevice();
-    this->posDeltaY.readFromDevice();
-    this->posDeltaZ.readFromDevice();
+    this->posDelta.readFromDevice();
+    this->renderPos.readFromDevice();
 }
 
 /**
@@ -480,9 +459,8 @@ void Simulation::writeToGPU()
     this->gridCellOffsets.writeToDevice();
     this->density.writeToDevice();
     this->lambda.writeToDevice();
-    this->posDeltaX.writeToDevice();
-    this->posDeltaY.writeToDevice();
-    this->posDeltaZ.writeToDevice();
+    this->posDelta.writeToDevice();
+    this->renderPos.writeToDevice();
 }
 
 /******************************************************************************/
@@ -549,10 +527,13 @@ void Simulation::step()
     // Read the changes back from the GPU so we can manipulate the values
     // in our C++ program:
 
-    #ifndef DISABLE_DRAWING
+#ifdef DRAW_PARTICLES_AS_SPHERES
     this->readFromGPU();
-    #endif
-    
+#else
+    // If rendering particles using GL_POINTS, we don't need to read anything
+    // back from the GPU
+#endif
+
     // Finally, bump up the frame counter:
 
     this->frameNumber++;
@@ -609,6 +590,7 @@ void Simulation::drawBounds(const ofVec3f& cameraPosition) const
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
+
     auto x  = (p1[0] + p2[0]) * 0.5f;
     auto y  = (p1[1] + p2[1]) * 0.5f;
     auto z  = (p1[2] + p2[2]) * 0.5f;
@@ -630,34 +612,34 @@ void Simulation::drawBounds(const ofVec3f& cameraPosition) const
  */
 void Simulation::drawParticles(const ofVec3f& cameraPosition)
 {
-    for (int i = 0; i < this->numParticles; i++) {
-
-        Particle &p = this->particles[i];
-
-        // The fill:
-        ofSetColor(51, 153, 255);
-        ofFill();
-        ofPushMatrix();
-        
-            ofTranslate(p.pos.x, p.pos.y, p.pos.z);
-
-            this->shader.begin();
-                this->particleMesh.draw();
-            this->shader.end();
-        
-        ofPopMatrix();
-
-        if (this->isVisualDebuggingEnabled()) {
-
-            // Label the particle with its number:
-            ofSetColor(255, 255, 0);
-            ofFill();
+#if DRAW_PARTICLES_AS_SPHERES
+    this->shader.begin();
+        for (int i = 0; i < this->numParticles; i++) {
+            
+            Particle &p = this->particles[i];
+            
             ofPushMatrix();
+                ofTranslate(p.pos.x, p.pos.y, p.pos.z);
+                this->particleMesh.draw();
+            ofPopMatrix();
+            
+            if (this->isVisualDebuggingEnabled()) {
+                // Label the particle with its number:
+                ofSetColor(255, 255, 0);
+                ofFill();
+                ofPushMatrix();
                 ofTranslate(0,0,p.pos.z);
                 ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
-            ofPopMatrix();
+                ofPopMatrix();
+            }
         }
-    }
+    this->shader.end();
+#else
+    this->shader.begin();
+        glPointSize(10.0f);
+        this->particleVertices.draw(GL_POINTS, 0, this->numParticles);
+    this->shader.end();
+#endif
 }
 
 /**
@@ -676,9 +658,7 @@ void Simulation::draw(const ofVec3f& cameraPosition)
         this->drawGrid(cameraPosition);
     }
 
-    #ifndef DISABLE_DRAWING
     this->drawParticles(cameraPosition);
-    #endif
     
     ofDrawAxis(2.0f);
 }
@@ -817,28 +797,26 @@ void Simulation::handleCollisions()
 /**
  * [TODO]
  *
+ * Apply vorticity confinement
+ */
+void Simulation::applyVorticityConfinement()
+{
+    //this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
+}
+
+/**
+ * [TODO]
+ *
  * Apply XSPH viscosity
  *
  *  f_i_viscosity = mu SUM_j(mass_j * ((v_j - v_i)/density_j) * Nabla^2 W(|x_i - x_j|)
  *
  *  where mu = 0.05f and Nabla^2 = (Laplace operator)
  *  particle i looks at neighbors j
- *
  */
 void Simulation::applyXSPHViscosity()
 {
     //this->openCL.loadKernel("applyViscosity")->run1D(this->numParticles);
-}
-
-/**
- * [TODO]
- *
- * Apply vorticity confinement
- */
-void Simulation::applyVorticityConfinement()
-{
-    //this->openCL.loadKernel("computeCurl")->run1D(this->numParticles);
-    //this->openCL.loadKernel("applyVorticity")->run1D(this->numParticles);
 }
 
 /**
@@ -849,6 +827,7 @@ void Simulation::applyVorticityConfinement()
  */
 void Simulation::updatePositionAndVelocity()
 {
+    this->openCL.kernel("updatePositionAndVelocity")->setArg(1, this->renderPos);
     this->openCL.kernel("updatePositionAndVelocity")->run1D(this->numParticles);
 }
 

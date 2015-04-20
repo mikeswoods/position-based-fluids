@@ -129,10 +129,7 @@ typedef struct Parameters {
  */
 class Simulation
 {
-    private:
-        // Particle VBO:
-        GLuint particleVBO;
-    
+    private:    
         // Count of the current frame number
         unsigned int frameNumber;
 
@@ -158,6 +155,9 @@ class Simulation
     protected:
         // Particle mesh sphere
         ofMesh particleMesh;
+    
+        // Particle vertices
+        ofVbo particleVertices;
     
         // OpenCL manager
         msa::OpenCL& openCL;
@@ -204,16 +204,16 @@ class Simulation
         // Incompressibility" of "Position Based Fluids"
         msa::OpenCLBufferManagedT<float> lambda;
     
-        // Position deltas in x, y, and z
-        msa::OpenCLBufferManagedT<float> posDeltaX;
-        msa::OpenCLBufferManagedT<float> posDeltaY;
-        msa::OpenCLBufferManagedT<float> posDeltaZ;
+        // Position deltas
+        msa::OpenCLBufferManagedT<float4> posDelta;
+
+        // Final render position for OpenCL <-> OpenGL instanced rendering
+        msa::OpenCLBufferManagedT<float4> renderPos;
     
         // Initialization-related functions:
         void initialize();
         void initializeKernels();
         void initializeOpenGL();
-        void initalizeParticleDraw();
 
         // Particle sorting functions:
         void computeCellHistogram();
@@ -266,7 +266,6 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
-        void reset();
         void step();
         void draw(const ofVec3f& cameraPosition);
     

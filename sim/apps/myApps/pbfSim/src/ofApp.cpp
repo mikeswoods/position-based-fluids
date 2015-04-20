@@ -38,6 +38,9 @@ void ofApp::setup()
     // rather than always drawing things on top of each other
     ofEnableDepthTest();
     
+    // Disable alpha blending, since we won't need it:
+    ofDisableAlphaBlending();
+    
     // This sets the camera's distance from the object
     this->camera.setDistance(50);
    // this->camera.set
@@ -46,18 +49,22 @@ void ofApp::setup()
     this->openCL.setupFromOpenGL();
 
 #ifdef SIMPLE_SCENE
+
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles = 50;
+    int numParticles = 20;
     
     Parameters parameters;
     parameters.particleRadius = 0.5f;
     ofSetVerticalSync(true);
+
 #else
-    AABB bounds(ofVec3f(-30.0f, 0.0f, -5.0f), ofVec3f(30.0f, 30.0f, 5.0f));
-    int numParticles = 2500;
+
+    AABB bounds(ofVec3f(-30.0f, 0.0f, -10.0f), ofVec3f(30.0f, 30.0f, 10.0f));
+    int numParticles = Constants::DEFAULT_NUM_PARTICLES;
     Parameters parameters;
     parameters.particleRadius = 0.5f;
     ofSetVerticalSync(false);
+
 #endif
 
     // Instantiate the simulator:
@@ -125,7 +132,7 @@ void ofApp::drawHeadsUpDisplay()
     if (this->isPaused()) {
         ofDrawBitmapString("Paused", hOffset, textYOffset += vSpacing);
     }
-    
+
     // Status information:
     auto bounds = this->simulation->getBounds();
     auto minExt = bounds.getMinExtent();
@@ -207,7 +214,7 @@ void ofApp::keyPressed(int key)
         // Reset
         case 'r':
             {
-                this->simulation->reset();
+                this->setup();
             }
             break;
         // Toggle visual debugging:

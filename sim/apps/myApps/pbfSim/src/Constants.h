@@ -7,14 +7,15 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-
 /******************************************************************************/
 
 // If defined, a simple test scene will be used for rendering
 //#define SIMPLE_SCENE 1
 
-// If defined, no drawing will take place
-//#define DISABLE_DRAWING 1
+// If defined, mesh spheres will be drawn for the particles, otherwise
+// faster OpenGL points will be used:
+
+//#define DRAW_PARTICLES_AS_SPHERES 1
 
 /******************************************************************************/
 
@@ -28,7 +29,7 @@ const int SOLVER_ITERATIONS = 3;
 /**
  * Default number of particles in the simulation
  */
-const int DEFAULT_NUM_PARTICLES = 2500;
+const int DEFAULT_NUM_PARTICLES = 5000;
 
 /**
  * Default time step = 1/30 of a second
@@ -62,7 +63,7 @@ const int PARTICLES_PER_CELL_Y = 2;
  * compute the optimal number of cells in the spatial grid per axis
  */
 const int PARTICLES_PER_CELL_Z = 2;
-    
+
 }
     
 #endif

@@ -753,9 +753,7 @@ kernel void resetParticleQuantities(global Particle* particles
                                    ,global ParticlePosition* sortedParticleToCell
                                    ,global float* density
                                    ,global float* lambda
-                                   ,global float* posDeltaX
-                                   ,global float* posDeltaY
-                                   ,global float* posDeltaZ)
+                                   ,global float4* posDelta)
 {
     int id = get_global_id(0);
     global Particle *p           = &particles[id];
@@ -777,9 +775,7 @@ kernel void resetParticleQuantities(global Particle* particles
 
     lambda[id]    = 0.0f;
     
-    posDeltaX[id] = 0.0f;
-    posDeltaY[id] = 0.0f;
-    posDeltaZ[id] = 0.0f;
+    posDelta[id]  = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 /**
@@ -1227,9 +1223,7 @@ kernel void computeLambda(const global Parameters* parameters
  *              bounding box in world space
  * @param [in]  float3 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
- * @param [out] float* posDeltaX position changes in X
- * @param [out] float* posDeltaY position changes in Y
- * @param [out] float* posDeltaZ position changes in Z
+ * @param [out] float4* posDelta position changes
  */
 kernel void computePositionDelta(const global Parameters* parameters
                                 ,const global Particle* particles
@@ -1242,9 +1236,7 @@ kernel void computePositionDelta(const global Parameters* parameters
                                 ,int cellsZ
                                 ,float3 minExtent
                                 ,float3 maxExtent
-                                ,global float* posDeltaX
-                                ,global float* posDeltaY
-                                ,global float* posDeltaZ)
+                                ,global float4* posDelta)
 {
     int id = get_global_id(0);
 
@@ -1265,11 +1257,7 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,callback_PositionDelta_i
                    ,(void*)&pd);
     
-    float4 pStar = INV_REST_DENSITY * pd.posDelta;
-    
-    posDeltaX[id] = pStar.x;
-    posDeltaY[id] = pStar.y;
-    posDeltaZ[id] = pStar.z;
+    posDelta[id] = INV_REST_DENSITY * pd.posDelta;
 }
 
 /**
@@ -1277,22 +1265,16 @@ kernel void computePositionDelta(const global Parameters* parameters
  * position delta to the predicted positions p_i.posStar.(x|y|z), e.g. "x_i*"
  * in the Position Based Fluids paper
  *
- * @param [in]  float* posDeltaX The predicted delta position in the x-axis
- * @param [in]  float* posDeltaY The predicted delta position in the x-axis
- * @param [in]  float* posDeltaZ The predicted delta position in the x-axis
+ * @param [in]  float4* posDelta The predicted delta position
  * @param [out] Particle* particles The particles in the simulation to be updated
  */
-kernel void applyPositionDelta(const global float* posDeltaX
-                              ,const global float* posDeltaY
-                              ,const global float* posDeltaZ
+kernel void applyPositionDelta(const global float4* posDelta
                               ,global Particle* particles)
 {
     int id = get_global_id(0);
     global Particle *p = &particles[id];
     
-    p->posStar.x += posDeltaX[id];
-    p->posStar.y += posDeltaY[id];
-    p->posStar.z += posDeltaZ[id];
+    p->posStar += posDelta[id];
 }
 
 /**
@@ -1300,23 +1282,53 @@ kernel void applyPositionDelta(const global float* posDeltaX
  * position and velocity of the particle in the current simulation step
  *
  * @param [in/out] Particle* particles The particles in the simulation to be updated
+ * @param [out]    float4* The final render position of the particle to use in
+ *                 OpenGL for rendering the instanced position of the particle
  * @param [in]     float dt The timestep
  */
 kernel void updatePositionAndVelocity(global Particle* particles
+                                     ,global float4* renderPos
                                      ,float dt)
 {
     int id = get_global_id(0);
-    
     global Particle *p = &particles[id];
     
     // Update the particle's final velocity:
+
     p->vel = (1.0f / dt) * (p->posStar - p->pos);
     
     // And finally the position:
+
     p->pos = p->posStar;
+    
+    renderPos[id] = p->pos;
+
+    // We need this since we're using a 4 dimensional homogenous representation
+    // of a 3D point, e.g. we need to show a point in (x,y,z), but our
+    // representation is in (x,y,z,w), which OpenGL converts to
+    // (x/w,y/z,z/w) so that it can be displayed in 3D. If w is zero, then
+    // we'll never see any output, so if we set this explicitly to 1.0, then
+    // everything will work correctly:
+
+    renderPos[id].w = 1.0f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Vorticity Confinement
+ *
+ */
+kernel void applyVorticity(global Particle* particles
+                           ,float dt
+                           ,const global ParticlePosition* sortedParticleToCell
+                           ,const global GridCellOffset* gridCellOffsets
+                           ,int cellsX
+                           ,int cellsY
+                           ,int cellsZ)
+{
+    
+}
 
 /**
  *  Add Viscosity to each particle
@@ -1325,35 +1337,6 @@ kernel void applyViscosity(global Particle* particles
                           ,const global ParticlePosition* sortedParticleToCell
                           ,const global GridCellOffset* gridCellOffsets
                           ,const global float* density
-                          ,int cellsX
-                          ,int cellsY
-                          ,int cellsZ)
-{
-
-}
-
-/**
- *  Compute the Curl for each particle
- */
-kernel void computeCurl(global Particle* particles
-                       ,const global ParticlePosition* sortedParticleToCell
-                       ,const global GridCellOffset* gridCellOffsets
-                       ,int cellsX
-                       ,int cellsY
-                       ,int cellsZ)
-{
-
-}
-
-
-/**
- * Vorticity Confinement
- *
- */
-kernel void applyVorticity(global Particle* particles
-                          ,float dt
-                          ,const global ParticlePosition* sortedParticleToCell
-                          ,const global GridCellOffset* gridCellOffsets
                           ,int cellsX
                           ,int cellsY
                           ,int cellsZ)
