@@ -27,21 +27,6 @@ ostream& operator<<(ostream& os, Particle p)
               << "}";
 }
 
-ostream& operator<<(ostream& os, Parameters p)
-{
-    os << "Parameters {" << endl
-       << "  particleRadius:\t"      << p.particleRadius      << endl
-       << "  particleMass:\t"        << p.particleMass        << endl
-       << "  smoothingRadius:\t"     << p.smoothingRadius     << endl
-       << "  relaxation:\t"          << p.relaxation          << endl
-       << "  artificialPressureK:\t" << p.artificialPressureK << endl
-       << "  artificialPressureN:\t" << p.artificialPressureN << endl
-       << "  epsilonVorticity:\t"    << p.epsilonVorticity    << endl
-       << "  viscosityCoeff:\t"      << p.viscosityCoeff    << endl
-       << "}";
-    return os;
-}
-
 /******************************************************************************/
 
 /**
@@ -544,7 +529,7 @@ void Simulation::step()
     
     //this->applyVorticityConfinement();
     
-    this->applyXSPHViscosity();
+    //this->applyXSPHViscosity();
     
     this->updatePosition();
 

@@ -14,6 +14,7 @@
 		2712CA371AD76E760056EF01 /* Simulation.cl in Sources */ = {isa = PBXBuildFile; fileRef = 2712CA361AD76E760056EF01 /* Simulation.cl */; };
 		279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B26971AD62D9500B6B554 /* AABB.cpp */; };
 		279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B269A1AD62D9500B6B554 /* Simulation.cpp */; };
+		27A363041AE5A25700654DC8 /* Parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27A363031AE5A25700654DC8 /* Parameters.cpp */; };
 		27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */; };
 		27BB07281AD7148E009F3377 /* MSAOpenCLBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */; };
 		27BB07291AD7148E009F3377 /* MSAOpenCLImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07181AD7148E009F3377 /* MSAOpenCLImage.cpp */; };
@@ -111,6 +112,8 @@
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
 		279B269A1AD62D9500B6B554 /* Simulation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Simulation.cpp; sourceTree = "<group>"; };
 		279B269B1AD62D9500B6B554 /* Simulation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Simulation.h; sourceTree = "<group>"; };
+		27A363021AE5A10900654DC8 /* Parameters.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parameters.h; sourceTree = "<group>"; };
+		27A363031AE5A25700654DC8 /* Parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Parameters.cpp; sourceTree = "<group>"; };
 		27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCL.cpp; sourceTree = "<group>"; };
 		27BB07141AD7148E009F3377 /* MSAOpenCL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCL.h; sourceTree = "<group>"; };
 		27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLBuffer.cpp; sourceTree = "<group>"; };
@@ -493,6 +496,8 @@
 				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
 				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
 				276C3E1E1ADEBF1C00492E07 /* Constants.h */,
+				27A363021AE5A10900654DC8 /* Parameters.h */,
+				27A363031AE5A25700654DC8 /* Parameters.cpp */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -662,6 +667,7 @@
 				27BB072B1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp in Sources */,
 				4E322024174AFB49A3BEA152 /* model3DS.cpp in Sources */,
 				279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */,
+				27A363041AE5A25700654DC8 /* Parameters.cpp in Sources */,
 				C2B7714E50909A7BCAE5A51C /* texture3DS.cpp in Sources */,
 				270E10051AE492F80035B686 /* README.md in Sources */,
 				59DB8A662B2617751F4A9412 /* ofx3dModelLoader.cpp in Sources */,

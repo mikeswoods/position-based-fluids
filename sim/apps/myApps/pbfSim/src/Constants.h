@@ -7,6 +7,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include "Parameters.h";
+
 /******************************************************************************/
 
 // If defined, a simple test scene will be used for rendering
@@ -69,6 +71,19 @@ const int PARTICLES_PER_CELL_Z = 2;
  */
 const float OPENGL_POINT_PARTICLE_RADIUS = 25.0f;
 
+    
+/******************************************************************************/
+
+/**
+ * Parameters for a simulation with particles of radius 0.5 units
+ */
+const Parameters FOR_RADIUS_0_5 = Parameters(0.5f, 1.0f, 1.1f, 0.005f, 0.001f, 4, 0.1f, 0.01f);
+
+/**
+ * Parameters for a simulation with particles of radius 0.25 units
+ */
+const Parameters FOR_RADIUS_0_25 = Parameters(0.25f, 1.0f, 0.5f, 0.1, 0.1, 4, 0.1f, 0.01f);
+    
 }
     
 #endif

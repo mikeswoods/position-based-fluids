@@ -41,8 +41,10 @@ void ofApp::setup()
     ofDisableAlphaBlending();
     
     // This sets the camera's distance from the object
-    this->camera.setDistance(50);
-   // this->camera.set
+    if (!this->cameraSet) {
+        this->camera.setDistance(50);
+        this->cameraSet = true;
+    }
 
     // Initialize from GL world:
     this->openCL.setupFromOpenGL();
@@ -50,18 +52,16 @@ void ofApp::setup()
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles = 20;
+    int numParticles = 120;
     
     Parameters parameters;
-    parameters.particleRadius = 0.5f;
     ofSetVerticalSync(true);
 
 #else
 
     AABB bounds(ofVec3f(-30.0f, 0.0f, -10.0f), ofVec3f(30.0f, 30.0f, 10.0f));
-    int numParticles = Constants::DEFAULT_NUM_PARTICLES;
-    Parameters parameters;
-    parameters.particleRadius = 0.5f;
+    int numParticles = 10000;
+    Parameters parameters = Constants::FOR_RADIUS_0_5;
     ofSetVerticalSync(false);
 
 #endif
@@ -232,6 +232,7 @@ void ofApp::keyPressed(int key)
         // Reset
         case 'r':
             {
+                auto oldCam = this->camera;
                 this->setup();
             }
             break;

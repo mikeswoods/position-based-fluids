@@ -8,6 +8,7 @@
 #define SIMULATION_H
 
 #include <iostream>
+#include "Parameters.h"
 #include "Constants.h"
 #include "AABB.h"
 #include "MSAOpenCL.h"
@@ -67,56 +68,6 @@ typedef struct {
     int __padding[2]; // Padding
     
 } GridCellOffset;
-
-// Tuneable parameters for the simulation:
-
-typedef struct Parameters {
-
-    float particleRadius;      // Particle radius
-    
-    float particleMass;        // Particle mass
-    
-    float smoothingRadius;     // Kernel smoothing radius
-    
-    float relaxation;          // Pressure relaxation coefficient (epsilon), as
-                               // described in the section 3 "Enforcing Incompressibility"
-                               // of the Position Based Fluids paper
-    float artificialPressureK; // Artificial pressure coefficient K
-    
-    float epsilonVorticity;    // Vorticity coefficient
-    
-    float viscosityCoeff;      // Viscosity coefficient
-    
-    float __padding1[3];
-
-    int artificialPressureN;   // Artificial pressure coefficient N
-
-    int __padding2[3];
-
-    /**
-     * Good parameter values when particle radius = 0.5
-     *
-     * H_SMOOTHING_RADIUS    = 1.1f;
-     * ARTIFICIAL_PRESSURE_K = 0.001f;
-     * ARTIFICIAL_PRESSURE_N = 4;
-     * EPSILON_RELAXATION    = 0.005f;
-     */
-    Parameters()
-    {
-        this->particleRadius       = 0.5f;
-        this->particleMass         = 1.0f;
-        this->smoothingRadius      = 1.1f;
-        this->relaxation           = 0.005f;
-        //this->artificialPressureK  = 0.1f;
-        this->artificialPressureK  = 0.001f;
-        this->artificialPressureN  = 4;
-        this->epsilonVorticity     = 0.1f;
-        this->viscosityCoeff       = 0.01f;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, Parameters p);
-    
-} Parameters;
 
 /******************************************************************************/
 

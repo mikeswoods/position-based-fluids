@@ -10,6 +10,9 @@
  
 class ofApp : public ofBaseApp
 {
+    private:
+        bool cameraSet = false;
+    
     protected:
         bool paused;
         bool advanceStep;
