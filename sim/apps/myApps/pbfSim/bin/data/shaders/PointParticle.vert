@@ -27,7 +27,7 @@ void main()
         wScale = 0.0001;
     }
     
-    gl_PointSize = (wScale * pointScale)    particleRadius;
+    gl_PointSize = (wScale * pointScale) * particleRadius;
     
     color = vec4(1.0, 1.0, 1.0, 1.0);
 }

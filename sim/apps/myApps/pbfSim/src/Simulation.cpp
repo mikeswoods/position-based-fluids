@@ -326,7 +326,7 @@ void Simulation::initializeOpenGL()
     
     // Copy the normal data from the sphere to fake a spherical shape
     // in the shaders later:
-
+    
     this->particleVertices.setNormalData(this->particleMesh.getNormalsPointer()
                                         ,this->numParticles
                                         ,GL_STATIC_DRAW);
