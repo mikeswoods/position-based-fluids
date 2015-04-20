@@ -24,7 +24,7 @@ typedef struct {
 
     float4 vel;      // Current particle velocity (v)
     
-    float4 curl;     // Curl force
+    float4 velStar;  // Updated particle velocity from XSPH viscosity (v*), 4 words
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
@@ -85,7 +85,7 @@ typedef struct Parameters {
     
     float epsilonVorticity;    // Vorticity coefficient
     
-    float epsilonViscosity;    // Viscosity coefficient
+    float viscosityCoeff;      // Viscosity coefficient
     
     float __padding1[3];
 
@@ -110,9 +110,9 @@ typedef struct Parameters {
         this->artificialPressureK  = 0.1f;
         this->artificialPressureN  = 5;
         this->epsilonVorticity     = 0.1f;
-        this->epsilonViscosity     = 0.1f;
+        this->viscosityCoeff       = 1.0f;
     }
-    
+
     friend std::ostream& operator<<(std::ostream& os, Parameters p);
     
 } Parameters;
@@ -184,27 +184,30 @@ class Simulation
         msa::OpenCLBufferManagedT<Particle>	particles;
     
         // An array of particle-to-cell mappings
-        msa::OpenCLBufferManagedT<ParticlePosition>	particleToCell;
+        msa::OpenCLBuffer particleToCell;
     
         // A cell count histogram used for particle neighbor finding
-        msa::OpenCLBufferManagedT<int> cellHistogram;
+        msa::OpenCLBuffer cellHistogram;
     
         // A sorted version of particleToCell, used to search for a given
         // particle's neighbors
-        msa::OpenCLBufferManagedT<ParticlePosition>	sortedParticleToCell;
+        msa::OpenCLBuffer sortedParticleToCell;
 
         // An array of cell start locations and spans in sortedParticleToCell
-        msa::OpenCLBufferManagedT<GridCellOffset> gridCellOffsets;
+        msa::OpenCLBuffer gridCellOffsets;
     
         // Particle densities computed by SPH estimation
-        msa::OpenCLBufferManagedT<float> density;
+        msa::OpenCLBuffer density;
 
         // Particle density lambda value from the section "Enforcing
         // Incompressibility" of "Position Based Fluids"
-        msa::OpenCLBufferManagedT<float> lambda;
+        msa::OpenCLBuffer lambda;
+    
+        // Vorticity curl force applied to each particle
+        msa::OpenCLBuffer curl;
     
         // Position deltas
-        msa::OpenCLBufferManagedT<float4> posDelta;
+        msa::OpenCLBuffer posDelta;
 
         // Final render position for OpenCL <-> OpenGL instanced rendering
         msa::OpenCLBufferManagedT<float4> renderPos;
@@ -228,9 +231,10 @@ class Simulation
         void calculatePositionDelta();
         void applyPositionDelta();
         void handleCollisions();
+        void updateVelocity();
         void applyXSPHViscosity();
         void applyVorticityConfinement();
-        void updatePositionAndVelocity();
+        void updatePosition();
     
         // Drawing-related functions:
         void drawBounds(const ofCamera& camera) const;

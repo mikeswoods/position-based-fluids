@@ -130,7 +130,6 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
     ofDrawBitmapString("Hotkeys:", hOffset, textYOffset += vSpacing);
     vector<string> hotkeys;
     hotkeys.push_back("'s' = step");
-    hotkeys.push_back("'z' = set particle radius");
     hotkeys.push_back("'p' or space = toggle pause");
     hotkeys.push_back("'r' = reset");
     hotkeys.push_back("'g' = toggle grid");

@@ -55,7 +55,7 @@ typedef struct {
     
     float epsilonVorticity;    // Vorticity coefficient
     
-    float epsilonViscosity;    // Viscosity coefficient
+    float viscosityCoeff;      // Viscosity coefficient
     
     float __padding1;
     
@@ -75,7 +75,7 @@ typedef struct {
     
     float4 vel;     // Current particle velocity (v), 4 words
     
-    float4 curl;    // Curl force, 4 words
+    float4 velStar; // Updated particle velocity from XSPH viscosity (v*), 4 words
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned
@@ -189,12 +189,19 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
                               ,const global Particle* p_j
                               ,void* data);
 
-void callback_Vorticity_i(const global Parameters* parameters
-                         ,int i
-                         ,const global Particle* p_i
-                         ,int j
-                         ,const global Particle* p_j
-                         ,void* data);
+void callback_Curl_i(const global Parameters* parameters
+                    ,int i
+                    ,const global Particle* p_i
+                    ,int j
+                    ,const global Particle* p_j
+                    ,void* data);
+
+void callback_XPSHViscosity_i(const global Parameters* parameters
+                             ,int i
+                             ,const global Particle* p_i
+                             ,int j
+                             ,const global Particle* p_j
+                             ,void* data);
 
 global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
                               ,const global GridCellOffset* gridCellOffsets
@@ -752,7 +759,7 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
 }
 
 /**
- * A callback function that computes the vorticity force acting on a given
+ * A callback function that computes the curl force acting on a given
  * particle, p_i
  *
  * @param [in] Parameters* parameters Simulation parameters
@@ -761,12 +768,12 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
  */
-void callback_Vorticity_i(const global Parameters* parameters
-                         ,int i
-                         ,const global Particle* p_i
-                         ,int j
-                         ,const global Particle* p_j
-                         ,void* data)
+void callback_Curl_i(const global Parameters* parameters
+                    ,int i
+                    ,const global Particle* p_i
+                    ,int j
+                    ,const global Particle* p_j
+                    ,void* data)
 {
     float4* omega_i = (float4*)data;
 
@@ -774,6 +781,31 @@ void callback_Vorticity_i(const global Parameters* parameters
     float4 gradient_ij = spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 
     (*omega_i) += cross(v_ij, gradient_ij);
+}
+
+/**
+ * A callback function that computes the XSPH viscosity acting on a given
+ * particle, p_i
+ *
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ */
+void callback_XPSHViscosity_i(const global Parameters* parameters
+                             ,int i
+                             ,const global Particle* p_i
+                             ,int j
+                             ,const global Particle* p_j
+                             ,void* data)
+{
+    float4* v_ij_sum = (float4*)data;
+    
+    float4 v_ij = p_i->vel - p_j->vel;
+    float W_ij  = poly6(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
+    
+    (*v_ij_sum) += (W_ij * v_ij);
 }
 
 /*******************************************************************************
@@ -803,15 +835,14 @@ kernel void resetParticleQuantities(global Particle* particles
     spp->particleIndex = -1;
     spp->cellI = spp->cellJ = spp->cellK = -1;
 
-    p->posStar.x  = 0.0f;
-    p->posStar.y  = 0.0f;
-    p->posStar.z  = 0.0f;
+    p->posStar   = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    p->velStar   = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 
-    density[id]   = 0.0f;
+    density[id]  = 0.0f;
 
-    lambda[id]    = 0.0f;
+    lambda[id]   = 0.0f;
     
-    posDelta[id]  = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    posDelta[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 /**
@@ -1314,46 +1345,135 @@ kernel void applyPositionDelta(const global float4* posDelta
 }
 
 /**
- * For all particles p_i in particles, this kernel computes the final, true 
- * position and velocity of the particle in the current simulation step
+ * Tests for collisions between particles and objects/bounds and projects
+ * the positions of the particles accordingly
+ *
+ * TODO: For now, this just clamps the particle to the world bounds
+ *
+ * @param [in]     Parameters* parameters Simulation parameters
+ * @param [in/out] const Particle* particles The particles in the simulation
+ * @param [in]     float3 minExtent The minimum extent of the simulation's
+ *                 bounding box in world space
+ * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ *                 bounding box in world space
+ */
+kernel void resolveCollisions(const global Parameters* parameters
+                              ,global Particle* particles
+                              ,float3 minExtent
+                              ,float3 maxExtent)
+{
+    int id = get_global_id(0);
+    
+    global Particle *p = &particles[id];
+    
+    // Clamp predicted and actual positions:
+    
+    float R = parameters->particleRadius;
+    
+    // Actual positions:
+    p->pos.x = clamp(p->pos.x, minExtent.x + R, maxExtent.x - R);
+    p->pos.y = clamp(p->pos.y, minExtent.y + R, maxExtent.y - R);
+    p->pos.z = clamp(p->pos.z, minExtent.z + R, maxExtent.z - R);
+    
+    // Predicted positions:
+    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
+    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
+    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
+}
+
+
+/**
+ * For all particles p_i in particles, this kernel computes the final, true
+ * velocity of the particle in the current simulation step
  *
  * @param [in/out] Particle* particles The particles in the simulation to be updated
- * @param [out]    float4* The final render position of the particle to use in
- *                 OpenGL for rendering the instanced position of the particle
  * @param [in]     float dt The timestep
  */
-kernel void updatePositionAndVelocity(global Particle* particles
-                                     ,global float4* renderPos
-                                     ,float dt)
+kernel void updateVelocity(global Particle* particles
+                          ,float dt)
 {
     int id = get_global_id(0);
     global Particle *p = &particles[id];
     
-    // Update the particle's final velocity:
-
-    p->vel = (1.0f / dt) * (p->posStar - p->pos);
+    // Update the particle's final velocity based on the actual (x) and
+    // predicted (x*) positions:
     
-    // And finally the position:
-
-    p->pos = p->posStar;
-    
-    renderPos[id] = p->pos;
-
-    // We need this since we're using a 4 dimensional homogenous representation
-    // of a 3D point, e.g. we need to show a point in (x,y,z), but our
-    // representation is in (x,y,z,w), which OpenGL converts to
-    // (x/w,y/z,z/w) so that it can be displayed in 3D. If w is zero, then
-    // we'll never see any output, so if we set this explicitly to 1.0, then
-    // everything will work correctly:
-
-    renderPos[id].w = 1.0f;
+    p->vel     = (1.0f / dt) * (p->posStar - p->pos);
+    p->velStar = p->vel;
 }
 
-////////////////////////////////////////////////////////////////////////////////
+/**
+ * Computes the curl associated with each particle
+ *
+ * @param [in]  Parameters* parameters Simulation parameters
+ * @param [in]  const Particle* particles The particles in the simulation
+ * @param [in]  const ParticlePosition* sortedParticleToCell
+ * @param [in]  const GridCellOffset* gridCellOffsets
+ * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
+ * @param [out] float4 curl The curl associated with each particle
+ */
+kernel void computeCurl(const global Parameters* parameters
+                       ,const global Particle* particles
+                       ,const global ParticlePosition* sortedParticleToCell
+                       ,const global GridCellOffset* gridCellOffsets
+                       ,int numParticles
+                       ,int cellsX
+                       ,int cellsY
+                       ,int cellsZ
+                       ,float3 minExtent
+                       ,float3 maxExtent
+                       ,global float4* curl)
+{
+    int id = get_global_id(0);
+    
+    // Curl for particle i:
+    float4 omega_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    forAllNeighbors(parameters
+                    ,particles
+                    ,sortedParticleToCell
+                    ,gridCellOffsets
+                    ,numParticles
+                    ,cellsX
+                    ,cellsY
+                    ,cellsZ
+                    ,minExtent
+                    ,maxExtent
+                    ,id
+                    ,callback_Curl_i
+                    ,(void*)&omega_i);
+    
+    curl[id] = omega_i;
+}
 
 /**
- * Vorticity Confinement
+ * Computes and applies the vorticity confinement force
  *
+ * @param [in]  Parameters* parameters Simulation parameters
+ * @param [in]  const Particle* particles The particles in the simulation
+ * @param [in]  const ParticlePosition* sortedParticleToCell
+ * @param [in]  const GridCellOffset* gridCellOffsets
+ * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
  */
 kernel void applyVorticity(const global Parameters* parameters
                           ,const global Particle* particles
@@ -1368,6 +1488,7 @@ kernel void applyVorticity(const global Parameters* parameters
 {
     int id = get_global_id(0);
     
+    // Curl for particle i:
     float4 omega_i = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
 
     forAllNeighbors(parameters
@@ -1381,58 +1502,99 @@ kernel void applyVorticity(const global Parameters* parameters
                     ,minExtent
                     ,maxExtent
                     ,id
-                    ,callback_Vorticity_i
+                    ,callback_Curl_i
                     ,(void*)&omega_i);
+    
 }
 
 /**
- *  Add Viscosity to each particle
- */
-kernel void applyViscosity(global Particle* particles
-                          ,const global ParticlePosition* sortedParticleToCell
-                          ,const global GridCellOffset* gridCellOffsets
-                          ,const global float* density
-                          ,int cellsX
-                          ,int cellsY
-                          ,int cellsZ)
-{
-
-}
-
-/**
- * Tests for collisions between particles and objects/bounds and projects
- * the positions of the particles accordingly
- * 
- * TODO: For now, this just clamps the particle to the world bounds
+ * Computes and applies the XSPH viscosity to each particle as described
+ * by Schechter and Bridson, 2012.
  *
- * @param [in]     Parameters* parameters Simulation parameters
- * @param [in/out] const Particle* particles The particles in the simulation
- * @param [in]     float3 minExtent The minimum extent of the simulation's
- *                 bounding box in world space
- * @param [in]     float3 maxExtent The maximum extent of the simulation's
- *                 bounding box in world space
+ * @param [in]  Parameters* parameters Simulation parameters
+ * @param [in]  const Particle* particles The particles in the simulation
+ * @param [in]  const ParticlePosition* sortedParticleToCell
+ * @param [in]  const GridCellOffset* gridCellOffsets
+ * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  int cellsX The number of cells in the x axis of the spatial
+ *              grid
+ * @param [in]  int cellsY The number of cells in the y axis of the spatial
+ *              grid
+ * @param [in]  int cellsZ The number of cells in the z axis of the spatial
+ *              grid
+ * @param [in]  float3 minExtent The minimum extent of the simulation's
+ *              bounding box in world space
+ * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ *              bounding box in world space
  */
-kernel void resolveCollisions(const global Parameters* parameters
-                             ,global Particle* particles
-                             ,float3 minExtent
-                             ,float3 maxExtent)
+kernel void applyXSPHViscosity(const global Parameters* parameters
+                              ,const global Particle* particles
+                              ,const global ParticlePosition* sortedParticleToCell
+                              ,const global GridCellOffset* gridCellOffsets
+                              ,int numParticles
+                              ,int cellsX
+                              ,int cellsY
+                              ,int cellsZ
+                              ,float3 minExtent
+                              ,float3 maxExtent)
 {
     int id = get_global_id(0);
-
     global Particle *p = &particles[id];
-
-    // Clamp predicted and actual positions:
-
-    float R = parameters->particleRadius;
     
-    // Actual positions:
-    p->pos.x = clamp(p->pos.x, minExtent.x + R, maxExtent.x - R);
-    p->pos.y = clamp(p->pos.y, minExtent.y + R, maxExtent.y - R);
-    p->pos.z = clamp(p->pos.z, minExtent.z + R, maxExtent.z - R);
+    float4 v_i_sum = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    forAllNeighbors(parameters
+                   ,particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,numParticles
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,minExtent
+                   ,maxExtent
+                   ,id
+                   ,callback_XPSHViscosity_i
+                   ,(void*)&v_i_sum);
+    
+    //p->velStar = p->vel + (parameters->viscosityCoeff * v_i_sum);
+    p->vel += (parameters->viscosityCoeff * v_i_sum);
+}
 
-    // Predicted positions:
-    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
-    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
-    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
+/**
+ * For all particles p_i in particles, this kernel computes the final, true
+ * position of the particle in the current simulation step
+ *
+ * @param [in/out] Particle* particles The particles in the simulation to be updated
+ * @param [out]    float4* The final render position of the particle to use in
+ *                 OpenGL for rendering the instanced position of the particle
+ * @param [in]     float dt The timestep
+ */
+kernel void updatePosition(global Particle* particles
+                          ,global float4* renderPos
+                          ,float dt)
+{
+    int id = get_global_id(0);
+    global Particle *p = &particles[id];
+    
+    // Update the particle's final velocity based on the actual (x) and
+    // predicted (x*) positions:
+
+    p->vel = p->velStar;
+    
+    // And finally the position:
+    
+    p->pos = p->posStar;
+    
+    renderPos[id] = p->pos;
+    
+    // We need this since we're using a 4 dimensional homogenous representation
+    // of a 3D point, e.g. we need to show a point in (x,y,z), but our
+    // representation is in (x,y,z,w), which OpenGL converts to
+    // (x/w,y/z,z/w) so that it can be displayed in 3D. If w is zero, then
+    // we'll never see any output, so if we set this explicitly to 1.0, then
+    // everything will work correctly:
+    
+    renderPos[id].w = 1.0f;
 }
 

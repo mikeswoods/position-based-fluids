@@ -8,19 +8,16 @@ out vec4 color;
 in vec4 position;
 in vec4 normal;
 
-// Constants (tweakable):
-const float minPointScale = 0.01;
-const float maxPointScale = 25.0;
-const float maxDistance   = 100.0;
-
 void main()
 {
+    float minPointScale = 1.0e-6;
+    float maxPointScale = particleRadius * 2.0;
+    float maxDistance   = 100.0;
+    
     gl_Position = modelViewProjectionMatrix * position;
 
-    float cameraDist = distance(gl_Position.xyz, cameraPosition);
-    float pointScale = 1.0 - clamp(cameraDist / maxDistance, 0.001, 1.0);
-    pointScale = max(pointScale, minPointScale);
-    pointScale = min(pointScale, maxPointScale);
+    float cameraDist = distance(position.xyz, cameraPosition);
+    float pointScale = clamp(1.0 - (cameraDist / maxDistance), minPointScale, maxPointScale);
     
     float wScale = position.w;
     if (wScale == 0.0) {
