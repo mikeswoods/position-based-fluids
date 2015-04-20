@@ -254,10 +254,21 @@ void Simulation::initializeOpenGL()
     
     // Set up the shaders:
     
-    if (this->shader.load("shaders/Basic.vert", "shaders/Basic.frag")) {
-        ofLogNotice() << "Loaded shader" << endl;
+    string shaderType;
+
+#ifdef DRAW_PARTICLES_AS_SPHERES
+    shaderType = "SphereParticle";
+#else
+    shaderType = "PointParticle";
+#endif
+    
+    bool loadStatus = this->shader.load("shaders/" + shaderType + ".vert"
+                                       ,"shaders/" + shaderType + ".frag");
+
+    if (loadStatus) {
+        ofLogNotice() << ("Loaded shader: " + shaderType) << endl;
     } else {
-        ofLogError() << "Failed to load shader!" << endl;
+        ofLogError() << ("Failed to load shader: " + shaderType) << endl;
     }
     
     // Bind default symbols:
@@ -268,13 +279,30 @@ void Simulation::initializeOpenGL()
     // OpenCL:
     
 #ifdef DRAW_PARTICLES_AS_SPHERES
+
     // Nothing to do
+
 #else
+    
+    // Set up how our particles are going to be displayed as points:
+    glPointSize(10.0f);
+    glEnable(GL_POINT_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     this->particleVertices.setVertexData((const float*)0      // No need to explicitly upload anything, since it'll be zeros anyway
                                         ,4                    // Our points are represented by a 4D homogenous point (x,y,z,w)
                                         ,this->numParticles
                                         ,GL_STATIC_DRAW
                                         ,sizeof(float) * 4 ); // Each point is 4 floats
+    
+    // Copy the normal data from the sphere to fake a spherical shape
+    // in the shaders later:
+
+    this->particleVertices.setNormalData(this->particleMesh.getNormalsPointer()
+                                        ,this->numParticles
+                                        ,GL_STATIC_DRAW);
+    
 #endif
 }
 
@@ -636,7 +664,6 @@ void Simulation::drawParticles(const ofVec3f& cameraPosition)
     this->shader.end();
 #else
     this->shader.begin();
-        glPointSize(10.0f);
         this->particleVertices.draw(GL_POINTS, 0, this->numParticles);
     this->shader.end();
 #endif

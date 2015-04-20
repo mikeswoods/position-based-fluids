@@ -10,6 +10,5 @@ in vec4 normal;
 void main()
 {
     gl_Position = modelViewProjectionMatrix * position;
-    //color = normalize(normal);
-    color = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    color = normalize(normal);
 }
