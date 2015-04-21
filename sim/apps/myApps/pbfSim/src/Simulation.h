@@ -87,7 +87,10 @@ class Simulation
     private:    
         // Count of the current frame number
         unsigned int frameNumber;
-
+    
+        // Counter used for the current bounds-modifying animation operation
+        unsigned int animFrameNumber;
+    
         // Total number of cells in the system
         int numCells;
     
@@ -96,6 +99,10 @@ class Simulation
     
         // Flag for visual debugging
         bool flagVisualDebugging;
+    
+        // Flag to indicate that the bounds of the simulation should be
+        // animated, e.g. moving in some periodic fashion
+        bool flagAnimateBounds;
     
         // Given a particle count, particle radius and world bounds,
         // find the "ideal" cell count per axis
@@ -237,6 +244,9 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
 
+        const bool boundsAnimationEnabled() const { return this->flagAnimateBounds; }
+        void toggleBoundsAnimation() { this->flagAnimateBounds = !this->flagAnimateBounds; }
+    
         void step();
         void resetBounds();
         void draw(const ofCamera& camera);

@@ -30,5 +30,5 @@ void main(void)
     // calculate lighting
     float diffuse = max(0.0, dot(lightDir, N));
     
-    outputColor = globalColor * diffuse;
+    outputColor = color * diffuse;
 }

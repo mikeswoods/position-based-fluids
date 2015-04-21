@@ -48,6 +48,8 @@ Simulation::Simulation(msa::OpenCL& _openCL
     dt(Constants::DEFAULT_DT),
     parameters(_parameters),
     frameNumber(0),
+    animFrameNumber(0),
+    flagAnimateBounds(false),
     flagDrawGrid(false),
     flagVisualDebugging(false)
 {
@@ -78,6 +80,8 @@ Simulation::Simulation(msa::OpenCL& _openCL
     cellsPerAxis(_cellsPerAxis),
     parameters(_parameters),
     frameNumber(0),
+    animFrameNumber(0),
+    flagAnimateBounds(false),
     flagDrawGrid(false),
     flagVisualDebugging(false)
 {
@@ -100,9 +104,9 @@ ofVec3f Simulation::findIdealParticleCount()
     auto minExt   = this->bounds.getMinExtent();
     auto maxExt   = this->bounds.getMaxExtent();
     
-    float width   = maxExt[0] - minExt[0];
-    float height  = maxExt[1] - minExt[1];
-    float depth   = maxExt[2] - minExt[2];
+    float width   = maxExt.x - minExt.x;
+    float height  = maxExt.y - minExt.y;
+    float depth   = maxExt.z - minExt.z;
     float radius  = this->parameters.particleRadius;
     float subDivX = static_cast<float>(Constants::PARTICLES_PER_CELL_X);
     float subDivY = static_cast<float>(Constants::PARTICLES_PER_CELL_Y);
@@ -165,9 +169,9 @@ void Simulation::initialize()
     
     this->cellsPerAxis = this->findIdealParticleCount();
     
-    this->numCells      =   static_cast<int>(this->cellsPerAxis.x)
-                          * static_cast<int>(this->cellsPerAxis.y)
-                          * static_cast<int>(this->cellsPerAxis.z);
+    this->numCells =   static_cast<int>(this->cellsPerAxis.x)
+                     * static_cast<int>(this->cellsPerAxis.y)
+                     * static_cast<int>(this->cellsPerAxis.z);
 
     // Set up OpenGL VAOs, VBOs, and shader programs:
     
@@ -505,19 +509,14 @@ void Simulation::resetBounds()
 }
 
 /**
- * Steps the dimensions of the current simulation bounds based on the 
- * current animation scheme
+ * Steps the simulation's bounding box animation, if enabled, by 1 frame
  */
 void Simulation::stepBoundsAnimation(float period, float amp)
 {
-    float theta  = ofDegToRad(static_cast<float>(this->frameNumber % 720));
+    float theta  = ofDegToRad(static_cast<float>(this->animFrameNumber++ % 720));
     float value  = amp * sin(period * static_cast<float>(M_PI) * theta);
 
-    //cout << "X* = " << this->bounds.getMaxExtent().x + value << endl;
-
     this->bounds.getMaxExtent().x = this->originalBounds.getMaxExtent().x + value;
-    
-    //cout << this->frameNumber << " // " << value << endl;
 }
 
 /**
@@ -598,7 +597,9 @@ void Simulation::step()
 
     // Animate the bounds of the simulation to generate waves in the particles:
 
-    //this->stepBoundsAnimation(1.0f, 10.0f);
+    if (this->flagAnimateBounds) {
+        this->stepBoundsAnimation(1.0f, 10.0f);
+    }
     
     // Finally, bump up the frame counter:
 
@@ -617,11 +618,11 @@ void Simulation::drawGrid(const ofCamera& camera)
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
     
-    float xCellWidth = (p2[0] - p1[0]) / static_cast<float>(this->cellsPerAxis.x);
+    float xCellWidth = (p2.x - p1.x) / static_cast<float>(this->cellsPerAxis.x);
     float halfXWidth = xCellWidth * 0.5f;
-    float yCellWidth = (p2[1] - p1[1]) / static_cast<float>(this->cellsPerAxis.y);
+    float yCellWidth = (p2.y - p1.y) / static_cast<float>(this->cellsPerAxis.y);
     float halfYWidth = yCellWidth * 0.5f;
-    float zCellWidth = (p2[2] - p1[2]) / static_cast<float>(this->cellsPerAxis.z);
+    float zCellWidth = (p2.z - p1.z) / static_cast<float>(this->cellsPerAxis.z);
     float halfZWidth = zCellWidth * 0.5f;
     
     ofNoFill();
@@ -629,15 +630,15 @@ void Simulation::drawGrid(const ofCamera& camera)
 
     for (int i = 1; i < (2  * this->cellsPerAxis.x); i += 2) {
 
-        float xCorner = p1[0] + (static_cast<float>(i) * halfXWidth);
+        float xCorner = p1.x + (static_cast<float>(i) * halfXWidth);
 
         for (int j = 1; j < (2  * this->cellsPerAxis.y); j += 2) {
         
-            float yCorner = p1[1] + (static_cast<float>(j) * halfYWidth);
+            float yCorner = p1.y + (static_cast<float>(j) * halfYWidth);
         
             for (int k = 1; k < (2  * this->cellsPerAxis.z); k += 2) {
                 
-                float zCorner = p1[2] + (static_cast<float>(k) * halfZWidth);
+                float zCorner = p1.z + (static_cast<float>(k) * halfZWidth);
 
                 ofDrawBox(xCorner, yCorner, zCorner, xCellWidth, yCellWidth, zCellWidth);
             }
@@ -657,12 +658,12 @@ void Simulation::drawBounds(const ofCamera& camera)
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
 
-    auto x  = (p1[0] + p2[0]) * 0.5f;
-    auto y  = (p1[1] + p2[1]) * 0.5f;
-    auto z  = (p1[2] + p2[2]) * 0.5f;
-    auto w  = p2[0] - p1[0];
-    auto h  = p2[1] - p1[1];
-    auto d  = p2[2] - p1[2];
+    auto x  = (p1.x + p2.x) * 0.5f;
+    auto y  = (p1.y + p2.y) * 0.5f;
+    auto z  = (p1.z + p2.z) * 0.5f;
+    auto w  = p2.x - p1.x;
+    auto h  = p2.y - p1.y;
+    auto d  = p2.z - p1.z;
     
     ofNoFill();
     ofSetColor(255, 255, 255);
@@ -678,33 +679,22 @@ void Simulation::drawBounds(const ofCamera& camera)
  */
 void Simulation::drawParticles(const ofCamera& camera)
 {
+    auto cp = camera.getPosition();
+    
 #if DRAW_PARTICLES_AS_SPHERES
 
     this->shader.begin();
+        this->shader.setUniform3f("cameraPosition", cp.x, cp.y, cp.z);
         for (int i = 0; i < this->numParticles; i++) {
-            
             Particle &p = this->particles[i];
-            
             ofPushMatrix();
                 ofTranslate(p.pos.x, p.pos.y, p.pos.z);
                 this->particleMesh.draw();
             ofPopMatrix();
-            
-            if (this->isVisualDebuggingEnabled()) {
-                // Label the particle with its number:
-                ofSetColor(255, 255, 0);
-                ofFill();
-                ofPushMatrix();
-                ofTranslate(0,0,p.pos.z);
-                ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
-                ofPopMatrix();
-            }
         }
     this->shader.end();
 
 #else
-
-    auto cp = camera.getPosition();
     
     this->shader.begin();
         this->shader.setUniform1f("particleRadius", Constants::OPENGL_POINT_PARTICLE_RADIUS);
@@ -713,6 +703,22 @@ void Simulation::drawParticles(const ofCamera& camera)
     this->shader.end();
 
 #endif
+
+    // Use visual debugging? If so, we can see the IDs assigned to individual
+    // particle
+
+    if (this->isVisualDebuggingEnabled()) {
+        for (int i = 0; i < this->numParticles; i++) {
+            Particle &p = this->particles[i];
+            // Label the particle with its number:
+            ofSetColor(255, 255, 0);
+            ofFill();
+            ofPushMatrix();
+                ofTranslate(0,0,p.pos.z);
+                ofDrawBitmapString(ofToString(i), p.pos.x, p.pos.y);
+            ofPopMatrix();
+        }
+    }
 }
 
 /**

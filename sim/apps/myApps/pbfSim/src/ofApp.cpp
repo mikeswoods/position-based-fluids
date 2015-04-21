@@ -31,8 +31,10 @@ void ofApp::setup()
     this->paused      = true;
     this->advanceStep = false;
     
+#ifdef ENABLE_LOGGING
 	ofSetLogLevel(OF_LOG_VERBOSE);
-
+#endif
+    
     // This uses depth information for occlusion
     // rather than always drawing things on top of each other
     ofEnableDepthTest();
@@ -222,6 +224,12 @@ void ofApp::togglePaused()
 void ofApp::keyPressed(int key)
 {
     switch (key) {
+        // Animate bounds
+        case 'a':
+            {
+                this->simulation->toggleBoundsAnimation();
+            }
+            break;
         // Pause
         case 'p':
         case ' ':

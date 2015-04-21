@@ -26,5 +26,6 @@ void main()
     
     gl_PointSize = (wScale * pointScale) * particleRadius;
     
-    color = vec4(1.0, 1.0, 1.0, 1.0);
+    // Waterish color:
+    color = vec4(0.251, 0.643, 0.875, 0.8);
 }
