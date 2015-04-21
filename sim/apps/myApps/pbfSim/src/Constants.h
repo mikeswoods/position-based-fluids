@@ -13,7 +13,7 @@
 
 // If defined, verbose-level logging of system events to the console will
 // be enabled
-#define ENABLE_LOGGING 1
+//#define ENABLE_LOGGING 1
 
 // If defined, a simple test scene will be used for rendering
 //#define SIMPLE_SCENE 1
@@ -30,7 +30,7 @@ namespace Constants {
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 3;
+const int SOLVER_ITERATIONS = 4;
    
 /**
  * Default number of particles in the simulation
@@ -42,16 +42,6 @@ const int DEFAULT_NUM_PARTICLES = 5000;
  */
 const float DEFAULT_DT = 0.033f;
 
-/**
- * Max particle radius
- */
-const float MAX_PARTICLE_RADIUS = 3.0f;
-    
-/**
- * Default particle radius
- */
-const float DEFAULT_PARTICLE_RADIUS = 0.1f;
-    
 /**
  * Desired number of particles per cell in X. This value is used to 
  * compute the optimal number of cells in the spatial grid per axis

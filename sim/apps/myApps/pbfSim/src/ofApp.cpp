@@ -16,10 +16,6 @@
 
 /******************************************************************************/
 
-static float readParticleRadius(float currentSize);
-
-/******************************************************************************/
-
 using namespace std;
 
 /*******************************************************************************
@@ -107,7 +103,6 @@ void ofApp::update()
 void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
 {
     ofVec3f cameraPos = camera.getPosition();
-    ofVec3f targetPos = camera.getTarget().getPosition();
     
     // Show the current frame rate and frame count
     ofSetColor(255);
@@ -159,18 +154,12 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
                       ,hOffset
                       ,textYOffset += vSpacing);
 
-    // Camera target:
-    ofDrawBitmapString("Camera target: <" + ofToString(targetPos.x) +
-                                      "," + ofToString(targetPos.y) +
-                                      "," + ofToString(targetPos.z) + ">"
-                       ,hOffset
-                       ,textYOffset += vSpacing);
-
     // Bounds:
     ofDrawBitmapString("Bounds: <" +
                        ofToString(minExt.x) + "," + ofToString(minExt.y) + "," + ofToString(minExt.z) + "> <" +
                        ofToString(maxExt.x) + "," + ofToString(maxExt.y) + "," + ofToString(maxExt.z) + ">"
                       ,hOffset, textYOffset += vSpacing);
+
     // Cell count:
     auto cellsPerAxis = this->simulation->getCellsPerAxis();
     ofDrawBitmapString("Cells per axis: <" +
@@ -190,11 +179,9 @@ void ofApp::draw()
     ofBackground(0);
     
     this->camera.begin();
-
         this->simulation->draw(this->camera);
-
     this->camera.end();
-    
+
     this->drawHeadsUpDisplay(this->camera);
 }
 
@@ -246,7 +233,6 @@ void ofApp::keyPressed(int key)
         // Reset
         case 'r':
             {
-                auto oldCam = this->camera;
                 this->setup();
             }
             break;
@@ -303,21 +289,6 @@ void ofApp::gotMessage(ofMessage msg)
 void ofApp::dragEvent(ofDragInfo dragInfo)
 {
 
-}
-
-/*******************************************************************************
- * Utility functions
- ******************************************************************************/
-
-float readParticleRadius(float currentSize)
-{
-    string maxSizeStr     = ofToString(Constants::MAX_PARTICLE_RADIUS);
-    string currentSizeStr = ofToString(currentSize);
-    
-    string input = ofSystemTextBoxDialog("Particle size? (> 0.0], max = " + maxSizeStr + ")", currentSizeStr);
-    float r = ofToFloat(input);
-    r = std::min(std::max(0.0f, r), Constants::MAX_PARTICLE_RADIUS);
-    return r == 0.0f ? Constants::DEFAULT_PARTICLE_RADIUS : r;
 }
 
 /******************************************************************************/
