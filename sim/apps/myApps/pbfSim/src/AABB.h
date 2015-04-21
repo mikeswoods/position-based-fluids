@@ -23,10 +23,9 @@ class AABB
         AABB();
         AABB(float3 p, ofVec3f q);
         AABB(const AABB& other);
-        AABB& operator=(const AABB& other);
     
-        const ofVec3f& getMinExtent() const;
-        const ofVec3f& getMaxExtent() const;
+        ofVec3f& getMinExtent();
+        ofVec3f& getMaxExtent();
     
         void addMin(ofVec3f amount);
         void addMax(ofVec3f amount);

@@ -15,7 +15,7 @@ using namespace std;
 
 /******************************************************************************/
 
-ostream& operator<<(ostream& os, const AABB& aabb)
+ostream& operator<<(ostream& os, AABB& aabb)
 {
     return os << "AABB { "
               << aabb.getMinExtent() << ", " << aabb.getMaxExtent()
@@ -25,15 +25,15 @@ ostream& operator<<(ostream& os, const AABB& aabb)
 /******************************************************************************/
 
 AABB::AABB():
-    minV(float3(0.0f, 0.0f, 0.0f)),
-    maxV(float3(0.0f, 0.0f, 0.0f))
+    minV(ofVec3f(0.0f, 0.0f, 0.0f)),
+    maxV(ofVec3f(0.0f, 0.0f, 0.0f))
 {
     
 }
 
 AABB::AABB(float3 _p, float3 _q) :
-    minV(float3(std::min(_p[0], _q[0]), std::min(_p[1], _q[1]), std::min(_p[2], _q[2]))),
-    maxV(float3(std::max(_p[0], _q[0]), std::max(_p[1], _q[1]), std::max(_p[2], _q[2])))
+    minV(float3(std::min(_p.x, _q.x), std::min(_p.y, _q.y), std::min(_p.z, _q.z))),
+    maxV(float3(std::max(_p.x, _q.x), std::max(_p.y, _q.y), std::max(_p.z, _q.z)))
 {
     
 }
@@ -45,24 +45,12 @@ AABB::AABB(const AABB& other) :
     
 }
 
-AABB& AABB::operator=(const AABB& other)
-{
-    if (this == &other) {
-        return *this;
-    }
-    
-    this->minV = other.minV;
-    this->maxV = other.maxV;
-    
-    return *this;
-}
-
-const float3& AABB::getMinExtent() const
+ofVec3f& AABB::getMinExtent()
 {
     return this->minV;
 }
 
-const float3& AABB::getMaxExtent() const
+ofVec3f& AABB::getMaxExtent()
 {
     return this->maxV;
 }

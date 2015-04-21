@@ -43,6 +43,7 @@ Simulation::Simulation(msa::OpenCL& _openCL
                       ,Parameters _parameters) :
     openCL(_openCL),
     bounds(_bounds),
+    originalBounds(_bounds),
     numParticles(_numParticles),
     dt(Constants::DEFAULT_DT),
     parameters(_parameters),
@@ -71,6 +72,7 @@ Simulation::Simulation(msa::OpenCL& _openCL
                       ,Parameters _parameters) :
     openCL(_openCL),
     bounds(_bounds),
+    originalBounds(_bounds),
     numParticles(_numParticles),
     dt(_dt),
     cellsPerAxis(_cellsPerAxis),
@@ -163,9 +165,9 @@ void Simulation::initialize()
     
     this->cellsPerAxis = this->findIdealParticleCount();
     
-    this->numCells      =   static_cast<int>(this->cellsPerAxis[0])
-                          * static_cast<int>(this->cellsPerAxis[1])
-                          * static_cast<int>(this->cellsPerAxis[2]);
+    this->numCells      =   static_cast<int>(this->cellsPerAxis.x)
+                          * static_cast<int>(this->cellsPerAxis.y)
+                          * static_cast<int>(this->cellsPerAxis.z);
 
     // Set up OpenGL VAOs, VBOs, and shader programs:
     
@@ -191,7 +193,6 @@ void Simulation::initialize()
     // 0 <= ParticlePosition#cellK < cellsPerAxis.z
 
     this->particleToCell.initBuffer(this->numParticles * sizeof(ParticlePosition));
-    this->particleToCellAux.initBuffer(this->numParticles * sizeof(ParticlePosition));
 
     // Where the sorted version of the above will be sorted per simulation
     // step. The ParticlePosition indices will be sorted in ascending order
@@ -330,9 +331,9 @@ void Simulation::initializeKernels()
     auto minExt = this->bounds.getMinExtent();
     auto maxExt = this->bounds.getMaxExtent();
 
-    int  cellsX = static_cast<int>(this->cellsPerAxis[0]);
-    int  cellsY = static_cast<int>(this->cellsPerAxis[1]);
-    int  cellsZ = static_cast<int>(this->cellsPerAxis[2]);
+    int  cellsX = static_cast<int>(this->cellsPerAxis.x);
+    int  cellsY = static_cast<int>(this->cellsPerAxis.y);
+    int  cellsZ = static_cast<int>(this->cellsPerAxis.z);
     
     // Read the source files for the kernels:
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
@@ -383,18 +384,6 @@ void Simulation::initializeKernels()
     this->openCL.kernel("countSortParticles")->setArg(6, cellsX);
     this->openCL.kernel("countSortParticles")->setArg(7, cellsY);
     this->openCL.kernel("countSortParticles")->setArg(8, cellsZ);
-
-    // KERNEL :: bitonicSortParticles (bitonic parallel sort)
-    this->openCL.loadKernel("bitonicSortParticles");
-    this->openCL.kernel("bitonicSortParticles")->setArg(0, this->particleToCell);
-    this->openCL.kernel("bitonicSortParticles")->setArg(1, this->particleToCellAux);
-    this->openCL.kernel("bitonicSortParticles")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("bitonicSortParticles")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("bitonicSortParticles")->setArg(4, this->numParticles);
-    this->openCL.kernel("bitonicSortParticles")->setArg(5, this->numCells);
-    this->openCL.kernel("bitonicSortParticles")->setArg(6, cellsX);
-    this->openCL.kernel("bitonicSortParticles")->setArg(7, cellsY);
-    this->openCL.kernel("bitonicSortParticles")->setArg(8, cellsZ);
     
     // KERNEL :: estimateDensity
     this->openCL.loadKernel("estimateDensity");
@@ -449,8 +438,8 @@ void Simulation::initializeKernels()
     this->openCL.loadKernel("resolveCollisions");
     this->openCL.kernel("resolveCollisions")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("resolveCollisions")->setArg(1, this->particles);
-    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMinExtent());
-    this->openCL.kernel("resolveCollisions")->setArg(3, this->bounds.getMaxExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(2, minExt);
+    this->openCL.kernel("resolveCollisions")->setArg(3, maxExt);
 
     // KERNEL :: computeCurl
     this->openCL.loadKernel("computeCurl");
@@ -507,6 +496,31 @@ void Simulation::initializeKernels()
 /******************************************************************************/
 
 /**
+ * Resets the current simulation stats bounding box back to the initial
+ * dimensions the were in place at the beginning of the simulation
+ */
+void Simulation::resetBounds()
+{
+    this->bounds = this->originalBounds;
+}
+
+/**
+ * Steps the dimensions of the current simulation bounds based on the 
+ * current animation scheme
+ */
+void Simulation::stepBoundsAnimation(float period, float amp)
+{
+    float theta  = ofDegToRad(static_cast<float>(this->frameNumber % 720));
+    float value  = amp * sin(period * static_cast<float>(M_PI) * theta);
+
+    //cout << "X* = " << this->bounds.getMaxExtent().x + value << endl;
+
+    this->bounds.getMaxExtent().x = this->originalBounds.getMaxExtent().x + value;
+    
+    //cout << this->frameNumber << " // " << value << endl;
+}
+
+/**
  * Moves the state of the simulation forward one time step according to the
  * time step value, dt, passed to the constrcutor
  *
@@ -545,20 +559,20 @@ void Simulation::step()
     for (int i = 0; i < N; i++) {
 
         this->calculateDensity();
-        
+
         this->calculatePositionDelta();
-        
+
         this->applyPositionDelta();
 
         this->handleCollisions();
     }
 
     this->updateVelocity();
-    
+
     //this->applyVorticityConfinement();
-    
+
     this->applyXSPHViscosity();
-    
+
     this->updatePosition();
 
     // Make sure the OpenCL work queue is empty before proceeding. This will
@@ -582,6 +596,10 @@ void Simulation::step()
 
 #endif
 
+    // Animate the bounds of the simulation to generate waves in the particles:
+
+    this->stepBoundsAnimation(1.0f, 10.0f);
+    
     // Finally, bump up the frame counter:
 
     this->frameNumber++;
@@ -589,40 +607,35 @@ void Simulation::step()
 
 /******************************************************************************/
 
-void Simulation::animateSineWave()
-{
-    
-}
-
 /**
  * Draws the cell grid
  *
  * @param [in] The current world position of the camera cameraPosition
  */
-void Simulation::drawGrid(const ofCamera& camera) const
+void Simulation::drawGrid(const ofCamera& camera)
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
     
-    float xCellWidth = (p2[0] - p1[0]) / static_cast<float>(this->cellsPerAxis[0]);
+    float xCellWidth = (p2[0] - p1[0]) / static_cast<float>(this->cellsPerAxis.x);
     float halfXWidth = xCellWidth * 0.5f;
-    float yCellWidth = (p2[1] - p1[1]) / static_cast<float>(this->cellsPerAxis[1]);
+    float yCellWidth = (p2[1] - p1[1]) / static_cast<float>(this->cellsPerAxis.y);
     float halfYWidth = yCellWidth * 0.5f;
-    float zCellWidth = (p2[2] - p1[2]) / static_cast<float>(this->cellsPerAxis[2]);
+    float zCellWidth = (p2[2] - p1[2]) / static_cast<float>(this->cellsPerAxis.z);
     float halfZWidth = zCellWidth * 0.5f;
     
     ofNoFill();
     ofSetColor(0, 255, 0);
 
-    for (int i = 1; i < (2  * this->cellsPerAxis[0]); i += 2) {
+    for (int i = 1; i < (2  * this->cellsPerAxis.x); i += 2) {
 
         float xCorner = p1[0] + (static_cast<float>(i) * halfXWidth);
 
-        for (int j = 1; j < (2  * this->cellsPerAxis[1]); j += 2) {
+        for (int j = 1; j < (2  * this->cellsPerAxis.y); j += 2) {
         
             float yCorner = p1[1] + (static_cast<float>(j) * halfYWidth);
         
-            for (int k = 1; k < (2  * this->cellsPerAxis[2]); k += 2) {
+            for (int k = 1; k < (2  * this->cellsPerAxis.z); k += 2) {
                 
                 float zCorner = p1[2] + (static_cast<float>(k) * halfZWidth);
 
@@ -638,7 +651,7 @@ void Simulation::drawGrid(const ofCamera& camera) const
  *
  * @param [in] The current scene camera
  */
-void Simulation::drawBounds(const ofCamera& camera) const
+void Simulation::drawBounds(const ofCamera& camera)
 {
     // Draw the bounding box that will hold the particles:
     auto p1 = this->bounds.getMinExtent();
@@ -719,7 +732,7 @@ void Simulation::draw(const ofCamera& camera)
     }
 
     this->drawParticles(camera);
-    
+
     ofDrawAxis(2.0f);
 }
 
@@ -778,6 +791,8 @@ void Simulation::predictPositions()
  */
 void Simulation::discretizeParticlePositions()
 {
+    this->openCL.kernel("discretizeParticlePositions")->setArg(6, this->bounds.getMinExtent());
+    this->openCL.kernel("discretizeParticlePositions")->setArg(7, this->bounds.getMaxExtent());
     this->openCL.kernel("discretizeParticlePositions")->run1D(this->numParticles);
 }
 
@@ -796,7 +811,6 @@ void Simulation::sortParticlesByCell()
     // sequential in nature, hence the invocation with 1 thread, e.g.
     // "kernel("sortParticlesByCell")->run1D(1)"!
 
-    //this->openCL.kernel("bitonicSortParticles")->run1D(this->numParticles);
     this->openCL.kernel("countSortParticles")->run1D(1);
 }
 
@@ -809,6 +823,8 @@ void Simulation::sortParticlesByCell()
  */
 void Simulation::calculateDensity()
 {
+    this->openCL.kernel("estimateDensity")->setArg(8, this->bounds.getMinExtent());
+    this->openCL.kernel("estimateDensity")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("estimateDensity")->run1D(this->numParticles);
 }
 
@@ -821,8 +837,12 @@ void Simulation::calculateDensity()
  */
 void Simulation::calculatePositionDelta()
 {
+    this->openCL.kernel("computeLambda")->setArg(9, this->bounds.getMinExtent());
+    this->openCL.kernel("computeLambda")->setArg(10, this->bounds.getMaxExtent());
     this->openCL.kernel("computeLambda")->run1D(this->numParticles);
 
+    this->openCL.kernel("computePositionDelta")->setArg(9, this->bounds.getMinExtent());
+    this->openCL.kernel("computePositionDelta")->setArg(10, this->bounds.getMaxExtent());
     this->openCL.kernel("computePositionDelta")->run1D(this->numParticles);
 }
 
@@ -844,6 +864,8 @@ void Simulation::applyPositionDelta()
  */
 void Simulation::handleCollisions()
 {
+    this->openCL.kernel("resolveCollisions")->setArg(2, this->bounds.getMinExtent());
+    this->openCL.kernel("resolveCollisions")->setArg(3, this->bounds.getMaxExtent());
     this->openCL.kernel("resolveCollisions")->run1D(this->numParticles);
 }
 
@@ -865,7 +887,12 @@ void Simulation::updateVelocity()
  */
 void Simulation::applyVorticityConfinement()
 {
+    this->openCL.kernel("computeCurl")->setArg(8, this->bounds.getMinExtent());
+    this->openCL.kernel("computeCurl")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("computeCurl")->run1D(this->numParticles);
+    
+    this->openCL.kernel("applyVorticity")->setArg(8, this->bounds.getMinExtent());
+    this->openCL.kernel("applyVorticity")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("applyVorticity")->run1D(this->numParticles);
 }
 
@@ -876,6 +903,8 @@ void Simulation::applyVorticityConfinement()
  */
 void Simulation::applyXSPHViscosity()
 {
+    this->openCL.kernel("applyXSPHViscosity")->setArg(8, this->bounds.getMinExtent());
+    this->openCL.kernel("applyXSPHViscosity")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("applyXSPHViscosity")->run1D(this->numParticles);
 }
 

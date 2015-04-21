@@ -121,7 +121,8 @@ class Simulation
         ofShader shader;
     
         // Bounding volume
-        AABB bounds;
+        AABB originalBounds; // Starting, unmodified bounds
+        AABB bounds;         // Modifiable bounds
     
         // Timestep size:
         float dt;
@@ -143,9 +144,6 @@ class Simulation
     
         // An array of particle-to-cell mappings
         msa::OpenCLBuffer particleToCell;
-
-        // Auxiliary buffer for sorting
-        msa::OpenCLBuffer particleToCellAux;
     
         // A cell count histogram used for particle neighbor finding
         msa::OpenCLBuffer cellHistogram;
@@ -198,10 +196,12 @@ class Simulation
         void updatePosition();
     
         // Drawing-related functions:
-        void drawBounds(const ofCamera& camera) const;
-        void drawGrid(const ofCamera& camera) const;
+        void drawBounds(const ofCamera& camera);
+        void drawGrid(const ofCamera& camera);
         void drawParticles(const ofCamera& camera);
 
+        void stepBoundsAnimation(float period = 2.0, float amp = 2.0);
+    
     public:
         Simulation(msa::OpenCL& openCL
                   ,AABB bounds
@@ -218,10 +218,16 @@ class Simulation
         virtual ~Simulation();
 
         const unsigned int getFrameNumber() const { return this->frameNumber; }
+
         const AABB& getBounds() const { return this->bounds; }
+        void setBounds(const AABB& bounds) { this->bounds = bounds; }
+
         const ofVec3f& getCellsPerAxis() const { return this->cellsPerAxis; }
+    
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
+    
         const unsigned int getNumberOfCells() const { return this->numCells; }
+    
         const Parameters& getParameters() const;
         void setParameters(const Parameters& parameters);
     
@@ -230,9 +236,9 @@ class Simulation
     
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
-    
-        void animateSineWave();
+
         void step();
+        void resetBounds();
         void draw(const ofCamera& camera);
 };
 
