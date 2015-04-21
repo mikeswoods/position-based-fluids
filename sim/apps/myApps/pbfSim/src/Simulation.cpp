@@ -509,14 +509,37 @@ void Simulation::resetBounds()
 }
 
 /**
- * Steps the simulation's bounding box animation, if enabled, by 1 frame
+ * Steps the simulation's bounding box animation, if enabled, by one frame
+ *
+ * @param [in] type The animation type: SINE_WAVE, LINEAR_RAMP, EXP_RAMP
+ * @param [in] period The animation wave period
+ * @param [in] amp The animation wave amplitude
+ * @param [in] bothSides If true, both sides of the bounding box will be animated
  */
-void Simulation::stepBoundsAnimation(float period, float amp)
+void Simulation::stepBoundsAnimation(AnimationType type, float period, float amp, bool bothSides)
 {
-    float theta  = ofDegToRad(static_cast<float>(this->animFrameNumber++ % 720));
-    float value  = amp * sin(period * static_cast<float>(M_PI) * theta);
+    float value = 0.0f;
+    float pi    = static_cast<float>(M_PI);
+    float t     = static_cast<float>(this->animFrameNumber);
+    
+    if (type == SINE_WAVE) {
+        
+        float theta = ofDegToRad(static_cast<float>(this->animFrameNumber % 720));
+        value = amp * sin(period * pi * theta);
+        
+    } else if (type == LINEAR_RAMP) {
+        
+        float tPeriod = (t / period) * this->dt;
+        value = 2.0f * amp * (tPeriod - floor(0.5f + tPeriod));
+    }
 
-    this->bounds.getMaxExtent().x = this->originalBounds.getMaxExtent().x + value;
+    this->bounds.getMaxExtent().x = this->originalBounds.getMaxExtent().x - value;
+
+    if  (bothSides) {
+        this->bounds.getMinExtent().x = this->originalBounds.getMinExtent().x + value;
+    }
+    
+    this->animFrameNumber++;
 }
 
 /**
@@ -598,7 +621,7 @@ void Simulation::step()
     // Animate the bounds of the simulation to generate waves in the particles:
 
     if (this->flagAnimateBounds) {
-        this->stepBoundsAnimation(1.0f, 10.0f);
+        this->stepBoundsAnimation(SINE_WAVE, 1.0f, 10.0f, true);
     }
     
     // Finally, bump up the frame counter:

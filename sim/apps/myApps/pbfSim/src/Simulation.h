@@ -84,7 +84,14 @@ typedef struct {
  */
 class Simulation
 {
-    private:    
+    public:
+        enum AnimationType
+        {
+            SINE_WAVE
+           ,LINEAR_RAMP
+        };
+    
+    private:
         // Count of the current frame number
         unsigned int frameNumber;
     
@@ -207,7 +214,7 @@ class Simulation
         void drawGrid(const ofCamera& camera);
         void drawParticles(const ofCamera& camera);
 
-        void stepBoundsAnimation(float period = 2.0, float amp = 2.0);
+        void stepBoundsAnimation(AnimationType type, float period = 2.0, float amp = 2.0, bool bothSides = false);
     
     public:
         Simulation(msa::OpenCL& openCL

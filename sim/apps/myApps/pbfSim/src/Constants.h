@@ -13,7 +13,7 @@
 
 // If defined, verbose-level logging of system events to the console will
 // be enabled
-//#define ENABLE_LOGGING 1
+#define ENABLE_LOGGING 1
 
 // If defined, a simple test scene will be used for rendering
 //#define SIMPLE_SCENE 1
