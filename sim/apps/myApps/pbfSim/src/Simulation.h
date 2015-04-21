@@ -55,6 +55,10 @@ typedef struct {
 
     int cellK;         // Corresponding grid index in the z-axis
 
+    int key;           // Linearized index key computed from the subscript
+                       // (cellI, cellJ, cellK)
+    int __padding[3];
+    
 } ParticlePosition;
 
 // A type that encodes the start and length of a grid cell in sortedParticleToCell

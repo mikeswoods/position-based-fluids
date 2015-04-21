@@ -106,6 +106,10 @@ typedef struct {
     
     int cellK;         // Corresponding grid index in the z-axis (1 word)
 
+    int key;           // Linearized index key computed from the subscript
+                       // (cellI, cellJ, cellK)
+    int __padding[3];
+    
 } ParticlePosition;
 
 // A type that encodes the start and length of a grid cell in sortedParticleToCell
@@ -159,6 +163,7 @@ global int3 getSubscript(const global Particle* p
                         ,float3 maxExtent);
 
 float poly6(float4 r, float h);
+float poly6_scalar(float q, float h);
 
 float4 spiky(float4 r, float h);
 
@@ -613,6 +618,32 @@ float poly6(float4 r, float h)
 }
 
 /**
+ * Computes poly6 using a scalar value in place of r
+ *
+ * From the PBF slides SIGGRAPH 2013, pg. 13
+ *
+ * @param [in] float r distance
+ * @param [in] float h Smoothing kernel radius
+ * @returns float The computed scalar value
+ */
+float poly6_scalar(float q, float h)
+{
+    if (q > h) {
+        return 0.0f;
+    }
+    
+    // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
+    float h9 = (h * h * h * h * h * h * h * h * h);
+    if (h9 == 0.0) {
+        return 0.0f;
+    }
+    float A  = 1.566681471061f / h9;
+    float B  = (h * h) - (q * q);
+    
+    return A * (B * B * B);
+}
+
+/**
  * Computes the spiky smoothing kernel gradient
  *
  * From the PBF slides SIGGRAPH 2013, pg. 13
@@ -750,14 +781,12 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
-    float dQ        = 0.1f * h;
+    float deltaQ    = 0.3f * h;
     float4 r        = p_i->posStar - p_j->posStar;
-    float4 q        = dQ * ((float4)(1.0f, 1.0f, 1.0f, 1.0f) + p_i->posStar);
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    //float d         = poly6(q, h);
-    float d         = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
-    float nd        = d < 0.01f ? 0.0f : n / d;
+    float d         = poly6_scalar(deltaQ, h);
+    float nd        = d <= EPSILON ? 0.0f : n / d;
     float sCorr     = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
     
     //printf("sCorr = %f\n", sCorr);
@@ -836,11 +865,8 @@ kernel void resetParticleQuantities(global Particle* particles
     global ParticlePosition *spp = &sortedParticleToCell[id];
 
     // Particle index; -1 indicates unset
-    pp->particleIndex = -1;
-    pp->cellI = pp->cellJ = pp->cellK = -1;
-
-    spp->particleIndex = -1;
-    spp->cellI = spp->cellJ = spp->cellK = -1;
+    pp->particleIndex = pp->cellI = pp->cellJ = pp->cellK = pp->key = -1;
+    spp->particleIndex = spp->cellI = spp->cellJ = spp->cellK = spp->key = -1;
 
     p->posStar   = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     p->velDelta  = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
@@ -955,6 +981,7 @@ kernel void discretizeParticlePositions(const global Particle* particles
     p2c->cellI = subscript.x;
     p2c->cellJ = subscript.y;
     p2c->cellK = subscript.z;
+    p2c->key   = key;
 
     // This is needed; "cellHistogram[z] += 1" won't work here as multiple
     // threads are modifying cellHistogram simultaneously:
@@ -1028,9 +1055,12 @@ kernel void bitonicSortParticles(const global ParticlePosition* particleToCell
             global ParticlePosition* pp_i = &aux[i];
             global ParticlePosition* pp_j = &aux[j];
 
-            int iKey = sub2ind(pp_i->cellI, pp_i->cellJ, pp_i->cellK, cellsX, cellsY);
-            int jKey = sub2ind(pp_j->cellI, pp_j->cellJ, pp_j->cellK, cellsX, cellsY);
+            //int iKey = sub2ind(pp_i->cellI, pp_i->cellJ, pp_i->cellK, cellsX, cellsY);
+            //int jKey = sub2ind(pp_j->cellI, pp_j->cellJ, pp_j->cellK, cellsX, cellsY);
 
+            int iKey = pp_i->key;
+            int jKey = pp_j->key;
+            
             bool smaller = (jKey < iKey) || (jKey == iKey && j < i);
             bool swap = smaller ^ (j < i) ^ direction;
 
@@ -1075,8 +1105,11 @@ kernel void bitonicSortParticles(const global ParticlePosition* particleToCell
         // (q_x, q_y, q_z), then the keys are the linearized indices for p and
         // q, p_key and q_key.
         
-        currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
-        nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        //currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
+        //nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        
+        currentKey = currentP->key;
+        nextKey    = nextP->key;
         
         // If p_key and q_key are equal, increase the length of the span:
         
@@ -1103,25 +1136,6 @@ kernel void bitonicSortParticles(const global ParticlePosition* particleToCell
         gridCellOffsets[nextKey].start  = cellStart;
         gridCellOffsets[nextKey].length = lengthCount;
     }
-    
-    /*
-     printf("=================================\n");
-     printf("[ParticlePosition]\n");
-     for (int i = 0; i < numParticles; i++) {
-     global ParticlePosition* spp = &sortedParticleToCell[i];
-     int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
-     printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
-     i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
-     }
-     printf("\n");
-     
-     printf("[GridCellOffset]\n");
-     for (int i = 0; i < numCells; i++) {
-     global GridCellOffset* gco = &gridCellOffsets[i];
-     printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
-     }
-     printf("\n");
-     */
 }
 
 /**
@@ -1183,7 +1197,8 @@ kernel void countSortParticles(const global ParticlePosition* particleToCell
 
         const global ParticlePosition* pp = &particleToCell[i];
 
-        int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
+        //int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
+        int key = pp->key;
         int j   = cellHistogram[key];
 
         sortedParticleToCell[j] = *pp;
@@ -1223,8 +1238,11 @@ kernel void countSortParticles(const global ParticlePosition* particleToCell
         // (q_x, q_y, q_z), then the keys are the linearized indices for p and
         // q, p_key and q_key.
 
-        currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
-        nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        //currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
+        //nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        
+        currentKey = currentP->key;
+        nextKey    = nextP->key;
         
         // If p_key and q_key are equal, increase the length of the span:
 

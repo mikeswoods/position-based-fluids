@@ -557,7 +557,7 @@ void Simulation::step()
     
     //this->applyVorticityConfinement();
     
-    //this->applyXSPHViscosity();
+    this->applyXSPHViscosity();
     
     this->updatePosition();
 

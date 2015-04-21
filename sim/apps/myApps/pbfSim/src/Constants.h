@@ -12,7 +12,7 @@
 /******************************************************************************/
 
 // If defined, a simple test scene will be used for rendering
-//#define SIMPLE_SCENE 1
+#define SIMPLE_SCENE 1
 
 // If defined, mesh spheres will be drawn for the particles, otherwise
 // faster OpenGL points will be used:
@@ -82,7 +82,7 @@ const Parameters FOR_RADIUS_0_5 = Parameters(0.5f    // Particle radius
                                             ,1.25f   // Smoothing radius
                                             ,0.0033f // Relaxation
                                             ,0.001f  // Artifical Pressure K
-                                            ,4.0f    // Artifical Pressure N
+                                            ,5.0f    // Artifical Pressure N
                                             ,0.1f    // Vorticity epsilon
                                             ,0.01f); // Viscosity coefficient
 
@@ -93,8 +93,8 @@ const Parameters FOR_RADIUS_0_25 = Parameters(0.25f   // Particle radius
                                              ,1.0f    // Particle mass
                                              ,0.5f    // Smoothing radius
                                              ,0.1f    // Relaxation
-                                             ,0.1f    // Artifical Pressure K
-                                             ,4.0f    // Artifical Pressure N
+                                             ,0.001f  // Artifical Pressure K
+                                             ,5.0f    // Artifical Pressure N
                                              ,0.1f    // Vorticity epsilon
                                              ,0.01f); // Viscosity coefficient
     

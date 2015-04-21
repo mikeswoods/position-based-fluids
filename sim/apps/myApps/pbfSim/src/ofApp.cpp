@@ -28,7 +28,7 @@ using namespace std;
 
 void ofApp::setup()
 {
-    this->paused = true;
+    this->paused      = true;
     this->advanceStep = false;
     
 	ofSetLogLevel(OF_LOG_VERBOSE);
@@ -52,16 +52,19 @@ void ofApp::setup()
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles = 50;
-    
-    Parameters parameters;
+
+    int numParticles = 150;
+    Parameters parameters = Constants::FOR_RADIUS_0_25;
+
     ofSetVerticalSync(true);
 
 #else
 
-    AABB bounds(ofVec3f(-30.0f, 0.0f, -10.0f), ofVec3f(30.0f, 30.0f, 10.0f));
-    int numParticles = 2500;
-    Parameters parameters = Constants::FOR_RADIUS_0_5;
+    AABB bounds(ofVec3f(-30.0f, 0.0f, -5.0f), ofVec3f(30.0f, 30.0f, 5.0f));
+
+    int numParticles = 5000;
+    Parameters parameters = Constants::FOR_RADIUS_0_25;
+
     ofSetVerticalSync(false);
 
 #endif
