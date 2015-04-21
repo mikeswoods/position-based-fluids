@@ -7,17 +7,17 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#include "Parameters.h";
+#include "Parameters.h"
 
 /******************************************************************************/
 
 // If defined, a simple test scene will be used for rendering
-//#define SIMPLE_SCENE 1
+#define SIMPLE_SCENE 1
 
 // If defined, mesh spheres will be drawn for the particles, otherwise
 // faster OpenGL points will be used:
 
-//#define DRAW_PARTICLES_AS_SPHERES 1
+#define DRAW_PARTICLES_AS_SPHERES 1
 
 /******************************************************************************/
 
@@ -77,12 +77,12 @@ const float OPENGL_POINT_PARTICLE_RADIUS = 25.0f;
 /**
  * Parameters for a simulation with particles of radius 0.5 units
  */
-const Parameters FOR_RADIUS_0_5 = Parameters(0.5f, 1.0f, 1.1f, 0.005f, 0.001f, 4, 0.1f, 0.01f);
+const Parameters FOR_RADIUS_0_5 = Parameters(0.5f, 1.0f, 1.2f, 0.001f, 0.0001f, 4.0f, 0.1f, 0.01f);
 
 /**
  * Parameters for a simulation with particles of radius 0.25 units
  */
-const Parameters FOR_RADIUS_0_25 = Parameters(0.25f, 1.0f, 0.5f, 0.1, 0.1, 4, 0.1f, 0.01f);
+const Parameters FOR_RADIUS_0_25 = Parameters(0.25f, 1.0f, 0.5f, 0.1, 0.1, 4.0f, 0.1f, 0.01f);
     
 }
     

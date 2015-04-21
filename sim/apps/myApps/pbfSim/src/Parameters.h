@@ -26,15 +26,11 @@ typedef struct Parameters
                                // of the Position Based Fluids paper
     float artificialPressureK; // Artificial pressure coefficient K
     
+    float artificialPressureN;   // Artificial pressure coefficient N
+    
     float epsilonVorticity;    // Vorticity coefficient
-    
+
     float viscosityCoeff;      // Viscosity coefficient
-    
-    float __padding1[3];
-    
-    int artificialPressureN;   // Artificial pressure coefficient N
-    
-    int __padding2[3];
 
     Parameters();
     Parameters(float _particleRadius
@@ -42,7 +38,7 @@ typedef struct Parameters
               ,float _smoothingRadius
               ,float _relaxation
               ,float _artificialPressureK
-              ,int _artificialPressureN
+              ,float _artificialPressureN
               ,float _epsilonVorticity
               ,float _viscosityCoeff);
     Parameters(const Parameters& other);

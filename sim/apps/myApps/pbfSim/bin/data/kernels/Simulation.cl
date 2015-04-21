@@ -20,6 +20,11 @@
  ******************************************************************************/
 
 /**
+ * A small epislon value
+ */
+const constant float EPSILON = 1.0e-4f;
+
+/**
  * The maximum number of neighbors to examine for a given particle:
  */
 const constant int CHECK_MAX_NEIGHBORS = 8;
@@ -43,25 +48,21 @@ const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 
 typedef struct {
     
-    float particleRadius;      // Particle radius
+    float particleRadius;      // 1. Particle radius
     
-    float particleMass;        // Particle mass
+    float particleMass;        // 2. Particle mass
     
-    float smoothingRadius;     // Kernel smoothing radius
+    float smoothingRadius;     // 3. Kernel smoothing radius
     
-    float relaxation;          // Pressure relaxation coefficient (epsilon)
+    float relaxation;          // 4. Pressure relaxation coefficient (epsilon)
     
-    float artificialPressureK; // Artificial pressure coefficient K
+    float artificialPressureK; // 5. Artificial pressure coefficient K
     
-    float epsilonVorticity;    // Vorticity coefficient
+    float artificialPressureN; // 6. Artificial pressure coefficient N
     
-    float viscosityCoeff;      // Viscosity coefficient
+    float epsilonVorticity;    // 7. Vorticity coefficient
     
-    float __padding1;
-    
-    int artificialPressureN;   // Artificial pressure coefficient N
-    
-    int __padding2[3];
+    float viscosityCoeff;      // 8. Viscosity coefficient
     
 } Parameters;
 
@@ -602,6 +603,9 @@ float poly6(float4 r, float h)
     
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
+    if (h9 == 0.0) {
+        h9 = EPSILON;
+    }
     float A  = 1.566681471061f / h9;
     float B  = (h * h) - (rBar * rBar);
 
@@ -627,9 +631,12 @@ float4 spiky(float4 r, float h)
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
+    if (h6 == 0.0f) {
+        h6 = EPSILON;
+    }
     float A    = 14.323944878271f / h6;
     float B    = (h - rBar);
-    float4 out = A * (B * B) * (r / (rBar + 0.001f));
+    float4 out = A * (B * B) * (r / (rBar + EPSILON));
     out[3] = 0.0f;
     return out;
 }
@@ -743,19 +750,17 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
-    float dQ        = 0.3f * h;
+    float dQ        = 0.5f * h;
     float4 r        = p_i->posStar - p_j->posStar;
     float4 q        = dQ * ((float4)(1.0f, 1.0f, 1.0f, 1.0f) + p_i->posStar);
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    //float d         = poly6(q, h);
-    float d = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
+    float d         = poly6(q, h);
+    //float d         = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
+    float nd        = d < 0.01f ? 0.0f : n / d;
+    float sCorr     = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
     
-    if (d == 0.0f) {
-        d = 1.0e-4f;
-    }
-
-    float sCorr = -parameters->artificialPressureK * pow(n / d, parameters->artificialPressureN);
+    //printf("sCorr = %f\n", sCorr);
     
     context->posDelta += ((lambda_i + lambda_j + sCorr) * gradient);
 }
@@ -958,6 +963,168 @@ kernel void discretizeParticlePositions(const global Particle* particles
 }
 
 /**
+ * Parallel bitonic sort implementation
+ *
+ * @see discretizeParticlePositions
+ *
+ * @param [in]     ParticlePosition* particleToCell
+ * @param [out]    ParticlePosition* aux
+ * @param [out]    ParticlePosition* sortedParticleToCell
+ * @param [out]    GridCellOffset* gridCellOffsets An array of size
+ *                 [0 .. numCells-1], where each index i contains the start and
+ *                 length of the i-th cell in the grid as it occurs in
+ *                 sortedParticleToCell
+ * @param [in] int numParticles The total number of particles in the simulation
+ * @param [in] int numCells The total number of cells in the spatial grid
+ * @param [in] int cellsX The number of cells in the x axis of the spatial
+ *             grid
+ * @param [in] int cellsY The number of cells in the y axis of the spatial
+ *             grid
+ * @param [in] int cellsZ The number of cells in the z axis of the spatial
+ *             grid
+ */
+kernel void bitonicSortParticles(const global ParticlePosition* particleToCell
+                                ,global ParticlePosition* aux
+                                ,global ParticlePosition* sortedParticleToCell
+                                ,global GridCellOffset* gridCellOffsets
+                                ,int numParticles
+                                ,int numCells
+                                ,int cellsX
+                                ,int cellsY
+                                ,int cellsZ)
+{
+    // ==== Sorting code =======================================================
+    
+    // index in workgroup
+
+    int i  = get_local_id(0);
+
+    // workgroup size = block size, power of 2
+
+    int wg = get_local_size(0);
+
+    // Move IN, OUT to block start
+
+    int offset = get_group_id(0) * wg;
+    particleToCell       += offset;
+    sortedParticleToCell += offset;
+
+    // Load block in AUX[WG]
+
+    aux[i] = particleToCell[i];
+    barrier(CLK_LOCAL_MEM_FENCE); // make sure AUX is entirely up to date
+
+    // Loop on sorted sequence length
+
+    for (int length = 1; length < wg; length <<= 1) {
+
+        bool direction = ((i & (length << 1)) != 0); // direction of sort: 0=asc, 1=desc
+    
+        // Loop on comparison distance (between keys)
+    
+        for (int inc = length; inc > 0; inc >>= 1) {
+
+            int j = i ^ inc; // sibling to compare
+            global ParticlePosition* pp_i = &aux[i];
+            global ParticlePosition* pp_j = &aux[j];
+
+            int iKey = sub2ind(pp_i->cellI, pp_i->cellJ, pp_i->cellK, cellsX, cellsY);
+            int jKey = sub2ind(pp_j->cellI, pp_j->cellJ, pp_j->cellK, cellsX, cellsY);
+
+            bool smaller = (jKey < iKey) || (jKey == iKey && j < i);
+            bool swap = smaller ^ (j < i) ^ direction;
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+            aux[i] = *((swap) ? pp_j : pp_i);
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+    }
+
+    // Write output
+    sortedParticleToCell[i] = aux[i];
+    
+    // ==== Binning code =======================================================
+    
+    // Now, the ParticlePosition entries of sortedParticleToCell are sorted in
+    // ascending order by the value sub2ind(pp[i].cellI, pp[i].cellJ, pp[i].cellK, cellsX, cellsY),
+    // where pp is an instance of ParticlePosition  at index i, such that
+    // 0 <= i < numParticles.
+    
+    // Record the offsets per grid cell:
+    // The i-th entry of the gridCellOffsets contains the start and length
+    // of the i-th linearized grid cell in sortedParticleToCell
+    
+    int lengthCount = 1;
+    int cellStart   = 0;
+    int currentKey  = -1;
+    int nextKey     = -1;
+    
+    // We traverse the list to find sequences of consecutive particles that
+    // are assigned the same cell. We record the start and length to these
+    // sequences and store the results in gridCellOffsets, so we can
+    // quickly find all of the particles in a given cell quickly.
+    
+    for (int i = 0; i < (numParticles - 1); i++) {
+        
+        // Compare the particle position at index i and i+1:
+        
+        const global ParticlePosition* currentP = &sortedParticleToCell[i];
+        const global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
+        
+        // If two particles p and q have cell subscripts (p_x, p_y, p_z) and
+        // (q_x, q_y, q_z), then the keys are the linearized indices for p and
+        // q, p_key and q_key.
+        
+        currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
+        nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
+        
+        // If p_key and q_key are equal, increase the length of the span:
+        
+        if (currentKey == nextKey) {
+            
+            lengthCount++;
+            
+        } else {
+            
+            // We hit a new key. Record this grid cell offset and continue;
+            
+            gridCellOffsets[currentKey].start  = cellStart;
+            gridCellOffsets[currentKey].length = lengthCount;
+            
+            cellStart   = i + 1;
+            lengthCount = 1;
+        }
+    }
+    
+    // For the last particle, since we iterate up to, but not including
+    // the particle at index (numParticles - 1):
+    
+    if (nextKey != -1) {
+        gridCellOffsets[nextKey].start  = cellStart;
+        gridCellOffsets[nextKey].length = lengthCount;
+    }
+    
+    /*
+     printf("=================================\n");
+     printf("[ParticlePosition]\n");
+     for (int i = 0; i < numParticles; i++) {
+     global ParticlePosition* spp = &sortedParticleToCell[i];
+     int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
+     printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
+     i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
+     }
+     printf("\n");
+     
+     printf("[GridCellOffset]\n");
+     for (int i = 0; i < numCells; i++) {
+     global GridCellOffset* gco = &gridCellOffsets[i];
+     printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
+     }
+     printf("\n");
+     */
+}
+
+/**
  * NOTE: This kernel is meant to be run with 1 thread. This is necessary
  * since we have to perform a sort and perform some other actions which are
  * inherently sequential in nature
@@ -986,16 +1153,18 @@ kernel void discretizeParticlePositions(const global Particle* particles
  * @param [in] int cellsZ The number of cells in the z axis of the spatial
  *             grid
  */
-kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
-                               ,global int* cellHistogram
-                               ,global ParticlePosition* sortedParticleToCell
-                               ,global GridCellOffset* gridCellOffsets
-                               ,int numParticles
-                               ,int numCells
-                               ,int cellsX
-                               ,int cellsY
-                               ,int cellsZ)
+kernel void countSortParticles(const global ParticlePosition* particleToCell
+                              ,global int* cellHistogram
+                              ,global ParticlePosition* sortedParticleToCell
+                              ,global GridCellOffset* gridCellOffsets
+                              ,int numParticles
+                              ,int numCells
+                              ,int cellsX
+                              ,int cellsY
+                              ,int cellsZ)
 {
+    // ==== Sorting code =======================================================
+    
     // First step of counting sort is done already, since we calculated
     //the histogram (cellHistogram) in the discretizeParticlePositions kernel:
     
@@ -1021,6 +1190,8 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         
         cellHistogram[key] += 1;
     }
+    
+    // ==== Binning code =======================================================
     
     // Now, the ParticlePosition entries of sortedParticleToCell are sorted in
     // ascending order by the value sub2ind(pp[i].cellI, pp[i].cellJ, pp[i].cellK, cellsX, cellsY),
@@ -1080,25 +1251,6 @@ kernel void sortParticlesByCell(const global ParticlePosition* particleToCell
         gridCellOffsets[nextKey].start  = cellStart;
         gridCellOffsets[nextKey].length = lengthCount;
     }
-
-    /*
-        printf("=================================\n");
-        printf("[ParticlePosition]\n");
-        for (int i = 0; i < numParticles; i++) {
-            global ParticlePosition* spp = &sortedParticleToCell[i];
-            int key = sub2ind(spp->cellI, spp->cellJ, spp->cellK, cellsX, cellsY);
-            printf("P [%d] :: particleIndex = %d, key = %d, cell = (%d,%d,%d) \n",
-                   i, spp->particleIndex, key, spp->cellI, spp->cellJ, spp->cellK);
-        }
-        printf("\n");
-    
-        printf("[GridCellOffset]\n");
-        for (int i = 0; i < numCells; i++) {
-            global GridCellOffset* gco = &gridCellOffsets[i];
-            printf("C [%d] :: start = %d, length = %d\n", i, gco->start, gco->length);
-        }
-        printf("\n");
-    */
 }
 
 /**
@@ -1265,7 +1417,8 @@ kernel void computeLambda(const global Parameters* parameters
     
     // ==== lambda_i ===========================================================
 
-    lambda[id] = -(C_i / (gradientSum + parameters->relaxation));
+    
+    lambda[id] = -(C_i / ((gradientSum + parameters->relaxation) + EPSILON));
 }
 
 /**
@@ -1306,8 +1459,10 @@ kernel void computePositionDelta(const global Parameters* parameters
 {
     int id = get_global_id(0);
 
-    _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 0.0f),
+    _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 1.0f),
                                  .lambda = lambda };
+    
+    //printf("pressure N = %f\n", parameters->artificialPressureN);
     
     forAllNeighbors(parameters
                    ,particles
@@ -1357,12 +1512,11 @@ kernel void applyPositionDelta(const global float4* posDelta
  *                 bounding box in world space
  */
 kernel void resolveCollisions(const global Parameters* parameters
-                              ,global Particle* particles
-                              ,float3 minExtent
-                              ,float3 maxExtent)
+                             ,global Particle* particles
+                             ,float3 minExtent
+                             ,float3 maxExtent)
 {
     int id = get_global_id(0);
-    
     global Particle *p = &particles[id];
     
     // Clamp predicted and actual positions:
@@ -1379,7 +1533,6 @@ kernel void resolveCollisions(const global Parameters* parameters
     p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
     p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
 }
-
 
 /**
  * For all particles p_i in particles, this kernel computes the final, true

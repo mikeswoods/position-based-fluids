@@ -129,14 +129,19 @@ class Simulation
         int numParticles;
 
         // Simulation parameters to pass to the kernels
-        Parameters parameterData;
-        msa::OpenCLBufferManagedT<Parameters> parameters;
+        Parameters parameters;
+    
+        // And the buffer to hold the parameters on the GPU:
+        msa::OpenCLBuffer parameterBuffer;
     
         // All particles in the simulation
         msa::OpenCLBufferManagedT<Particle>	particles;
     
         // An array of particle-to-cell mappings
         msa::OpenCLBuffer particleToCell;
+
+        // Auxiliary buffer for sorting
+        msa::OpenCLBuffer particleToCellAux;
     
         // A cell count histogram used for particle neighbor finding
         msa::OpenCLBuffer cellHistogram;
@@ -213,8 +218,9 @@ class Simulation
         const ofVec3f& getCellsPerAxis() const { return this->cellsPerAxis; }
         const unsigned int getNumberOfParticles() const { return this->numParticles; }
         const unsigned int getNumberOfCells() const { return this->numCells; }
-        Parameters& getParameters() { return this->parameters[0]; }
-
+        const Parameters& getParameters() const;
+        void setParameters(const Parameters& parameters);
+    
         const bool drawGridEnabled() const { return this->flagDrawGrid; }
         void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
     

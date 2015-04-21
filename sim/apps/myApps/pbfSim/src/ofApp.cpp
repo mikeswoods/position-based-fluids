@@ -52,7 +52,7 @@ void ofApp::setup()
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles = 120;
+    int numParticles = 50;
     
     Parameters parameters;
     ofSetVerticalSync(true);
@@ -60,12 +60,16 @@ void ofApp::setup()
 #else
 
     AABB bounds(ofVec3f(-30.0f, 0.0f, -10.0f), ofVec3f(30.0f, 30.0f, 10.0f));
-    int numParticles = 10000;
+    int numParticles = 7500;
     Parameters parameters = Constants::FOR_RADIUS_0_5;
     ofSetVerticalSync(false);
 
 #endif
 
+    
+    ofLogNotice() << "sizeof(Parameters) = " << sizeof(Parameters) << endl
+                  << parameters << endl;
+    
     // Instantiate the simulator:
     this->simulation = std::shared_ptr<Simulation>(new Simulation(this->openCL
                                                                  ,bounds

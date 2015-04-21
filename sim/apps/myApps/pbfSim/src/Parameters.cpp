@@ -15,14 +15,14 @@ using namespace std;
 
 /******************************************************************************/
 
-//Parameters(0.5f, 1.0f, 1.1f, 0.005f, 0.001f, 4, 0.1f, 0.01f);
+//Parameters(0.5f, 1.0f, 1.1f, 0.005f, 0.001f, 4.0f, 0.1f, 0.01f);
 Parameters::Parameters() :
     particleRadius(0.5f),
     particleMass(1.0f),
     smoothingRadius(1.1f),
     relaxation(0.005f),
     artificialPressureK(0.001f),
-    artificialPressureN(4),
+    artificialPressureN(4.0f),
     epsilonVorticity(0.1f),
     viscosityCoeff(0.01f)
 {
@@ -34,7 +34,7 @@ Parameters::Parameters(float _particleRadius
                       ,float _smoothingRadius
                       ,float _relaxation
                       ,float _artificialPressureK
-                      ,int _artificialPressureN
+                      ,float _artificialPressureN
                       ,float _epsilonVorticity
                       ,float _viscosityCoeff) :
     particleRadius(_particleRadius),
