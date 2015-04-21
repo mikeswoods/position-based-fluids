@@ -104,9 +104,9 @@ ofVec3f Simulation::findIdealParticleCount()
     float height  = maxExt[1] - minExt[1];
     float depth   = maxExt[2] - minExt[2];
     float radius  = this->parameters.particleRadius;
-    float subDivX = static_cast<float>(Constants::PARTICLES_PER_CELL_X) / radius;
-    float subDivY = static_cast<float>(Constants::PARTICLES_PER_CELL_Y) / radius;
-    float subDivZ = static_cast<float>(Constants::PARTICLES_PER_CELL_Z) / radius;
+    float subDivX = static_cast<float>(Constants::PARTICLES_PER_CELL_X);
+    float subDivY = static_cast<float>(Constants::PARTICLES_PER_CELL_Y);
+    float subDivZ = static_cast<float>(Constants::PARTICLES_PER_CELL_Z);
     
     int cellsX   = static_cast<int>(ceil((width / radius) / subDivX));
     int cellsY   = static_cast<int>(ceil((height / radius) / subDivY));
@@ -598,7 +598,7 @@ void Simulation::step()
 
     // Animate the bounds of the simulation to generate waves in the particles:
 
-    this->stepBoundsAnimation(1.0f, 10.0f);
+    //this->stepBoundsAnimation(1.0f, 10.0f);
     
     // Finally, bump up the frame counter:
 
