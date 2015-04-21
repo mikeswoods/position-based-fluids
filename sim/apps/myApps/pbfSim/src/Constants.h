@@ -12,12 +12,12 @@
 /******************************************************************************/
 
 // If defined, a simple test scene will be used for rendering
-#define SIMPLE_SCENE 1
+//#define SIMPLE_SCENE 1
 
 // If defined, mesh spheres will be drawn for the particles, otherwise
 // faster OpenGL points will be used:
 
-#define DRAW_PARTICLES_AS_SPHERES 1
+//#define DRAW_PARTICLES_AS_SPHERES 1
 
 /******************************************************************************/
 
