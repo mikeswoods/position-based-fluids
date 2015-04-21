@@ -67,4 +67,45 @@ const float3& AABB::getMaxExtent() const
     return this->maxV;
 }
 
+void AABB::addMin(ofVec3f amount)
+{
+    this->minV += amount;
+}
+
+void AABB::addMax(ofVec3f amount)
+{
+    this->maxV += amount;
+}
+
+void AABB::addMinX(float amount)
+{
+    this->minV.x += amount;
+}
+
+void AABB::addMaxX(float amount)
+{
+    this->maxV.x += amount;
+}
+
+void AABB::addMinY(float amount)
+{
+    this->minV.y += amount;
+}
+
+void AABB::addMaxY(float amount)
+{
+    this->maxV.y += amount;
+}
+
+void AABB::addMinZ(float amount)
+{
+    this->minV.z += amount;
+}
+
+void AABB::addMaxZ(float amount)
+{
+    this->maxV.z += amount;
+}
+
+
 /******************************************************************************/

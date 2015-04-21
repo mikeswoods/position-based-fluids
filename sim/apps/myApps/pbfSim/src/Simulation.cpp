@@ -589,6 +589,11 @@ void Simulation::step()
 
 /******************************************************************************/
 
+void Simulation::animateSineWave()
+{
+    
+}
+
 /**
  * Draws the cell grid
  *

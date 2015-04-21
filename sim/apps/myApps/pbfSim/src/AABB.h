@@ -28,6 +28,16 @@ class AABB
         const ofVec3f& getMinExtent() const;
         const ofVec3f& getMaxExtent() const;
     
+        void addMin(ofVec3f amount);
+        void addMax(ofVec3f amount);
+    
+        void addMinX(float amount);
+        void addMaxX(float amount);
+        void addMinY(float amount);
+        void addMaxY(float amount);
+        void addMinZ(float amount);
+        void addMaxZ(float amount);
+    
         friend std::ostream& operator<<(std::ostream& stream, const AABB& aabb);
 };
 

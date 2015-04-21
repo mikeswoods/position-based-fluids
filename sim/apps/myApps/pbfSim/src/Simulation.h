@@ -231,6 +231,7 @@ class Simulation
         const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
         void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
     
+        void animateSineWave();
         void step();
         void draw(const ofCamera& camera);
 };
