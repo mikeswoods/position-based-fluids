@@ -60,13 +60,12 @@ void ofApp::setup()
 #else
 
     AABB bounds(ofVec3f(-30.0f, 0.0f, -10.0f), ofVec3f(30.0f, 30.0f, 10.0f));
-    int numParticles = 7500;
+    int numParticles = 2500;
     Parameters parameters = Constants::FOR_RADIUS_0_5;
     ofSetVerticalSync(false);
 
 #endif
 
-    
     ofLogNotice() << "sizeof(Parameters) = " << sizeof(Parameters) << endl
                   << parameters << endl;
     

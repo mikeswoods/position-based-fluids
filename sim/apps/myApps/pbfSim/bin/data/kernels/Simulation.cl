@@ -604,7 +604,7 @@ float poly6(float4 r, float h)
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
     if (h9 == 0.0) {
-        h9 = EPSILON;
+        return 0.0f;
     }
     float A  = 1.566681471061f / h9;
     float B  = (h * h) - (rBar * rBar);
@@ -632,7 +632,7 @@ float4 spiky(float4 r, float h)
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
     if (h6 == 0.0f) {
-        h6 = EPSILON;
+        return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     }
     float A    = 14.323944878271f / h6;
     float B    = (h - rBar);
@@ -746,17 +746,17 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     
     float lambda_i = context->lambda[i];
     float lambda_j = context->lambda[j];
-
+    
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
-    float dQ        = 0.5f * h;
+    float dQ        = 0.1f * h;
     float4 r        = p_i->posStar - p_j->posStar;
     float4 q        = dQ * ((float4)(1.0f, 1.0f, 1.0f, 1.0f) + p_i->posStar);
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    float d         = poly6(q, h);
-    //float d         = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
+    //float d         = poly6(q, h);
+    float d         = poly6((float4)(0.0f, 0.0f, 0.0f, 1.0f), h);
     float nd        = d < 0.01f ? 0.0f : n / d;
     float sCorr     = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
     
@@ -1417,8 +1417,11 @@ kernel void computeLambda(const global Parameters* parameters
     
     // ==== lambda_i ===========================================================
 
+    if (gradientSum == 0.0f) {
+        gradientSum = EPSILON;
+    }
     
-    lambda[id] = -(C_i / ((gradientSum + parameters->relaxation) + EPSILON));
+    lambda[id] = -(C_i / ((gradientSum + parameters->relaxation)));
 }
 
 /**
