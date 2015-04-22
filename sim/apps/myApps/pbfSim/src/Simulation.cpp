@@ -594,7 +594,7 @@ void Simulation::step()
 
     this->predictPositions();
 
-    this->groupParticlesByCell();
+    this->findNeighboringParticles();
 
     // Solver runs for N iterations:
 
@@ -794,7 +794,7 @@ void Simulation::draw(const ofCamera& camera)
  *
  * See http://on-demand.gputechconf.com/gtc/2014/presentations/S4117-fast-fixed-radius-nearest-neighbor-gpu.pdf
  */
-void Simulation::groupParticlesByCell()
+void Simulation::findNeighboringParticles()
 {
     this->discretizeParticlePositions();
     

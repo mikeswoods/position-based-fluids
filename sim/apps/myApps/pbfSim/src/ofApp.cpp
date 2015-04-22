@@ -67,9 +67,6 @@ void ofApp::setup()
 
 #endif
 
-    ofLogNotice() << "sizeof(Parameters) = " << sizeof(Parameters) << endl
-                  << parameters << endl;
-    
     // Instantiate the simulator:
     this->simulation = std::shared_ptr<Simulation>(new Simulation(this->openCL
                                                                  ,bounds
