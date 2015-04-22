@@ -148,6 +148,11 @@ global int3 getSubscript(const global Particle* p
                         ,float3 minExtent
                         ,float3 maxExtent);
 
+void clampToBounds(const global Parameters* parameters
+                  ,global Particle* p
+                  ,float3 minExtent
+                  ,float3 maxExtent);
+
 float poly6(float4 r, float h);
 
 float poly6_scalar(float q, float h);
@@ -343,6 +348,34 @@ global int getKey(const global Particle* p
 }
 
 /**
+ * Given a particle, p, this function will clamp the particle's position to
+ * the region defining the valid boundary of the simulation
+ *
+ * @param [in]     Parameters* parameters The runtime parameters of the 
+ *                 simulation
+ * @param [in/out] Parameters* parameters The particle to clamp
+ * @param [in]     float3 minExtent The minimum extent of the simulation's
+ *                 bounding box in world space
+ * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ *                 bounding box in world space
+ */
+void clampToBounds(const global Parameters* parameters
+                  ,global Particle* p
+                  ,float3 minExtent
+                  ,float3 maxExtent)
+{
+    // Clamp predicted and actual positions:
+    
+    float R = parameters->particleRadius;
+    
+    // Clamp the predicted positions to the bounding box of the simulation:
+    
+    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
+    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
+    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
+}
+
+/**
  * Given the subscript (i,j,k) as an int3 of a cell to search the vicinity of,
  * this function will return a count of valid neighboring cells (including
  * itself) in the range [1,27], e.g. between 1 and 27 neighboring cells are
@@ -431,7 +464,7 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  * function to all particle pairs (p_i, p_j), accumulating the result and
  * returning it
  *
- * @param [in]  Parameters* parameters
+ * @param [in]  Parameters* parameters The runtime parameters of the simulation
  * @param [in]  Particle* particles
  * @param [in]  ParticlePosition* sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
@@ -1386,7 +1419,10 @@ kernel void computePositionDelta(const global Parameters* parameters
                                 ,global float4* posDelta)
 {
     int id = get_global_id(0);
+    global Particle *p = &particles[id];
 
+    // The accumulated position delta, \delta p_i for the particle, p_i
+    
     float4 posDelta_i = (float4)(0.0f, 0.0f, 0.0f, 1.0f);
     
     forAllNeighbors(parameters
@@ -1405,13 +1441,16 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,(void*)&posDelta_i);
     
     posDelta[id] = INV_REST_DENSITY * posDelta_i;
+    
+    // Finally, clamp the particle's predicted position to the valid bounds
+    // of the simulation:
+    
+    clampToBounds(parameters, p, minExtent, maxExtent);
 }
 
 /**
  * Tests for collisions between particles and objects/bounds and projects
  * the positions of the particles accordingly
- *
- * TODO: For now, this just clamps the particle to the world bounds
  *
  * @param [in]     Parameters* parameters Simulation parameters
  * @param [in/out] const Particle* particles The particles in the simulation
@@ -1425,18 +1464,7 @@ kernel void resolveCollisions(const global Parameters* parameters
                               ,float3 minExtent
                               ,float3 maxExtent)
 {
-    int id = get_global_id(0);
-    global Particle *p = &particles[id];
-    
-    // Clamp predicted and actual positions:
-    
-    float R = parameters->particleRadius;
 
-    // Clamp the predicted positions to the bounding box of the simulation:
-
-    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
-    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
-    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
 }
 
 /**

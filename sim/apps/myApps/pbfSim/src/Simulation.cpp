@@ -604,7 +604,7 @@ void Simulation::step()
 
         this->calculatePositionDelta(); // See (1) - (4)
 
-        this->handleCollisions();
+        //this->handleCollisions();
         
         this->applyPositionDelta();
     }
