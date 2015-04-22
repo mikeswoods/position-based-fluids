@@ -1475,8 +1475,8 @@ kernel void resolveCollisions(const global Parameters* parameters
  * @param [in]  float4* posDelta The predicted delta position
  * @param [out] Particle* particles The particles in the simulation to be updated
  */
-kernel void applyPositionDelta(const global float4* posDelta
-                              ,global Particle* particles)
+kernel void updatePositionDelta(const global float4* posDelta
+                               ,global Particle* particles)
 {
     int id = get_global_id(0);
     global Particle *p = &particles[id];

@@ -212,7 +212,7 @@ class Simulation
         void findNeighboringParticles();
         void calculateDensity();
         void calculatePositionDelta();
-        void applyPositionDelta();
+        void updatePositionDelta();
         void handleCollisions();
         void updateVelocity();
         void applyXSPHViscosity();

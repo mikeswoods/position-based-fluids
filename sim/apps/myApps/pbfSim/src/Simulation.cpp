@@ -445,11 +445,11 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computePositionDelta")->setArg(10, maxExt);
     this->openCL.kernel("computePositionDelta")->setArg(11, this->posDelta);
     
-    // KERNEL :: applyPositionDelta
+    // KERNEL :: updatePositionDelta
 
-    this->openCL.loadKernel("applyPositionDelta");
-    this->openCL.kernel("applyPositionDelta")->setArg(0, this->posDelta);
-    this->openCL.kernel("applyPositionDelta")->setArg(1, this->particles);
+    this->openCL.loadKernel("updatePositionDelta");
+    this->openCL.kernel("updatePositionDelta")->setArg(0, this->posDelta);
+    this->openCL.kernel("updatePositionDelta")->setArg(1, this->particles);
 
     // KERNEL :: resolveCollisions
 
@@ -606,7 +606,7 @@ void Simulation::step()
 
         //this->handleCollisions();
         
-        this->applyPositionDelta();
+        this->updatePositionDelta();
     }
 
     this->updateVelocity();
@@ -888,11 +888,11 @@ void Simulation::calculatePositionDelta()
 /**
  * Apply the position delta
  *
- * @see kernels/Simulation.cl (applyPositionDelta) for details
+ * @see kernels/Simulation.cl (updatePositionDelta) for details
  */
-void Simulation::applyPositionDelta()
+void Simulation::updatePositionDelta()
 {
-    this->openCL.kernel("applyPositionDelta")->run1D(this->numParticles);
+    this->openCL.kernel("updatePositionDelta")->run1D(this->numParticles);
 }
 
 /**
