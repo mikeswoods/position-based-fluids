@@ -592,21 +592,21 @@ void Simulation::step()
     // "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID"
     // that uses counting sort as an alternative to radix sort
 
-    this->predictPositions();
-
-    this->findNeighboringParticles();
+    this->predictPositions(); // See (1) - (4)
+    
+    this->findNeighboringParticles(); // See (5) - (7)
 
     // Solver runs for N iterations:
 
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) { // See (8) - (19)
 
-        this->calculateDensity();
+        this->calculateDensity(); // See (9) - (12)
 
-        this->calculatePositionDelta();
-
-        this->applyPositionDelta();
+        this->calculatePositionDelta(); // See (1) - (4)
 
         this->handleCollisions();
+        
+        this->applyPositionDelta();
     }
 
     this->updateVelocity();

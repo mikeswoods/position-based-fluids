@@ -1408,6 +1408,38 @@ kernel void computePositionDelta(const global Parameters* parameters
 }
 
 /**
+ * Tests for collisions between particles and objects/bounds and projects
+ * the positions of the particles accordingly
+ *
+ * TODO: For now, this just clamps the particle to the world bounds
+ *
+ * @param [in]     Parameters* parameters Simulation parameters
+ * @param [in/out] const Particle* particles The particles in the simulation
+ * @param [in]     float3 minExtent The minimum extent of the simulation's
+ *                 bounding box in world space
+ * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ *                 bounding box in world space
+ */
+kernel void resolveCollisions(const global Parameters* parameters
+                              ,global Particle* particles
+                              ,float3 minExtent
+                              ,float3 maxExtent)
+{
+    int id = get_global_id(0);
+    global Particle *p = &particles[id];
+    
+    // Clamp predicted and actual positions:
+    
+    float R = parameters->particleRadius;
+
+    // Clamp the predicted positions to the bounding box of the simulation:
+
+    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
+    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
+    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
+}
+
+/**
  * For all particles p_i in particles, this kernel applies the computed 
  * position delta to the predicted positions p_i.posStar.(x|y|z), e.g. "x_i*"
  * in the Position Based Fluids paper
@@ -1422,42 +1454,6 @@ kernel void applyPositionDelta(const global float4* posDelta
     global Particle *p = &particles[id];
     
     p->posStar += posDelta[id];
-}
-
-/**
- * Tests for collisions between particles and objects/bounds and projects
- * the positions of the particles accordingly
- *
- * TODO: For now, this just clamps the particle to the world bounds
- *
- * @param [in]     Parameters* parameters Simulation parameters
- * @param [in/out] const Particle* particles The particles in the simulation
- * @param [in]     float3 minExtent The minimum extent of the simulation's
- *                 bounding box in world space
- * @param [in]     float3 maxExtent The maximum extent of the simulation's
- *                 bounding box in world space
- */
-kernel void resolveCollisions(const global Parameters* parameters
-                             ,global Particle* particles
-                             ,float3 minExtent
-                             ,float3 maxExtent)
-{
-    int id = get_global_id(0);
-    global Particle *p = &particles[id];
-    
-    // Clamp predicted and actual positions:
-    
-    float R = parameters->particleRadius;
-    
-    // Actual positions:
-    p->pos.x = clamp(p->pos.x, minExtent.x + R, maxExtent.x - R);
-    p->pos.y = clamp(p->pos.y, minExtent.y + R, maxExtent.y - R);
-    p->pos.z = clamp(p->pos.z, minExtent.z + R, maxExtent.z - R);
-    
-    // Predicted positions:
-    p->posStar.x = clamp(p->posStar.x, minExtent.x + R, maxExtent.x - R);
-    p->posStar.y = clamp(p->posStar.y, minExtent.y + R, maxExtent.y - R);
-    p->posStar.z = clamp(p->posStar.z, minExtent.z + R, maxExtent.z - R);
 }
 
 /**
