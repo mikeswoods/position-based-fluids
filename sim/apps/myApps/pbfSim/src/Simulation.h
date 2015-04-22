@@ -157,27 +157,38 @@ class Simulation
         msa::OpenCLBufferManagedT<Particle>	particles;
     
         // An array of particle-to-cell mappings
+        // - Buffer of ParticlePosition
         msa::OpenCLBuffer particleToCell;
     
         // A cell count histogram used for particle neighbor finding
+        // - Buffer of int
         msa::OpenCLBuffer cellHistogram;
     
         // A sorted version of particleToCell, used to search for a given
         // particle's neighbors
+        // - Buffer of ParticlePosition
         msa::OpenCLBuffer sortedParticleToCell;
 
         // An array of cell start locations and spans in sortedParticleToCell
+        // - Buffer of GridCellOffset
         msa::OpenCLBuffer gridCellOffsets;
     
         // Particle densities computed by SPH estimation
+        // - Buffer of float
         msa::OpenCLBuffer density;
 
         // Particle density lambda value from the section "Enforcing
         // Incompressibility" of "Position Based Fluids"
+        // - Buffer of float1
         msa::OpenCLBuffer lambda;
     
         // Vorticity curl force applied to each particle
+        // - Buffer of float4
         msa::OpenCLBuffer curl;
+    
+        // Accumulated external forces
+        // - Buffer of float4
+        msa::OpenCLBuffer extForces;
     
         // Position deltas
         msa::OpenCLBuffer posDelta;

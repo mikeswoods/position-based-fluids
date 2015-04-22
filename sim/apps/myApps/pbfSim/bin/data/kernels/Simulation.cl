@@ -149,6 +149,7 @@ global int3 getSubscript(const global Particle* p
                         ,float3 maxExtent);
 
 float poly6(float4 r, float h);
+
 float poly6_scalar(float q, float h);
 
 float4 spiky(float4 r, float h);
@@ -192,6 +193,14 @@ void callback_Curl_i(const global Parameters* parameters
                     ,const global Particle* p_j
                     ,void* dataArray
                     ,void* accum);
+
+void callback_Vorticity_i(const global Parameters* parameters
+                         ,int i
+                         ,const global Particle* p_i
+                         ,int j
+                         ,const global Particle* p_j
+                         ,void* dataArray
+                         ,void* accum);
 
 void callback_XPSHViscosity_i(const global Parameters* parameters
                              ,int i
@@ -835,6 +844,35 @@ void callback_Curl_i(const global Parameters* parameters
     float4 gradient_ij = spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 
     (*omega_i) += cross(v_ij, gradient_ij);
+}
+
+/**
+ * A callback function that computes the vorticity force acting on a given
+ * particle, p_i
+ *
+ * @param [in] Parameters* parameters Simulation parameters
+ * @param [in] int i The fixed index of particle i
+ * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
+ * @param [in] int j The varying index of particle j
+ * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
+ */
+void callback_Vorticity_i(const global Parameters* parameters
+                         ,int i
+                         ,const global Particle* p_i
+                         ,int j
+                         ,const global Particle* p_j
+                         ,void* dataArray
+                         ,void* accum)
+{
+    float4* curl          = (float4*)dataArray;
+    float4* omegaGradient = (float4*)accum;
+    
+    float4 r = p_i->posStar - p_j->posStar;
+    float4 omegaBar = length(curl[i] - curl[j]);
+    
+    (*omegaGradient) += (omegaBar / r);
 }
 
 /**
@@ -1510,6 +1548,7 @@ kernel void computeCurl(const global Parameters* parameters
  * @param [in]  const ParticlePosition* sortedParticleToCell
  * @param [in]  const GridCellOffset* gridCellOffsets
  * @param [in]  int numParticles The number of particles in the simulation
+ * @param [in]  float4* curl Computed curl for the particle p_i
  * @param [in]  int cellsX The number of cells in the x axis of the spatial
  *              grid
  * @param [in]  int cellsY The number of cells in the y axis of the spatial
@@ -1520,21 +1559,50 @@ kernel void computeCurl(const global Parameters* parameters
  *              bounding box in world space
  * @param [in]  float3 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
+ * @param [out] float4* extForces Accumulated external forces acting on 
+ *              particle p_i
  */
 kernel void applyVorticity(const global Parameters* parameters
                           ,const global Particle* particles
                           ,const global ParticlePosition* sortedParticleToCell
                           ,const global GridCellOffset* gridCellOffsets
                           ,int numParticles
+                          ,const global float4* curl
                           ,int cellsX
                           ,int cellsY
                           ,int cellsZ
                           ,float3 minExtent
-                          ,float3 maxExtent)
+                          ,float3 maxExtent
+                          ,global float4* extForces)
 {
     int id = get_global_id(0);
-
     
+    // Curl force for particle i:
+    float4 omegaGradient = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    forAllNeighbors(parameters
+                    ,particles
+                    ,sortedParticleToCell
+                    ,gridCellOffsets
+                    ,numParticles
+                    ,cellsX
+                    ,cellsY
+                    ,cellsZ
+                    ,minExtent
+                    ,maxExtent
+                    ,id
+                    ,(void*)curl
+                    ,callback_Vorticity_i
+                    ,(void*)&omegaGradient);
+    
+    float n = length(omegaGradient);
+    float4 N = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    if (n > EPSILON) {
+        N = normalize(omegaGradient);
+    }
+    
+    float4 f_curl = parameters->relaxation * cross(N, curl[id]);
 }
 
 /**

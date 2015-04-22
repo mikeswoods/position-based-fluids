@@ -188,6 +188,10 @@ void Simulation::initialize()
     this->renderPos.initFromGLObject(this->particleVertices.getVertId(), this->numParticles);
 #endif
     
+    // Accumulated forces acting on the i-th particles
+
+    this->extForces.initBuffer(this->numParticles * sizeof(float4));
+    
     // particleToCell contains [0 .. this->numParticles - 1] entries, where
     // each ParticlePosition instance (index is not important) maps
     // a particle's index (ParticlePosition#particleIndex) to a spatial grid
@@ -231,10 +235,13 @@ void Simulation::initialize()
     // buffer:
     
     this->density.initBuffer(this->numParticles * sizeof(float));
+
     this->lambda.initBuffer(this->numParticles * sizeof(float));
+
     this->curl.initBuffer(this->numParticles * sizeof(float4));
     
     // For particle position correction in the solver:
+
     this->posDelta.initBuffer(this->numParticles * sizeof(float4));
     
     // Set up initial positions and velocities for the particles:
@@ -466,12 +473,14 @@ void Simulation::initializeKernels()
     this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
     this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
     this->openCL.kernel("applyVorticity")->setArg(4, this->numParticles);
-    this->openCL.kernel("applyVorticity")->setArg(5, cellsX);
-    this->openCL.kernel("applyVorticity")->setArg(6, cellsY);
-    this->openCL.kernel("applyVorticity")->setArg(7, cellsZ);
-    this->openCL.kernel("applyVorticity")->setArg(8, minExt);
-    this->openCL.kernel("applyVorticity")->setArg(9, maxExt);
-
+    this->openCL.kernel("applyVorticity")->setArg(5, this->curl);
+    this->openCL.kernel("applyVorticity")->setArg(6, cellsX);
+    this->openCL.kernel("applyVorticity")->setArg(7, cellsY);
+    this->openCL.kernel("applyVorticity")->setArg(8, cellsZ);
+    this->openCL.kernel("applyVorticity")->setArg(9, minExt);
+    this->openCL.kernel("applyVorticity")->setArg(10, maxExt);
+    this->openCL.kernel("applyVorticity")->setArg(11, this->extForces);
+    
     // KERNEL :: applyXSPHViscosity
     this->openCL.loadKernel("applyXSPHViscosity");
     this->openCL.kernel("applyXSPHViscosity")->setArg(0, this->parameterBuffer);
@@ -592,7 +601,7 @@ void Simulation::step()
 
     this->updateVelocity();
 
-    //this->applyVorticityConfinement();
+    this->applyVorticityConfinement();
 
     this->applyXSPHViscosity();
 
@@ -920,7 +929,7 @@ void Simulation::applyVorticityConfinement()
     this->openCL.kernel("computeCurl")->setArg(8, this->bounds.getMinExtent());
     this->openCL.kernel("computeCurl")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("computeCurl")->run1D(this->numParticles);
-    
+
     this->openCL.kernel("applyVorticity")->setArg(8, this->bounds.getMinExtent());
     this->openCL.kernel("applyVorticity")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("applyVorticity")->run1D(this->numParticles);

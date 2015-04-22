@@ -51,8 +51,8 @@ void ofApp::setup()
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
 
-    int numParticles = 150;
-    Parameters parameters = Constants::FOR_RADIUS_0_25;
+    int numParticles = 25;
+    Parameters parameters = Constants::FOR_RADIUS_0_5;
 
     ofSetVerticalSync(true);
 
