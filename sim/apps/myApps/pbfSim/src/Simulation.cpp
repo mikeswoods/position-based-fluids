@@ -474,48 +474,22 @@ void Simulation::initializeKernels()
     this->openCL.kernel("computeCurl")->setArg(9, maxExt);
     this->openCL.kernel("computeCurl")->setArg(10, this->curl);
     
-    // KERNEL :: applyVorticity
-
-    this->openCL.loadKernel("applyVorticity");
-    this->openCL.kernel("applyVorticity")->setArg(0, this->parameterBuffer);
-    this->openCL.kernel("applyVorticity")->setArg(1, this->particles);
-    this->openCL.kernel("applyVorticity")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("applyVorticity")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("applyVorticity")->setArg(4, this->numParticles);
-    this->openCL.kernel("applyVorticity")->setArg(5, this->curl);
-    this->openCL.kernel("applyVorticity")->setArg(6, cellsX);
-    this->openCL.kernel("applyVorticity")->setArg(7, cellsY);
-    this->openCL.kernel("applyVorticity")->setArg(8, cellsZ);
-    this->openCL.kernel("applyVorticity")->setArg(9, minExt);
-    this->openCL.kernel("applyVorticity")->setArg(10, maxExt);
-    this->openCL.kernel("applyVorticity")->setArg(11, this->extForces);
-    
-    // KERNEL :: applyXSPHViscosity
-
-    this->openCL.loadKernel("applyXSPHViscosity");
-    this->openCL.kernel("applyXSPHViscosity")->setArg(0, this->parameterBuffer);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(1, this->particles);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(4, this->numParticles);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(5, cellsX);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(6, cellsY);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(7, cellsZ);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(8, minExt);
-    this->openCL.kernel("applyXSPHViscosity")->setArg(9, maxExt);
-
-    // KERNEL ::  updateVelocity
-
-    this->openCL.loadKernel("updateVelocity");
-    this->openCL.kernel("updateVelocity")->setArg(0, this->particles);
-    this->openCL.kernel("updateVelocity")->setArg(1, this->dt);
-    
     // KERNEL ::  updatePosition
-
+    
     this->openCL.loadKernel("updatePosition");
-    this->openCL.kernel("updatePosition")->setArg(0, this->particles);
-    this->openCL.kernel("updatePosition")->setArg(1, this->renderPos);
-    this->openCL.kernel("updatePosition")->setArg(2, this->dt);
+    this->openCL.kernel("updatePosition")->setArg(0, this->parameterBuffer);
+    this->openCL.kernel("updatePosition")->setArg(1, this->dt);
+    this->openCL.kernel("updatePosition")->setArg(2, this->particles);
+    this->openCL.kernel("updatePosition")->setArg(3, this->sortedParticleToCell);
+    this->openCL.kernel("updatePosition")->setArg(4, this->gridCellOffsets);
+    this->openCL.kernel("updatePosition")->setArg(5, this->numParticles);
+    this->openCL.kernel("updatePosition")->setArg(6, this->curl);
+    this->openCL.kernel("updatePosition")->setArg(7, cellsX);
+    this->openCL.kernel("updatePosition")->setArg(8, cellsY);
+    this->openCL.kernel("updatePosition")->setArg(9, cellsZ);
+    this->openCL.kernel("updatePosition")->setArg(10, minExt);
+    this->openCL.kernel("updatePosition")->setArg(11, maxExt);
+    this->openCL.kernel("updatePosition")->setArg(12, this->renderPos);
 }
 
 /******************************************************************************/
@@ -606,17 +580,11 @@ void Simulation::step()
 
         //this->handleCollisions();
         
-        this->updatePositionDelta();
+        this->updatePositionDelta(); // See (17)
     }
 
-    this->updateVelocity();
-
-    this->applyVorticityConfinement();
-
-    this->applyXSPHViscosity();
-
-    this->updatePosition();
-
+    this->updatePosition(); // See (20) - (24)
+    
     // Make sure the OpenCL work queue is empty before proceeding. This will
     // block until all the stuff in GPU-land is done before moving forward
     // and reading the results of the work we did on the GPU back into
@@ -909,53 +877,19 @@ void Simulation::handleCollisions()
 }
 
 /**
- * Updates the actual, final velocity of the particles in the current 
- * simulation step
- *
- * @see kernels/Simulation.cl (updateVelocity) for details
- */
-void Simulation::updateVelocity()
-{
-    this->openCL.kernel("updateVelocity")->run1D(this->numParticles);
-}
-
-/**
- * Applies the vorticity confinement force
- *
- * @see kernels/Simulation.cl (applyVorticity) for details
- */
-void Simulation::applyVorticityConfinement()
-{
-    this->openCL.kernel("computeCurl")->setArg(8, this->bounds.getMinExtent());
-    this->openCL.kernel("computeCurl")->setArg(9, this->bounds.getMaxExtent());
-    this->openCL.kernel("computeCurl")->run1D(this->numParticles);
-
-    this->openCL.kernel("applyVorticity")->setArg(9, this->bounds.getMinExtent());
-    this->openCL.kernel("applyVorticity")->setArg(10, this->bounds.getMaxExtent());
-    this->openCL.kernel("applyVorticity")->run1D(this->numParticles);
-}
-
-/**
- * Applies XSPH viscosity
- *
- * @see kernels/Simulation.cl (applyXSPHViscosity) for details
- */
-void Simulation::applyXSPHViscosity()
-{
-    this->openCL.kernel("applyXSPHViscosity")->setArg(8, this->bounds.getMinExtent());
-    this->openCL.kernel("applyXSPHViscosity")->setArg(9, this->bounds.getMaxExtent());
-    this->openCL.kernel("applyXSPHViscosity")->run1D(this->numParticles);
-}
-
-/**
- * Updates the actual, final position of the particles in the current 
+ * Updates the actual, final position of the particles in the current
  * simulation step
  *
  * @see kernels/Simulation.cl (updatePosition) for details
  */
 void Simulation::updatePosition()
 {
-    this->openCL.kernel("updatePosition")->setArg(1, this->renderPos);
+    this->openCL.kernel("computeCurl")->setArg(8, this->bounds.getMinExtent());
+    this->openCL.kernel("computeCurl")->setArg(9, this->bounds.getMaxExtent());
+    this->openCL.kernel("computeCurl")->run1D(this->numParticles);
+
+    this->openCL.kernel("updatePosition")->setArg(10, this->bounds.getMinExtent());
+    this->openCL.kernel("updatePosition")->setArg(11, this->bounds.getMaxExtent());
     this->openCL.kernel("updatePosition")->run1D(this->numParticles);
 }
 

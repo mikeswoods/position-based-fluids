@@ -24,8 +24,6 @@ typedef struct {
     float4 posStar;  // Predicted particle position (x*)
 
     float4 vel;      // Current particle velocity (v)
-    
-    float4 velDelta; // Velocity delta from XSPH viscosity (v*), 4 words
 
     /**
      * VERY IMPORTANT: This is needed so that the struct's size is aligned 
@@ -38,7 +36,7 @@ typedef struct {
      *
      * See http://en.wikipedia.org/wiki/Data_structure_alignment
      */
-    //float  __padding[2]; // Padding
+    //float4  __padding[1]; // Padding
 
 } Particle;
 
@@ -214,9 +212,6 @@ class Simulation
         void calculatePositionDelta();
         void updatePositionDelta();
         void handleCollisions();
-        void updateVelocity();
-        void applyXSPHViscosity();
-        void applyVorticityConfinement();
         void updatePosition();
     
         // Drawing-related functions:
