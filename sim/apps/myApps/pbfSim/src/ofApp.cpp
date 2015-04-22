@@ -135,6 +135,8 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
     hotkeys.push_back("'s' = step");
     hotkeys.push_back("'p' or space = toggle pause");
     hotkeys.push_back("'r' = reset");
+    hotkeys.push_back("'z' = reset simulation bounds");
+    hotkeys.push_back("'a' = toggle bounds animation");
     hotkeys.push_back("'g' = toggle grid");
     hotkeys.push_back("'d' = toggle visual debugging");
     
@@ -217,19 +219,25 @@ void ofApp::keyPressed(int key)
                 this->simulation->toggleBoundsAnimation();
             }
             break;
+            // Reset bounds
+            case 'z':
+            {
+                this->simulation->resetBounds();
+            }
+            break;
         // Pause
         case 'p':
         case ' ':
             {
                 this->togglePaused();
             }
-        break;
+            break;
         // Step
         case 's':
             {
                 this->advanceStep = true;
             }
-        break;
+            break;
         // Reset
         case 'r':
             {

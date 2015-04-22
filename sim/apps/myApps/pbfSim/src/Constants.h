@@ -40,7 +40,10 @@ const int DEFAULT_NUM_PARTICLES = 5000;
 /**
  * Default time step = 1/30 of a second
  */
-const float DEFAULT_DT = 0.033f;
+//const float DEFAULT_DT = 0.04166; // 1/24 s
+//const float DEFAULT_DT = 0.033f; // 1/30 s
+const float DEFAULT_DT = 0.025f; // 1/40 s
+//const float DEFAULT_DT = 0.0166f; // 1/60 s
 
 /**
  * Desired number of particles per cell in X. This value is used to 

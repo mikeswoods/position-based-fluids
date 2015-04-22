@@ -124,20 +124,6 @@ typedef struct {
     
 } GridCellOffset;
 
-// Used to carry context into the forAllNeighbors function when
-// computing the position delta
-
-typedef struct {
-    
-    float4 posDelta;              // Accumulated position delta
-    
-    const global float* lambda;   // A pointer to the lambda array with
-                                  // [0 .. numParticles - 1] indices
-    
-    const global float* __padding[3];
-    
-} _PositionDeltaContext;
-
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
@@ -172,42 +158,48 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
                                    ,const global Particle* p_i
                                    ,int j
                                    ,const global Particle* p_j
-                                   ,void* data);
+                                   ,void* dataArray
+                                   ,void* accum);
 
  void callback_SPHGradient_i(const global Parameters* parameters
                             ,int i
                             ,const global Particle* p_i
                             ,int j
                             ,const global Particle* p_j
-                            ,void* data);
+                            ,void* dataArray
+                            ,void* accum);
 
  void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
                                          ,int i
                                          ,const global Particle* p_i
                                          ,int j
                                          ,const global Particle* p_j
-                                         ,void* data);
+                                         ,void* dataArray
+                                         ,void* accum);
 
  void callback_PositionDelta_i(const global Parameters* parameters
                               ,int i
                               ,const global Particle* p_i
                               ,int j
                               ,const global Particle* p_j
-                              ,void* data);
+                              ,void* dataArray
+                              ,void* accum);
 
 void callback_Curl_i(const global Parameters* parameters
                     ,int i
                     ,const global Particle* p_i
                     ,int j
                     ,const global Particle* p_j
-                    ,void* data);
+                    ,void* dataArray
+                    ,void* accum);
 
 void callback_XPSHViscosity_i(const global Parameters* parameters
                              ,int i
                              ,const global Particle* p_i
                              ,int j
                              ,const global Particle* p_j
-                             ,void* data);
+                             ,void* dataArray
+                             ,void* accum);
 
 global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
                               ,const global GridCellOffset* gridCellOffsets
@@ -228,8 +220,15 @@ global void forAllNeighbors(const global Parameters* parameters
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
-                           ,void (*callback)(const global Parameters*, int, const global Particle*, int, const global Particle*, void* accum)
-                           ,void* accum);
+                           ,void* dataArray
+                           ,void (*callback)(const global Parameters*
+                                            ,int
+                                            ,const global Particle*
+                                            ,int
+                                            ,const global Particle*
+                                            ,void* dataArray
+                                            ,void* currentAccum)
+                           ,void* initialAccum);
 
 /*******************************************************************************
  * Utility functions
@@ -457,8 +456,15 @@ global void forAllNeighbors(const global Parameters* parameters
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
-                           ,void (*callback)(const global Parameters*, int, const global Particle*, int, const global Particle*, void* accum)
-                           ,void* accum)
+                           ,void* dataArray
+                           ,void (*callback)(const global Parameters*
+                                            ,int
+                                            ,const global Particle*
+                                            ,int
+                                            ,const global Particle*
+                                            ,void* dataArray
+                                            ,void* currentAccum)
+                           ,void* initialAccum)
 {
     // Sanity check:
     if (particleId < 0 || particleId >= numParticles) {
@@ -498,7 +504,7 @@ global void forAllNeighbors(const global Parameters* parameters
                 return;
             }
             
-            callback(particleId, p_i, j, p_j, accum);
+            callback(parameters, particleId, p_i, j, p_j, dataArray, initialAccum);
 
             neighborsSeen++;
         }
@@ -574,7 +580,7 @@ global void forAllNeighbors(const global Parameters* parameters
                         // (p_i, p_j), along with their respective indices,
                         // and accumulate the result into accum:
 
-                        callback(parameters, particleId, p_i, J, p_j, accum);
+                        callback(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
                     
                         neighborsSeen++;
                     }
@@ -681,19 +687,21 @@ float4 spiky(float4 r, float h)
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
- * @param [in] void* The data to update (generally a float of accumulated densities)
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
 void callback_SPHDensityEstimator_i(const global Parameters* parameters
                                    ,int i
                                    ,const global Particle* p_i
                                    ,int j
                                    ,const global Particle* p_j
-                                   ,void* data)
+                                   ,void* dataArray
+                                   ,void* accum)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
     
-    float* accumDensity = (float*)data;
+    float* accumDensity = (float*)accum;
 
     (*accumDensity) += poly6(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
@@ -707,19 +715,21 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
- * @param [in] void* The data to update (generally a float4 gradient vector)
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
 void callback_SPHGradient_i(const global Parameters* parameters
                            ,int i
                            ,const global Particle* p_i
                            ,int j
                            ,const global Particle* p_j
-                           ,void* data)
+                           ,void* dataArray
+                           ,void* accum)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
 
-    float4* gradVector = (float4*)data;
+    float4* gradVector = (float4*)accum;
 
     (*gradVector) += spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
 }
@@ -733,19 +743,21 @@ void callback_SPHGradient_i(const global Parameters* parameters
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
- * @param [in] void* The data to update (generally a float4 gradient vector)
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
 void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
                                         ,int i
                                         ,const global Particle* p_i
                                         ,int j
                                         ,const global Particle* p_j
-                                        ,void* data)
+                                        ,void* dataArray
+                                        ,void* accum)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
     
-    float* totalGradLength = (float*)data;
+    float* totalGradLength = (float*)accum;
 
     float4 gradVector      = (INV_REST_DENSITY * -spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius));
     float gradVectorLength = length(gradVector);
@@ -762,22 +774,26 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
  void callback_PositionDelta_i(const global Parameters* parameters
                               ,int i
                               ,const global Particle* p_i
                               ,int j
                               ,const global Particle* p_j
-                              ,void* data)
+                              ,void* dataArray
+                              ,void* accum)
 {
     // Cast the void pointer to the type we expect, so we can update the
     // variable accordingly:
     
-    _PositionDeltaContext* context = (_PositionDeltaContext*)data;
-    
-    float lambda_i = context->lambda[i];
-    float lambda_j = context->lambda[j];
-    
+    float* lambda    = (float*)dataArray;
+    float4* posDelta = (float4*)accum;
+
+    float lambda_i = lambda[i];
+    float lambda_j = lambda[j];
+
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
@@ -785,13 +801,12 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     float4 r        = p_i->posStar - p_j->posStar;
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    float d         = poly6_scalar(deltaQ, h);
+    //float d         = poly6_scalar(deltaQ, h);
+    float d         = poly6_scalar(0.0f, h);
     float nd        = d <= EPSILON ? 0.0f : n / d;
     float sCorr     = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
-    
-    //printf("sCorr = %f\n", sCorr);
-    
-    context->posDelta += ((lambda_i + lambda_j + sCorr) * gradient);
+
+    (*posDelta) += ((lambda_i + lambda_j + sCorr) * gradient);
 }
 
 /**
@@ -803,15 +818,18 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
 void callback_Curl_i(const global Parameters* parameters
                     ,int i
                     ,const global Particle* p_i
                     ,int j
                     ,const global Particle* p_j
-                    ,void* data)
+                    ,void* dataArray
+                    ,void* accum)
 {
-    float4* omega_i = (float4*)data;
+    float4* omega_i = (float4*)accum;
 
     float4 v_ij        = p_i->vel - p_j->vel;
     float4 gradient_ij = spiky(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
@@ -828,15 +846,18 @@ void callback_Curl_i(const global Parameters* parameters
  * @param [in] Particle* p_i The i-th (fixed) particle, particle p_i
  * @param [in] int j The varying index of particle j
  * @param [in] Particle* p_j The j-th (varying) particle, particle p_j
+ * @param [in] void* dataArray An auxiliary readonly source data array to access
+ * @param [in] void* accum An accumulator value to update
  */
 void callback_XPSHViscosity_i(const global Parameters* parameters
                              ,int i
                              ,const global Particle* p_i
                              ,int j
                              ,const global Particle* p_j
-                             ,void* data)
+                             ,void* dataArray
+                             ,void* accum)
 {
-    float4* v_ij_sum = (float4*)data;
+    float4* v_ij_sum = (float4*)accum;
     
     float4 v_ij = p_i->vel - p_j->vel;
     float W_ij  = poly6(p_i->posStar - p_j->posStar, parameters->smoothingRadius);
@@ -1178,6 +1199,7 @@ void kernel estimateDensity(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,(void*)particles
                    ,callback_SPHDensityEstimator_i
                    ,(void*)&estDensity);
 
@@ -1257,6 +1279,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,(void*)particles
                    ,callback_SPHGradient_i
                    ,(void*)&gv_i);
     
@@ -1279,6 +1302,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,(void*)particles
                    ,callback_SquaredSPHGradientLength_j
                    ,(void*)&gv_sLengths);
     
@@ -1331,10 +1355,7 @@ kernel void computePositionDelta(const global Parameters* parameters
 {
     int id = get_global_id(0);
 
-    _PositionDeltaContext pd = { .posDelta = (float4)(0.0f, 0.0f, 0.0f, 1.0f),
-                                 .lambda = lambda };
-    
-    //printf("pressure N = %f\n", parameters->artificialPressureN);
+    float4 posDelta_i = (float4)(0.0f, 0.0f, 0.0f, 1.0f);
     
     forAllNeighbors(parameters
                    ,particles
@@ -1347,10 +1368,11 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,(void*)lambda
                    ,callback_PositionDelta_i
-                   ,(void*)&pd);
+                   ,(void*)&posDelta_i);
     
-    posDelta[id] = INV_REST_DENSITY * pd.posDelta;
+    posDelta[id] = INV_REST_DENSITY * posDelta_i;
 }
 
 /**
@@ -1473,6 +1495,7 @@ kernel void computeCurl(const global Parameters* parameters
                     ,minExtent
                     ,maxExtent
                     ,id
+                    ,(void*)particles
                     ,callback_Curl_i
                     ,(void*)&omega_i);
     
@@ -1561,6 +1584,7 @@ kernel void applyXSPHViscosity(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,(void*)particles
                    ,callback_XPSHViscosity_i
                    ,(void*)&v_i_sum);
 

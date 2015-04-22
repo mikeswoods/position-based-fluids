@@ -505,7 +505,8 @@ void Simulation::initializeKernels()
  */
 void Simulation::resetBounds()
 {
-    this->bounds = this->originalBounds;
+    this->animFrameNumber = 0;
+    this->bounds          = this->originalBounds;
 }
 
 /**
