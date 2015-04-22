@@ -365,19 +365,13 @@ void Simulation::initializeKernels()
     this->openCL.loadKernel("resetCellQuantities");
     this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
     this->openCL.kernel("resetCellQuantities")->setArg(1, this->gridCellOffsets);
-    
-    // KERNEL :: applyExternalForces
 
-    this->openCL.loadKernel("applyExternalForces");
-    this->openCL.kernel("applyExternalForces")->setArg(0, this->particles);
-    this->openCL.kernel("applyExternalForces")->setArg(1, this->extForces);
-    this->openCL.kernel("applyExternalForces")->setArg(2, this->dt);
-    
     // KERNEL :: predictPosition
 
     this->openCL.loadKernel("predictPosition");
     this->openCL.kernel("predictPosition")->setArg(0, this->particles);
-    this->openCL.kernel("predictPosition")->setArg(1, this->dt);
+    this->openCL.kernel("predictPosition")->setArg(1, this->extForces);
+    this->openCL.kernel("predictPosition")->setArg(2, this->dt);
     
     // KERNEL :: discretizeParticlePositions
 
@@ -597,8 +591,6 @@ void Simulation::step()
     // in the slides
     // "￼FAST FIXED-RADIUS NEAREST NEIGHBORS: INTERACTIVE MILLION-PARTICLE FLUID"
     // that uses counting sort as an alternative to radix sort
-    
-    this->applyExternalForces();
 
     this->predictPositions();
 
@@ -816,16 +808,6 @@ void Simulation::resetQuantities()
 {
     this->openCL.kernel("resetParticleQuantities")->run1D(this->numParticles);
     this->openCL.kernel("resetCellQuantities")->run1D(this->numCells);
-}
-
-/**
- * Applies external forces to the particles in the simulation.
- *
- * @see kernels/Simulation.cl (applyExternalForces) for details
- */
-void Simulation::applyExternalForces()
-{
-    this->openCL.kernel("applyExternalForces")->run1D(this->numParticles);
 }
 
 /**

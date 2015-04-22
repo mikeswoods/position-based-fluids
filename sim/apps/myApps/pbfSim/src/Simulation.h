@@ -208,7 +208,6 @@ class Simulation
     
         // Simulation state-related functions:
         void resetQuantities();
-        void applyExternalForces();
         void predictPositions();
         void groupParticlesByCell();
         void calculateDensity();

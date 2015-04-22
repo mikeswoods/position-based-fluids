@@ -950,60 +950,39 @@ kernel void resetCellQuantities(global int* cellHistogram
 }
 
 /**
- * For all particles p_i in particles, this kernel applies external forces to the
- * velocity of p_i
+ * This kernel computes lines (1) - (4) of the PBF algorithm, as described
+ * in the paper, specifically:
  *
- * Currently, only applies gravity to the y component of the velocity.
- * Additional forces may be added later like wind and other forms of
- * turbulence, etc.
- *
- *   v_i = v_i + dt + f_external(x_i)
+ * (1) for all particles i do
+ * (2)   apply forces     v_i  <- v_i + \delta t * f_ext(x_i)
+ * (3)   predict position x*_i <- x_i + \delta t * v_i
+ * (4) end for
  *
  * @param [in/out] Particle* particles The particles to update
  * @param [in/out] float4* extForces Accumulated external forces acting on
  *                 particle p_i
  * @param [in]     float dt The timestep
  */
-kernel void applyExternalForces(global Particle* particles
-                               ,global float4* extForces
-                               ,float dt)
-{
-    int id = get_global_id(0);
-    global Particle *p = &particles[id];
-    
-    // Add gravity to the accumulated force:
-
-    extForces[id].y += -G;
-    
-    // Apply the accumulated external forces to the particle's velocity:
-
-    p->vel += (dt * extForces[id]);
-    
-    // Zero out the accumulated external forces on the particle:
-    
-    extForces[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    
-    // Apply the force of gravity along the y-axis:
-    //p->vel.y += (dt * -G);
-}
-
-/**
- * For all particles p_i in particles, this kernel updates the predicted 
- * position of p_i using an explicit Euler step like so:
- *
- * x_i = x_i + (dt * v_i), where x_i is the position of p_i and v_i is
- * the velocity of p_i
- *
- * @param [in/out] Particle* particles The particles to update
- * @param [in]     float dt The timestep
- */
 kernel void predictPosition(global Particle* particles
+                           ,global float4* extForces
                            ,float dt)
 {
     int id = get_global_id(0);
     global Particle *p = &particles[id];
+    
+    extForces[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+    // Add gravity to the accumulated force:
+    
+    extForces[id].y += -G;
+    
+    // Apply the accumulated external forces to the particle's velocity:
+    
+    p->vel += (dt * extForces[id]);
 
-    // Explicit Euler step on the predicted particle position posStar (x*)
+    // Apply an explicit Euler step on the particle's current position to
+    // compute the predicted position, posStar (x*):
+
     p->posStar = p->pos + (dt * p->vel);
 }
 
