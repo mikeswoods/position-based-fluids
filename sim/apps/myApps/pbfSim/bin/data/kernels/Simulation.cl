@@ -1209,12 +1209,19 @@ kernel void countSortParticles(const global ParticlePosition* particleToCell
 }
 
 /**
- * From the Macklin & Muller paper: SPH density estimation
+ * For all particles p_i in particles, this kernel computes the density
+ * for p_i using SPH density estimation, as referenced in the PBF paper.
+ *
+ * Detail-wise, he SPH density estimator calculates 
  * 
- * The SPH density estimator calculates \rho_i = \sum_j * m_j * W(p_i - p_j, h),
+ * \rho_i = \sum_j * m_j * W(p_i - p_j, h),
+ *
  * where \rho_i is the density of the i-th particle, m_j is the mass of the 
  * j-th particle, p_i - p_j is the position delta between the particles p_i and
  * p_j and h is the smoothing radius
+ *
+ * The density for each particle p_i is a necessary prerequisite needed to
+ * compute the \lambda value for each particle
  *
  * @param [in]  Parameters* parameters
  * @param [in]  Particle* particles
@@ -1284,6 +1291,9 @@ void kernel estimateDensity(const global Parameters* parameters
  *   2) \rho_0 is the rest density, and
  *
  *   3) \rho_i is the density for particle p_i
+ *
+ * Specifically, this kernel computes lines (9) - (11) as part of the PBF 
+ * algorithm
  *
  * NOTE:
  * This corresponds to Figure (1) in the section "Enforcing Incompressibility"
@@ -1386,6 +1396,8 @@ kernel void computeLambda(const global Parameters* parameters
  * For all particles p_i in particles, this kernel computes the position
  * delta of p_i, p_i*
  *
+ * Specifically, this kernel computes line (13) as part of the PBF algorithm
+ *
  * @param [in]  Parameters* parameters Simulation parameters
  * @param [in]  const Particle* particles The particles in the simulation
  * @param [in]  const ParticlePosition* sortedParticleToCell
@@ -1449,8 +1461,11 @@ kernel void computePositionDelta(const global Parameters* parameters
 }
 
 /**
- * Tests for collisions between particles and objects/bounds and projects
- * the positions of the particles accordingly
+ * For all particles p_i in particles, this kernel tests for collisions between 
+ * particles and objects/bounds and projects the positions of the particles 
+ * accordingly
+ *
+ * Specifically, this kernel computes line (14) as part of the PBF algorithm
  *
  * @param [in]     Parameters* parameters Simulation parameters
  * @param [in/out] const Particle* particles The particles in the simulation
@@ -1471,6 +1486,9 @@ kernel void resolveCollisions(const global Parameters* parameters
  * For all particles p_i in particles, this kernel applies the computed 
  * position delta to the predicted positions p_i.posStar.(x|y|z), e.g. "x_i*"
  * in the Position Based Fluids paper
+ *
+ * Specifically, this kernel computes line (16) - (18) as part of the PBF 
+ * algorithm
  *
  * @param [in]  float4* posDelta The predicted delta position
  * @param [out] Particle* particles The particles in the simulation to be updated
