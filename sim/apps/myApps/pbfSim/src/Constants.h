@@ -72,11 +72,10 @@ const float OPENGL_POINT_PARTICLE_RADIUS = 25.0f;
  * Parameters for a simulation with particles of radius 0.5 units
  */
 const Parameters FOR_RADIUS_0_5 = Parameters(0.5f    // Particle radius
-                                            ,1.0f    // Particle mass
                                             ,1.25f   // Smoothing radius
                                             ,0.0033f // Relaxation
-                                            ,0.001f  // Artifical Pressure K
-                                            ,5.0f    // Artifical Pressure N
+                                            ,0.01f  // Artifical Pressure K
+                                            ,4.0f    // Artifical Pressure N
                                             ,0.1f    // Vorticity epsilon
                                             ,0.01f); // Viscosity coefficient
 
@@ -84,7 +83,6 @@ const Parameters FOR_RADIUS_0_5 = Parameters(0.5f    // Particle radius
  * Parameters for a simulation with particles of radius 0.25 units
  */
 const Parameters FOR_RADIUS_0_25 = Parameters(0.25f   // Particle radius
-                                             ,1.0f    // Particle mass
                                              ,0.5f    // Smoothing radius
                                              ,0.1f    // Relaxation
                                              ,0.001f  // Artifical Pressure K

@@ -49,20 +49,20 @@ const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
 typedef struct {
     
     float particleRadius;      // 1. Particle radius
+
+    float smoothingRadius;     // 2. Kernel smoothing radius
     
-    float particleMass;        // 2. Particle mass
+    float relaxation;          // 3. Pressure relaxation coefficient (epsilon)
     
-    float smoothingRadius;     // 3. Kernel smoothing radius
+    float artificialPressureK; // 4. Artificial pressure coefficient K
     
-    float relaxation;          // 4. Pressure relaxation coefficient (epsilon)
+    float artificialPressureN; // 5. Artificial pressure coefficient N
     
-    float artificialPressureK; // 5. Artificial pressure coefficient K
+    float epsilonVorticity;    // 6. Vorticity coefficient
     
-    float artificialPressureN; // 6. Artificial pressure coefficient N
+    float viscosityCoeff;      // 7. Viscosity coefficient
     
-    float epsilonVorticity;    // 7. Vorticity coefficient
-    
-    float viscosityCoeff;      // 8. Viscosity coefficient
+    float __padding[1];
     
 } Parameters;
 

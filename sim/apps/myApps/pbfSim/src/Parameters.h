@@ -16,9 +16,7 @@
 typedef struct Parameters
 {
     float particleRadius;      // Particle radius
-    
-    float particleMass;        // Particle mass
-    
+
     float smoothingRadius;     // Kernel smoothing radius
     
     float relaxation;          // Pressure relaxation coefficient (epsilon), as
@@ -34,7 +32,6 @@ typedef struct Parameters
 
     Parameters();
     Parameters(float _particleRadius
-              ,float _particleMass
               ,float _smoothingRadius
               ,float _relaxation
               ,float _artificialPressureK
