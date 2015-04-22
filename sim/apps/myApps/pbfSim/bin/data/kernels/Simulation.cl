@@ -870,9 +870,9 @@ void callback_Vorticity_i(const global Parameters* parameters
     float4* omegaGradient = (float4*)accum;
     
     float4 r = p_i->posStar - p_j->posStar;
-    float4 omegaBar = length(curl[i] - curl[j]);
-    
-    (*omegaGradient) += (omegaBar / r);
+    float omegaBar = length(curl[i] - curl[j]);
+
+    (*omegaGradient) += (float4)(omegaBar / r.x, omegaBar / r.y, omegaBar / r.z, 0.0f);
 }
 
 /**
@@ -983,8 +983,8 @@ kernel void applyExternalForces(global Particle* particles
     
     extForces[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     
-//    // Apply the force of gravity along the y-axis:
-//    p->vel.y += (dt * -G);
+    // Apply the force of gravity along the y-axis:
+    //p->vel.y += (dt * -G);
 }
 
 /**
@@ -1578,7 +1578,7 @@ kernel void computeCurl(const global Parameters* parameters
  *              particle p_i
  */
 kernel void applyVorticity(const global Parameters* parameters
-                          ,const global Particle* particles
+                          ,global Particle* particles
                           ,const global ParticlePosition* sortedParticleToCell
                           ,const global GridCellOffset* gridCellOffsets
                           ,int numParticles
@@ -1591,6 +1591,7 @@ kernel void applyVorticity(const global Parameters* parameters
                           ,global float4* extForces)
 {
     int id = get_global_id(0);
+    global Particle *p = &particles[id];
     
     // Curl force for particle i:
     float4 omegaGradient = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1616,8 +1617,12 @@ kernel void applyVorticity(const global Parameters* parameters
     if (n > EPSILON) {
         N = normalize(omegaGradient);
     }
-    
+
     float4 f_curl = parameters->vorticityEpsilon * cross(N, curl[id]);
+    
+    // Add the external vorticity force for the given particle, p_i:
+    
+    extForces[id] += f_curl;
 }
 
 /**

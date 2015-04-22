@@ -948,8 +948,8 @@ void Simulation::applyVorticityConfinement()
     this->openCL.kernel("computeCurl")->setArg(9, this->bounds.getMaxExtent());
     this->openCL.kernel("computeCurl")->run1D(this->numParticles);
 
-    this->openCL.kernel("applyVorticity")->setArg(8, this->bounds.getMinExtent());
-    this->openCL.kernel("applyVorticity")->setArg(9, this->bounds.getMaxExtent());
+    this->openCL.kernel("applyVorticity")->setArg(9, this->bounds.getMinExtent());
+    this->openCL.kernel("applyVorticity")->setArg(10, this->bounds.getMaxExtent());
     this->openCL.kernel("applyVorticity")->run1D(this->numParticles);
 }
 
