@@ -22,7 +22,7 @@ Parameters::Parameters() :
     relaxation(0.005f),
     artificialPressureK(0.001f),
     artificialPressureN(4.0f),
-    epsilonVorticity(0.1f),
+    vorticityEpsilon(0.1f),
     viscosityCoeff(0.01f)
 {
 
@@ -33,14 +33,14 @@ Parameters::Parameters(float _particleRadius
                       ,float _relaxation
                       ,float _artificialPressureK
                       ,float _artificialPressureN
-                      ,float _epsilonVorticity
+                      ,float _vorticityEpsilon
                       ,float _viscosityCoeff) :
     particleRadius(_particleRadius),
     smoothingRadius(_smoothingRadius),
     relaxation(_relaxation),
     artificialPressureK(_artificialPressureK),
     artificialPressureN(_artificialPressureN),
-    epsilonVorticity(_epsilonVorticity),
+    vorticityEpsilon(_vorticityEpsilon),
     viscosityCoeff(_viscosityCoeff)
 {
     
@@ -52,7 +52,7 @@ Parameters::Parameters(const Parameters& other) :
     relaxation(other.relaxation),
     artificialPressureK(other.artificialPressureK),
     artificialPressureN(other.artificialPressureN),
-    epsilonVorticity(other.epsilonVorticity),
+    vorticityEpsilon(other.vorticityEpsilon),
     viscosityCoeff(other.viscosityCoeff)
 {
     
@@ -66,7 +66,7 @@ ostream& operator<<(ostream& os, Parameters p)
     << "  relaxation:\t"          << p.relaxation          << endl
     << "  artificialPressureK:\t" << p.artificialPressureK << endl
     << "  artificialPressureN:\t" << p.artificialPressureN << endl
-    << "  epsilonVorticity:\t"    << p.epsilonVorticity    << endl
+    << "  vorticityEpsilon:\t"    << p.vorticityEpsilon    << endl
     << "  viscosityCoeff:\t"      << p.viscosityCoeff    << endl
     << "}";
     return os;

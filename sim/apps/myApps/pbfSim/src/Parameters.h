@@ -26,7 +26,7 @@ typedef struct Parameters
     
     float artificialPressureN;   // Artificial pressure coefficient N
     
-    float epsilonVorticity;    // Vorticity coefficient
+    float vorticityEpsilon;    // Vorticity coefficient
 
     float viscosityCoeff;      // Viscosity coefficient
 
@@ -36,7 +36,7 @@ typedef struct Parameters
               ,float _relaxation
               ,float _artificialPressureK
               ,float _artificialPressureN
-              ,float _epsilonVorticity
+              ,float _vorticityEpsilon
               ,float _viscosityCoeff);
     Parameters(const Parameters& other);
     

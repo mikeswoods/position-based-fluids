@@ -58,7 +58,7 @@ typedef struct {
     
     float artificialPressureN; // 5. Artificial pressure coefficient N
     
-    float epsilonVorticity;    // 6. Vorticity coefficient
+    float vorticityEpsilon;    // 6. Vorticity coefficient
     
     float viscosityCoeff;      // 7. Viscosity coefficient
     
@@ -960,16 +960,31 @@ kernel void resetCellQuantities(global int* cellHistogram
  *   v_i = v_i + dt + f_external(x_i)
  *
  * @param [in/out] Particle* particles The particles to update
+ * @param [in/out] float4* extForces Accumulated external forces acting on
+ *                 particle p_i
  * @param [in]     float dt The timestep
  */
 kernel void applyExternalForces(global Particle* particles
+                               ,global float4* extForces
                                ,float dt)
 {
     int id = get_global_id(0);
     global Particle *p = &particles[id];
     
-    // Apply the force of gravity along the y-axis:
-    p->vel.y += (dt * -G);
+    // Add gravity to the accumulated force:
+
+    extForces[id].y += -G;
+    
+    // Apply the accumulated external forces to the particle's velocity:
+
+    p->vel += (dt * extForces[id]);
+    
+    // Zero out the accumulated external forces on the particle:
+    
+    extForces[id] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    
+//    // Apply the force of gravity along the y-axis:
+//    p->vel.y += (dt * -G);
 }
 
 /**
@@ -1602,7 +1617,7 @@ kernel void applyVorticity(const global Parameters* parameters
         N = normalize(omegaGradient);
     }
     
-    float4 f_curl = parameters->relaxation * cross(N, curl[id]);
+    float4 f_curl = parameters->vorticityEpsilon * cross(N, curl[id]);
 }
 
 /**
