@@ -172,8 +172,12 @@ class Simulation
         msa::OpenCLBuffer particleToCell;
     
         // A cell count histogram used for particle neighbor finding
-        // - Buffer of int
+        // - Buffer of ints
         msa::OpenCLBuffer cellHistogram;
+    
+        // Used by counting sort as an auxiliary sort buffer
+        // - Buffer of ints
+        msa::OpenCLBuffer aux;
     
         // A sorted version of particleToCell, used to search for a given
         // particle's neighbors

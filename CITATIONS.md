@@ -12,3 +12,10 @@
 * Scaling point sprites with distance
 ** http://gamedev.stackexchange.com/a/54492
 ** Answered by "Will" http://gamedev.stackexchange.com/users/4129/will
+
+* OpenCL memory allocation: local vs. global
+** http://www.openclblog.com/2014/10/allocating-local-memory.html
+
+* A number of parallel sorting algorithms (selection, bitonic, merge) 
+  implemented in OpenCL
+** http://www.bealto.com/gpu-sorting.html

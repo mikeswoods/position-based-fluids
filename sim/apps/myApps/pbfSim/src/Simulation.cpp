@@ -57,6 +57,11 @@ Simulation::Simulation(msa::OpenCL& _openCL
     doDrawGrid(false),
     doVisualDebugging(false)
 {
+    // Given the number of particles, find the ideal number of cells per axis
+    // such that no cell contains more than 4 particles
+    
+    this->cellsPerAxis = this->findIdealParticleCount();
+    
     this->initialize();
 }
 
@@ -172,11 +177,6 @@ void Simulation::initialize()
     // Initialize a buffer to hold dynamic simulation related parameters:
     this->parameterBuffer.initBuffer(sizeof(Parameters));
     
-    // Given the number of particles, find the ideal number of cells per axis
-    // such that no cell contains more than 4 particles
-    
-    this->cellsPerAxis = this->findIdealParticleCount();
-    
     this->numCells =   static_cast<int>(this->cellsPerAxis.x)
                      * static_cast<int>(this->cellsPerAxis.y)
                      * static_cast<int>(this->cellsPerAxis.z);
@@ -237,7 +237,11 @@ void Simulation::initialize()
     // z = i + (j * GRIDWIDTH) + (k * GRIDWIDTH * GRIDHEIGHT)
 
     this->cellHistogram.initBuffer(this->numCells * sizeof(int));
-
+    
+    // Additional data buffers used by parallel counting sort:
+    
+    this->aux.initBuffer(this->numParticles * sizeof(ParticlePosition));
+    
     // The density/lambda/vorticity curl force values associated with each
     // particle. The i-th density corresponds to the i-th quantitity in each
     // buffer:
@@ -261,6 +265,7 @@ void Simulation::initialize()
         // Random position in the bounding box:
         p.pos.x = ofRandom(p1.x + radius, p2.x - radius);
         p.pos.y = ofRandom(p1.y + radius, 0.25f * (p2.y - radius));
+        //p.pos.y = ofRandom(p1.y + radius, p2.y - radius);
         p.pos.z = ofRandom(p1.z + radius, p2.z - radius);
         
         // No predicted position:
@@ -390,19 +395,27 @@ void Simulation::initializeKernels()
     this->openCL.kernel("discretizeParticlePositions")->setArg(5, cellsZ);
     this->openCL.kernel("discretizeParticlePositions")->setArg(6, minExt);
     this->openCL.kernel("discretizeParticlePositions")->setArg(7, maxExt);
-    
-    // KERNEL :: countSortParticles (sequential linear sort, O(n))
 
-    this->openCL.loadKernel("countSortParticles");
-    this->openCL.kernel("countSortParticles")->setArg(0, this->particleToCell);
-    this->openCL.kernel("countSortParticles")->setArg(1, this->cellHistogram);
-    this->openCL.kernel("countSortParticles")->setArg(2, this->sortedParticleToCell);
-    this->openCL.kernel("countSortParticles")->setArg(3, this->gridCellOffsets);
-    this->openCL.kernel("countSortParticles")->setArg(4, this->numParticles);
-    this->openCL.kernel("countSortParticles")->setArg(5, this->numCells);
-    this->openCL.kernel("countSortParticles")->setArg(6, cellsX);
-    this->openCL.kernel("countSortParticles")->setArg(7, cellsY);
-    this->openCL.kernel("countSortParticles")->setArg(8, cellsZ);
+    // KERNEL :: sort debug
+
+    this->openCL.loadKernel("sortDebug");
+    this->openCL.kernel("sortDebug")->setArg(0, this->sortedParticleToCell);
+    this->openCL.kernel("sortDebug")->setArg(1, this->numParticles);
+    
+    // KERNEL :: parallel sort
+    
+    this->openCL.loadKernel("sort");
+    this->openCL.kernel("sort")->setArg(0, this->particleToCell);
+    this->openCL.kernel("sort")->setArg(1, this->sortedParticleToCell);
+    //this->openCL.kernel("sort")->setArg(2, this->aux);
+
+    // KERNEL :: findParticleBins
+    
+    this->openCL.loadKernel("findParticleBins");
+    this->openCL.kernel("findParticleBins")->setArg(0, this->particleToCell);
+    this->openCL.kernel("findParticleBins")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("findParticleBins")->setArg(2, this->gridCellOffsets);
+    this->openCL.kernel("findParticleBins")->setArg(3, this->numParticles);
     
     // KERNEL :: estimateDensity
 
@@ -551,11 +564,11 @@ void Simulation::stepBoundsAnimation()
     } else if (this->animType == COMPRESS) {
 
         if (this->bounds.getMaxExtent().x >= limitMaxX) {
-            this->bounds.getMaxExtent().x -= 0.2f;
+            this->bounds.getMaxExtent().x -= 0.25f;
         }
 
         if (this->animBothSides && this->bounds.getMinExtent().x <= limitMinX) {
-            this->bounds.getMinExtent().x += 0.2f;
+            this->bounds.getMinExtent().x += 0.25f;
         }
     }
     
@@ -564,7 +577,7 @@ void Simulation::stepBoundsAnimation()
 
 /**
  * Moves the state of the simulation forward one time step according to the
- * time step value, dt, passed to the constrcutor
+ * time step value, dt, passed to the constructor
  *
  * In this method, the motion of the particles, as well as the various
  * quatities assigned to them are updated, as described in the paper
@@ -790,7 +803,6 @@ void Simulation::draw(const ofCamera& camera)
 void Simulation::findNeighboringParticles()
 {
     this->discretizeParticlePositions();
-    
     this->sortParticlesByCell();
 }
 
@@ -832,7 +844,7 @@ void Simulation::discretizeParticlePositions()
 
 /**
  * Sorts the particles by the assigned grid cell. Following the run of this
- * function, sortedParticleToCell (after read back fro the GPU) will contain a 
+ * function, sortedParticleToCell (on the GPU) will contain a
  * listing of ParticlePosition, that are sorted by linearized cell indices, e.g.
  * particles that are in the same cell will be consecutive in 
  * sortedParticleToCell, making neighbor search quick.
@@ -841,11 +853,11 @@ void Simulation::discretizeParticlePositions()
  */
 void Simulation::sortParticlesByCell()
 {
-    // Only 1 thread is needed to run this. The sorting operation is
-    // sequential in nature, hence the invocation with 1 thread, e.g.
-    // "kernel("sortParticlesByCell")->run1D(1)"!
+    this->openCL.kernel("sort")->run1D(this->numParticles);
+    
+    //this->openCL.kernel("sortDebug")->run1D(1);
 
-    this->openCL.kernel("countSortParticles")->run1D(1);
+    this->openCL.kernel("findParticleBins")->run1D(1);
 }
 
 /**

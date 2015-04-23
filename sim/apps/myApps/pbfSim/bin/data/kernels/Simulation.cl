@@ -1058,84 +1058,104 @@ kernel void discretizeParticlePositions(const global Particle* particles
 }
 
 /**
+ * Parallel sort
+ * Eric Bainville - June 2011
+ */
+kernel void sort(global ParticlePosition* in, global ParticlePosition* out)
+{
+    int i = get_global_id(0); // current thread
+    int n = get_global_size(0); // input size
+    global ParticlePosition* iData = &in[i];
+
+    int iKey = iData->key;
+
+    // Compute position of in[i] in output
+
+    int pos = 0;
+
+    for (int j=0; j<n; j++) {
+        int jKey     = in[j].key; // broadcasted
+        bool smaller = (jKey < iKey) || (jKey == iKey && j < i);  // in[j] < in[i] ?
+        pos += (smaller) ? 1 : 0;
+    }
+
+    out[pos] = *iData;
+}
+
+/*
+kernel void sort(global const ParticlePosition* in
+                ,global ParticlePosition* out
+                ,global ParticlePosition* aux)
+{
+    int i = get_local_id(0); // index in workgroup
+    int wg = get_local_size(0); // workgroup size = block size
+    
+    // Move IN, OUT to block start
+    int offset = get_group_id(0) * wg;
+    in += offset;
+    out += offset;
+    
+    // Load block in AUX[WG]
+    const global ParticlePosition* iData = &in[i];
+    aux[i] = *iData;
+    
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // Find output position of iData
+    int iKey = iData->key;
+    int pos = 0;
+    
+    for (int j=0;j<wg;j++) {
+        uint jKey = aux[j].key;
+        bool smaller = (jKey < iKey) || ( jKey == iKey && j < i ); // in[j] < in[i] ?
+        pos += (smaller)?1:0;
+    }
+
+    // Store output
+    out[pos] = *iData;
+}
+*/
+
+/**
+ * sorting debug kernel
+ */
+kernel void sortDebug(global ParticlePosition* p2c
+                     ,int numParticles)
+{
+    for (int i = 0; i < numParticles; i++) {
+        printf("[%d] => key: %d\n", i, p2c[i].key);
+    }
+}
+
+/**
  * NOTE: This kernel is meant to be run with 1 thread. This is necessary
  * since we have to perform a sort and perform some other actions which are
  * inherently sequential in nature
  *
- * This kernel basically performs a counting sort 
- * (http://en.wikipedia.org/wiki/Counting_sort) on the particles, sorting
- * them by the grid cell they were each assigned to. Rather than sorting by
- * a 3 dimensional subscript (i,j,k), we linearize the subscript, and sort by
- * that
- *
  * @see discretizeParticlePositions
  *
  * @param [in]     ParticlePosition* particleToCell
- * @param [in/out] int* cellHistogram
  * @param [out]    ParticlePosition* sortedParticleToCell
- * @param [out]    GridCellOffset* gridCellOffsets An array of size 
- *                 [0 .. numCells-1], where each index i contains the start and 
- *                 length of the i-th cell in the grid as it occurs in 
+ * @param [out]    GridCellOffset* gridCellOffsets An array of size
+ *                 [0 .. numCells-1], where each index i contains the start and
+ *                 length of the i-th cell in the grid as it occurs in
  *                 sortedParticleToCell
  * @param [in] int numParticles The total number of particles in the simulation
- * @param [in] int numCells The total number of cells in the spatial grid
- * @param [in] int cellsX The number of cells in the x axis of the spatial
- *             grid
- * @param [in] int cellsY The number of cells in the y axis of the spatial
- *             grid
- * @param [in] int cellsZ The number of cells in the z axis of the spatial
- *             grid
  */
-kernel void countSortParticles(const global ParticlePosition* particleToCell
-                              ,global int* cellHistogram
-                              ,global ParticlePosition* sortedParticleToCell
-                              ,global GridCellOffset* gridCellOffsets
-                              ,int numParticles
-                              ,int numCells
-                              ,int cellsX
-                              ,int cellsY
-                              ,int cellsZ)
+kernel void findParticleBins(const global ParticlePosition* particleToCell
+                            ,global ParticlePosition* sortedParticleToCell
+                            ,global GridCellOffset* gridCellOffsets
+                            ,int numParticles)
 {
-    // ==== Sorting code =======================================================
-    
-    // First step of counting sort is done already, since we calculated
-    //the histogram (cellHistogram) in the discretizeParticlePositions kernel:
-    
-    int prefixSum = 0;
-    int totalSum  = 0;
-
-    // Second step of counting sort:
-    for (int i = 0; i < numCells; i++) {
-        prefixSum        = cellHistogram[i];
-        cellHistogram[i] = totalSum;
-        totalSum        += prefixSum;
-    }
-
-    // Final step of counting sort:
-    for (int i = 0; i < numParticles; i++) {
-
-        const global ParticlePosition* pp = &particleToCell[i];
-
-        //int key = sub2ind(pp->cellI, pp->cellJ, pp->cellK, cellsX, cellsY);
-        int key = pp->key;
-        int j   = cellHistogram[key];
-
-        sortedParticleToCell[j] = *pp;
-        
-        cellHistogram[key] += 1;
-    }
-    
-    // ==== Binning code =======================================================
-    
     // Now, the ParticlePosition entries of sortedParticleToCell are sorted in
     // ascending order by the value sub2ind(pp[i].cellI, pp[i].cellJ, pp[i].cellK, cellsX, cellsY),
     // where pp is an instance of ParticlePosition  at index i, such that
     // 0 <= i < numParticles.
-
+    
     // Record the offsets per grid cell:
     // The i-th entry of the gridCellOffsets contains the start and length
     // of the i-th linearized grid cell in sortedParticleToCell
-
+    
     int lengthCount = 1;
     int cellStart   = 0;
     int currentKey  = -1;
@@ -1145,34 +1165,31 @@ kernel void countSortParticles(const global ParticlePosition* particleToCell
     // are assigned the same cell. We record the start and length to these
     // sequences and store the results in gridCellOffsets, so we can
     // quickly find all of the particles in a given cell quickly.
-
+    
     for (int i = 0; i < (numParticles - 1); i++) {
-
+        
         // Compare the particle position at index i and i+1:
         
         const global ParticlePosition* currentP = &sortedParticleToCell[i];
         const global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
-
+        
         // If two particles p and q have cell subscripts (p_x, p_y, p_z) and
         // (q_x, q_y, q_z), then the keys are the linearized indices for p and
         // q, p_key and q_key.
 
-        //currentKey = sub2ind(currentP->cellI, currentP->cellJ, currentP->cellK, cellsX, cellsY);
-        //nextKey    = sub2ind(nextP->cellI, nextP->cellJ, nextP->cellK, cellsX, cellsY);
-        
         currentKey = currentP->key;
         nextKey    = nextP->key;
         
         // If p_key and q_key are equal, increase the length of the span:
-
+        
         if (currentKey == nextKey) {
-
+            
             lengthCount++;
-
+            
         } else {
             
             // We hit a new key. Record this grid cell offset and continue;
-
+            
             gridCellOffsets[currentKey].start  = cellStart;
             gridCellOffsets[currentKey].length = lengthCount;
             
@@ -1183,7 +1200,7 @@ kernel void countSortParticles(const global ParticlePosition* particleToCell
     
     // For the last particle, since we iterate up to, but not including
     // the particle at index (numParticles - 1):
-
+    
     if (nextKey != -1) {
         gridCellOffsets[nextKey].start  = cellStart;
         gridCellOffsets[nextKey].length = lengthCount;

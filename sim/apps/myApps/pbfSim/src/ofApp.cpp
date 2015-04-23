@@ -34,6 +34,8 @@ void ofApp::setup()
 
     ofDisableAlphaBlending();
     
+    ofEnableDepthTest();
+    
     // set up the UI controls:
     
     this->gui.setup("Animation");
@@ -74,9 +76,16 @@ void ofApp::setup()
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles      = 250;
-    Parameters parameters = Constants::FOR_RADIUS_0_25;
+    int numParticles      = 207;
+    Parameters parameters = Constants::FOR_RADIUS_0_5;
 
+    this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
+                                                            ,bounds
+                                                            ,numParticles
+                                                            ,Constants::DEFAULT_DT
+                                                            ,ofVec3f(2,2,2)
+                                                            ,parameters));
+    
 #else
 
     AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
@@ -88,13 +97,12 @@ void ofApp::setup()
     int numParticles      = 2500;
     Parameters parameters = Constants::FOR_RADIUS_0_25;
     */
-
+    
+    this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
+                                                            ,bounds
+                                                            ,numParticles
+                                                            ,parameters));
 #endif
-
-    // Finally, instantiate the simulator:
-
-    this->simulation =
-        shared_ptr<Simulation>(new Simulation(this->openCL, bounds, numParticles, parameters));
 }
 
 /**
@@ -173,10 +181,12 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera)
 {
     // Show the controls:
 
+    /*
     ofDisableDepthTest();
         this->gui.draw();
     ofEnableDepthTest();
-    
+    */
+     
     ofVec3f cameraPos = camera.getPosition();
     
     // Show the current frame rate and frame count
