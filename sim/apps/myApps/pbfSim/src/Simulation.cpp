@@ -412,10 +412,9 @@ void Simulation::initializeKernels()
     // KERNEL :: findParticleBins
     
     this->openCL.loadKernel("findParticleBins");
-    this->openCL.kernel("findParticleBins")->setArg(0, this->particleToCell);
-    this->openCL.kernel("findParticleBins")->setArg(1, this->sortedParticleToCell);
-    this->openCL.kernel("findParticleBins")->setArg(2, this->gridCellOffsets);
-    this->openCL.kernel("findParticleBins")->setArg(3, this->numParticles);
+    this->openCL.kernel("findParticleBins")->setArg(0, this->sortedParticleToCell);
+    this->openCL.kernel("findParticleBins")->setArg(1, this->gridCellOffsets);
+    this->openCL.kernel("findParticleBins")->setArg(2, this->numParticles);
     
     // KERNEL :: estimateDensity
 
@@ -857,7 +856,7 @@ void Simulation::sortParticlesByCell()
     
     //this->openCL.kernel("sortDebug")->run1D(1);
 
-    this->openCL.kernel("findParticleBins")->run1D(1);
+    this->openCL.kernel("findParticleBins")->run1D(this->numParticles);
 }
 
 /**

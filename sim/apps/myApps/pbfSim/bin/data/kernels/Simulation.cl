@@ -401,10 +401,6 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
                               ,int3 cellSubscript
                               ,int* neighborCells)
 {
-    int i = cellSubscript.x;
-    int j = cellSubscript.y;
-    int k = cellSubscript.z;
-    
     // Count of valid neighbors:
 
     int neighborCellCount = 0;
@@ -425,15 +421,15 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
     
     for (int u = 0; u < 3; u++) {
 
-        I = i + offsets[u]; // I = i-1, i, i+1
+        I = cellSubscript.x + offsets[u]; // I = i-1, i, i+1
 
         for (int v = 0; v < 3; v++) {
         
-            J = j + offsets[v]; // J = j-1, j, j+1
+            J = cellSubscript.y + offsets[v]; // J = j-1, j, j+1
 
             for (int w = 0; w < 3; w++) {
             
-                K = k + offsets[w]; // K = k-1, k, k+1
+                K = cellSubscript.z + offsets[w]; // K = k-1, k, k+1
                 
                 if (   (I >= 0 && I < cellsX)
                     && (J >= 0 && J < cellsY)
@@ -1082,40 +1078,6 @@ kernel void sort(global ParticlePosition* in, global ParticlePosition* out)
     out[pos] = *iData;
 }
 
-/*
-kernel void sort(global const ParticlePosition* in
-                ,global ParticlePosition* out
-                ,global ParticlePosition* aux)
-{
-    int i = get_local_id(0); // index in workgroup
-    int wg = get_local_size(0); // workgroup size = block size
-    
-    // Move IN, OUT to block start
-    int offset = get_group_id(0) * wg;
-    in += offset;
-    out += offset;
-    
-    // Load block in AUX[WG]
-    const global ParticlePosition* iData = &in[i];
-    aux[i] = *iData;
-    
-    barrier(CLK_LOCAL_MEM_FENCE);
-    
-    // Find output position of iData
-    int iKey = iData->key;
-    int pos = 0;
-    
-    for (int j=0;j<wg;j++) {
-        uint jKey = aux[j].key;
-        bool smaller = (jKey < iKey) || ( jKey == iKey && j < i ); // in[j] < in[i] ?
-        pos += (smaller)?1:0;
-    }
-
-    // Store output
-    out[pos] = *iData;
-}
-*/
-
 /**
  * sorting debug kernel
  */
@@ -1134,7 +1096,6 @@ kernel void sortDebug(global ParticlePosition* p2c
  *
  * @see discretizeParticlePositions
  *
- * @param [in]     ParticlePosition* particleToCell
  * @param [out]    ParticlePosition* sortedParticleToCell
  * @param [out]    GridCellOffset* gridCellOffsets An array of size
  *                 [0 .. numCells-1], where each index i contains the start and
@@ -1142,68 +1103,30 @@ kernel void sortDebug(global ParticlePosition* p2c
  *                 sortedParticleToCell
  * @param [in] int numParticles The total number of particles in the simulation
  */
-kernel void findParticleBins(const global ParticlePosition* particleToCell
-                            ,global ParticlePosition* sortedParticleToCell
+kernel void findParticleBins(global ParticlePosition* sortedParticleToCell
                             ,global GridCellOffset* gridCellOffsets
                             ,int numParticles)
 {
-    // Now, the ParticlePosition entries of sortedParticleToCell are sorted in
-    // ascending order by the value sub2ind(pp[i].cellI, pp[i].cellJ, pp[i].cellK, cellsX, cellsY),
-    // where pp is an instance of ParticlePosition  at index i, such that
-    // 0 <= i < numParticles.
+    int id    = get_global_id(0);
+    int key   = sortedParticleToCell[id].key;
     
-    // Record the offsets per grid cell:
-    // The i-th entry of the gridCellOffsets contains the start and length
-    // of the i-th linearized grid cell in sortedParticleToCell
-    
-    int lengthCount = 1;
-    int cellStart   = 0;
-    int currentKey  = -1;
-    int nextKey     = -1;
-    
-    // We traverse the list to find sequences of consecutive particles that
-    // are assigned the same cell. We record the start and length to these
-    // sequences and store the results in gridCellOffsets, so we can
-    // quickly find all of the particles in a given cell quickly.
-    
-    for (int i = 0; i < (numParticles - 1); i++) {
-        
-        // Compare the particle position at index i and i+1:
-        
-        const global ParticlePosition* currentP = &sortedParticleToCell[i];
-        const global ParticlePosition* nextP    = &sortedParticleToCell[i+1];
-        
-        // If two particles p and q have cell subscripts (p_x, p_y, p_z) and
-        // (q_x, q_y, q_z), then the keys are the linearized indices for p and
-        // q, p_key and q_key.
+    if (gridCellOffsets[key].start == -1) {
 
-        currentKey = currentP->key;
-        nextKey    = nextP->key;
+        int left  = id;
+        int right = id;
         
-        // If p_key and q_key are equal, increase the length of the span:
-        
-        if (currentKey == nextKey) {
-            
-            lengthCount++;
-            
-        } else {
-            
-            // We hit a new key. Record this grid cell offset and continue;
-            
-            gridCellOffsets[currentKey].start  = cellStart;
-            gridCellOffsets[currentKey].length = lengthCount;
-            
-            cellStart   = i + 1;
-            lengthCount = 1;
+        while (left >= 0 && sortedParticleToCell[left].key == key) {
+            left--;
         }
-    }
-    
-    // For the last particle, since we iterate up to, but not including
-    // the particle at index (numParticles - 1):
-    
-    if (nextKey != -1) {
-        gridCellOffsets[nextKey].start  = cellStart;
-        gridCellOffsets[nextKey].length = lengthCount;
+        
+        while (right < numParticles && sortedParticleToCell[right].key == key) {
+            right++;
+        }
+        
+        left++;
+
+        gridCellOffsets[key].start  = left;
+        gridCellOffsets[key].length = right - left;
     }
 }
 

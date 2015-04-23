@@ -34,7 +34,7 @@ void ofApp::setup()
 
     ofDisableAlphaBlending();
     
-    ofEnableDepthTest();
+    //ofEnableDepthTest();
     
     // set up the UI controls:
     
@@ -180,13 +180,7 @@ void ofApp::setAnimAmp(float& amp)
 void ofApp::drawHeadsUpDisplay(ofEasyCam& camera)
 {
     // Show the controls:
-
-    /*
-    ofDisableDepthTest();
-        this->gui.draw();
-    ofEnableDepthTest();
-    */
-     
+    
     ofVec3f cameraPos = camera.getPosition();
     
     // Show the current frame rate and frame count
@@ -262,6 +256,10 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera)
 
     ofDrawBitmapString("Particles: " + ofToString(this->simulation->getNumberOfParticles())
                       ,hOffset, textYOffset += vSpacing);
+
+    ofDisableDepthTest();
+    this->gui.draw();
+    ofEnableDepthTest();
 }
 
 /**
