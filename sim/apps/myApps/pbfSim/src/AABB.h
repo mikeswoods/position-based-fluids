@@ -27,6 +27,10 @@ class AABB
         ofVec3f& getMinExtent();
         ofVec3f& getMaxExtent();
     
+        float width() const;
+        float height() const;
+        float depth() const;
+    
         void addMin(ofVec3f amount);
         void addMax(ofVec3f amount);
     

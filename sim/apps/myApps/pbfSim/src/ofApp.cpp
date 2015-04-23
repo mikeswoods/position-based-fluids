@@ -79,8 +79,8 @@ void ofApp::setup()
 
 #else
 
-    AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 40.0f, 10.0f));
-    int numParticles      = 5000;
+    AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
+    int numParticles      = 10000;
     Parameters parameters = Constants::FOR_RADIUS_0_5;
 
     /*

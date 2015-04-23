@@ -260,7 +260,7 @@ void Simulation::initialize()
 
         // Random position in the bounding box:
         p.pos.x = ofRandom(p1.x + radius, p2.x - radius);
-        p.pos.y = ofRandom(p1.y + radius, p2.y - radius);
+        p.pos.y = ofRandom(p1.y + radius, 0.25f * (p2.y - radius));
         p.pos.z = ofRandom(p1.z + radius, p2.z - radius);
         
         // No predicted position:

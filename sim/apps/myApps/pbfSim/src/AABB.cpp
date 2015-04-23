@@ -55,6 +55,21 @@ ofVec3f& AABB::getMaxExtent()
     return this->maxV;
 }
 
+float AABB::width() const
+{
+    return this->maxV.x - this->minV.x;
+}
+
+float AABB::height() const
+{
+    return this->maxV.y - this->minV.y;
+}
+
+float AABB::depth() const
+{
+    return this->maxV.z - this->minV.z;
+}
+
 void AABB::addMin(ofVec3f amount)
 {
     this->minV += amount;
