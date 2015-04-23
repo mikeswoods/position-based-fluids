@@ -24,54 +24,77 @@ using namespace std;
 
 void ofApp::setup()
 {
+#ifdef ENABLE_LOGGING
+    ofSetLogLevel(OF_LOG_VERBOSE);
+#endif
+
+    ofSetVerticalSync(false);
+    
+    // disable alpha blending, since we won't need it:
+
+    ofDisableAlphaBlending();
+    
+    // set up the UI controls:
+    
+    this->gui.setup("Animation");
+    this->gui.add(this->toggleAnimateBounds.setup("Toggle", false));
+    this->gui.add(this->toggleAnimateBothSides.setup("2-sides", false));
+    this->gui.add(this->selectSineAnim.setup("~ Sine wave"));
+    this->gui.add(this->selectRampAnim.setup("~ Linear ramp"));
+    this->gui.add(this->selectCompressAnim.setup("~ Compress"));
+    this->gui.add(this->periodAnimSlider.setup("Period", 1.0f, 0.01f, 2.0f));
+    this->gui.add(this->ampAnimSlider.setup("Amplitude", 1.0f, 1.0f, 15.0f));
+    this->gui.add(this->resetBounds.setup("Reset Bounds"));
+
+    this->selectSineAnim.addListener(this, &ofApp::setSineAnim);
+    this->selectRampAnim.addListener(this, &ofApp::setRampAnim);
+    this->selectCompressAnim.addListener(this, &ofApp::setCompressAnim);
+    this->periodAnimSlider.addListener(this, &ofApp::setAnimPeriod);
+    this->ampAnimSlider.addListener(this, &ofApp::setAnimAmp);
+    this->resetBounds.addListener(this, &ofApp::doResetBounds);
+    
+    // and the flag initial values:
+    
     this->paused      = true;
     this->advanceStep = false;
     
-#ifdef ENABLE_LOGGING
-	ofSetLogLevel(OF_LOG_VERBOSE);
-#endif
-    
-    // This uses depth information for occlusion
-    // rather than always drawing things on top of each other
-    ofEnableDepthTest();
-    
-    // Disable alpha blending, since we won't need it:
-    ofDisableAlphaBlending();
-    
-    // This sets the camera's distance from the object
+    // set the camera's distance from the object:
+
     if (!this->cameraSet) {
         this->camera.setDistance(50);
         this->cameraSet = true;
     }
 
     // Initialize from GL world:
+
     this->openCL.setupFromOpenGL();
 
+    // Set the scene parameters:
+    
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-
-    int numParticles = 250;
+    int numParticles      = 250;
     Parameters parameters = Constants::FOR_RADIUS_0_25;
-
-    ofSetVerticalSync(true);
 
 #else
 
     AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 40.0f, 10.0f));
-
-    int numParticles = 10000;
+    int numParticles      = 5000;
     Parameters parameters = Constants::FOR_RADIUS_0_5;
 
-    ofSetVerticalSync(false);
+    /*
+    AABB bounds(ofVec3f(-10.0f, -10.0f, -5.0f), ofVec3f(10.0f, 10.0f, 5.0f));
+    int numParticles      = 2500;
+    Parameters parameters = Constants::FOR_RADIUS_0_25;
+    */
 
 #endif
 
-    // Instantiate the simulator:
-    this->simulation = std::shared_ptr<Simulation>(new Simulation(this->openCL
-                                                                 ,bounds
-                                                                 ,numParticles
-                                                                 ,parameters));
+    // Finally, instantiate the simulator:
+
+    this->simulation =
+        shared_ptr<Simulation>(new Simulation(this->openCL, bounds, numParticles, parameters));
 }
 
 /**
@@ -87,6 +110,55 @@ void ofApp::update()
     } else {
         this->simulation->step();
     }
+
+    // Animate bounds?
+
+    if (this->toggleAnimateBounds) {
+        this->simulation->enableBoundsAnimation();
+    } else {
+        this->simulation->disableBoundsAnimation();
+    }
+    
+    if (this->toggleAnimateBothSides) {
+        this->simulation->enableBothSidesAnimation();
+    } else {
+        this->simulation->disableBothSidesAnimation();
+    }
+}
+
+/*******************************************************************************
+ * Control callback functions
+ ******************************************************************************/
+
+void ofApp::setSineAnim()
+{
+    this->simulation->setAnimationType(Simulation::SINE_WAVE);
+}
+
+void ofApp::setRampAnim()
+{
+    this->simulation->setAnimationType(Simulation::LINEAR_RAMP);
+}
+
+void ofApp::setCompressAnim()
+{
+    this->simulation->setAnimationType(Simulation::COMPRESS);
+}
+
+void ofApp::doResetBounds()
+{
+    this->simulation->disableBoundsAnimation();
+    this->simulation->resetBounds();
+}
+
+void ofApp::setAnimPeriod(float& period)
+{
+    this->simulation->setAnimationPeriod(period);
+}
+
+void ofApp::setAnimAmp(float& amp)
+{
+    this->simulation->setAnimationAmp(amp);
 }
 
 /*******************************************************************************
@@ -97,19 +169,25 @@ void ofApp::update()
  * Draws a "heads up display" that shows the status of the simulation, as well
  * as some other pieces of pertinent information
  */
-void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
+void ofApp::drawHeadsUpDisplay(ofEasyCam& camera)
 {
+    // Show the controls:
+
+    ofDisableDepthTest();
+        this->gui.draw();
+    ofEnableDepthTest();
+    
     ofVec3f cameraPos = camera.getPosition();
     
     // Show the current frame rate and frame count
-    ofSetColor(255);
-    ofFill();
 
-    int hOffset     = 10;
+    int w           = static_cast<int>(ofGetScreenWidth());
+    int hOffset     = static_cast<int>(static_cast<float>(w) - (0.425f * static_cast<float>(w)));
     int vSpacing    = 15;
     int textYOffset = vSpacing;
     
     // Paused flag
+
     if (this->isPaused()) {
         ofSetColor(0, 255, 0);
         ofFill();
@@ -120,20 +198,21 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
     ofFill();
     
     // FPS
+
     string fpsText = ofToString(ofGetFrameRate()) + " fps";
     ofDrawBitmapString(fpsText, hOffset, textYOffset += vSpacing);
 
     // Current frame
+
     ofDrawBitmapString("Frame: " + ofToString(this->simulation->getFrameNumber()), hOffset, textYOffset += vSpacing);
 
-    // Hotkeys:
+    // Hotkeys
+
     ofDrawBitmapString("Hotkeys:", hOffset, textYOffset += vSpacing);
     vector<string> hotkeys;
     hotkeys.push_back("'s' = step");
     hotkeys.push_back("'p' or space = toggle pause");
     hotkeys.push_back("'r' = reset");
-    hotkeys.push_back("'z' = reset simulation bounds");
-    hotkeys.push_back("'a' = toggle bounds animation");
     hotkeys.push_back("'g' = toggle grid");
     hotkeys.push_back("'d' = toggle visual debugging");
     
@@ -141,31 +220,36 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
         ofDrawBitmapString(*i, hOffset, textYOffset += vSpacing);
     }
 
-    // Status information:
+    // Status information
+
     auto bounds = this->simulation->getBounds();
     auto minExt = bounds.getMinExtent();
     auto maxExt = bounds.getMaxExtent();
     
-    // Camera Position:
+    // Camera Position
+
     ofDrawBitmapString("Camera position: <" + ofToString(cameraPos.x) +
                                         "," + ofToString(cameraPos.y) +
                                         "," + ofToString(cameraPos.z) + ">"
                       ,hOffset
                       ,textYOffset += vSpacing);
 
-    // Bounds:
+    // Bounds
+
     ofDrawBitmapString("Bounds: <" +
                        ofToString(minExt.x) + "," + ofToString(minExt.y) + "," + ofToString(minExt.z) + "> <" +
                        ofToString(maxExt.x) + "," + ofToString(maxExt.y) + "," + ofToString(maxExt.z) + ">"
                       ,hOffset, textYOffset += vSpacing);
 
-    // Cell count:
+    // Cell count
+
     auto cellsPerAxis = this->simulation->getCellsPerAxis();
     ofDrawBitmapString("Cells per axis: <" +
                        ofToString(cellsPerAxis[0]) + "," + ofToString(cellsPerAxis[1]) + "," + ofToString(cellsPerAxis[2]) + ">"
                        ,hOffset, textYOffset += vSpacing);
     
-    // Particle count:
+    // Particle count
+
     ofDrawBitmapString("Particles: " + ofToString(this->simulation->getNumberOfParticles())
                       ,hOffset, textYOffset += vSpacing);
 }
@@ -176,6 +260,8 @@ void ofApp::drawHeadsUpDisplay(ofEasyCam& camera) const
 void ofApp::draw()
 {
     ofBackground(0);
+    
+    // Render the current step of the simulation:
     
     this->camera.begin();
         this->simulation->draw(this->camera);
@@ -210,18 +296,6 @@ void ofApp::togglePaused()
 void ofApp::keyPressed(int key)
 {
     switch (key) {
-        // Animate bounds
-        case 'a':
-            {
-                this->simulation->toggleBoundsAnimation();
-            }
-            break;
-            // Reset bounds
-            case 'z':
-            {
-                this->simulation->resetBounds();
-            }
-            break;
         // Pause
         case 'p':
         case ' ':
@@ -254,46 +328,6 @@ void ofApp::keyPressed(int key)
             }
             break;
     }
-}
-
-void ofApp::keyReleased(int key)
-{
-
-}
-
-void ofApp::mouseMoved(int x, int y )
-{
-
-}
-
-void ofApp::mouseDragged(int x, int y, int button)
-{
-
-}
-
-void ofApp::mousePressed(int x, int y, int button)
-{
-
-}
-
-void ofApp::mouseReleased(int x, int y, int button)
-{
-
-}
-
-void ofApp::windowResized(int w, int h)
-{
-
-}
-
-void ofApp::gotMessage(ofMessage msg)
-{
-
-}
-
-void ofApp::dragEvent(ofDragInfo dragInfo)
-{
-
 }
 
 /******************************************************************************/

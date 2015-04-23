@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include "ofxGui.h"
 #include "MSAOpenCL.h"
 #include "Simulation.h"
 
@@ -13,14 +14,35 @@ class ofApp : public ofBaseApp
     private:
         bool cameraSet = false;
     
+        void setSineAnim();
+        void setRampAnim();
+        void setCompressAnim();
+        void doResetBounds();
+        void setAnimPeriod(float& period);
+        void setAnimAmp(float& amp);
+    
     protected:
+        // UI controls:
+        ofxGuiGroup gui;
+        ofxToggle toggleAnimateBounds;
+        ofxToggle toggleAnimateBothSides;
+        ofxButton selectSineAnim;
+        ofxButton selectRampAnim;
+        ofxButton selectCompressAnim;
+        ofxButton resetBounds;
+        ofxFloatSlider periodAnimSlider;
+        ofxFloatSlider ampAnimSlider;
+
+        // Flags
         bool paused;
         bool advanceStep;
+    
+        // Simulation, etc.
         ofEasyCam camera;
         msa::OpenCL openCL;
         std::shared_ptr<Simulation> simulation;
     
-        void drawHeadsUpDisplay(ofEasyCam& camera) const;
+        void drawHeadsUpDisplay(ofEasyCam& camera);
     
 	public:
 		void setup();
@@ -31,13 +53,4 @@ class ofApp : public ofBaseApp
         void togglePaused();
 
 		void keyPressed(int key);
-		void keyReleased(int key);
-		void mouseMoved(int x, int y );
-		void mouseDragged(int x, int y, int button);
-		void mousePressed(int x, int y, int button);
-		void mouseReleased(int x, int y, int button);
-		void windowResized(int w, int h);
-		void dragEvent(ofDragInfo dragInfo);
-		void gotMessage(ofMessage msg);
-		
 };

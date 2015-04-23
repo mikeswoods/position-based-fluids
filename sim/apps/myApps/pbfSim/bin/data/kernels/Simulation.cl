@@ -153,8 +153,6 @@ void clampToBounds(const global Parameters* parameters
 
 float poly6(float4 r, float h);
 
-float poly6_scalar(float q, float h);
-
 float4 spiky(float4 r, float h);
 
 void callback_SPHDensityEstimator_i(const global Parameters* parameters
@@ -648,9 +646,15 @@ float poly6(float4 r, float h)
 {
     float rBar = length(r);
 
+    if (rBar < EPSILON) {
+        return 0.0f;
+    }
+    
+    /*
     if (rBar > h) {
         return 0.0f;
     }
+    */
     
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
@@ -660,32 +664,6 @@ float poly6(float4 r, float h)
     float A  = 1.566681471061f / h9;
     float B  = (h * h) - (rBar * rBar);
 
-    return A * (B * B * B);
-}
-
-/**
- * Computes poly6 using a scalar value in place of r
- *
- * From the PBF slides SIGGRAPH 2013, pg. 13
- *
- * @param [in] float r distance
- * @param [in] float h Smoothing kernel radius
- * @returns float The computed scalar value
- */
-float poly6_scalar(float q, float h)
-{
-    if (q > h) {
-        return 0.0f;
-    }
-    
-    // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
-    float h9 = (h * h * h * h * h * h * h * h * h);
-    if (h9 == 0.0) {
-        return 0.0f;
-    }
-    float A  = 1.566681471061f / h9;
-    float B  = (h * h) - (q * q);
-    
     return A * (B * B * B);
 }
 
@@ -701,10 +679,16 @@ float poly6_scalar(float q, float h)
 float4 spiky(float4 r, float h)
 {
     float rBar = length(r);
+
+    if (rBar < EPSILON) {
+        return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    }
     
+    /*
     if (rBar > h) {
         return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     }
+    */
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
@@ -837,16 +821,23 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // Introduce the artificial pressure corrector:
     
     float h         = parameters->smoothingRadius;
-    float deltaQ    = 0.3f * h;
     float4 r        = p_i->posStar - p_j->posStar;
     float4 gradient = spiky(r, h);
     float n         = poly6(r, h);
-    //float d         = poly6_scalar(deltaQ, h);
-    float d         = poly6_scalar(0.0f, h);
-    float nd        = d <= EPSILON ? 0.0f : n / d;
-    float sCorr     = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
+    
+    // For the point delta Q, we use p_j->posStar as a starting point, and
+    // add an offset value:
 
-    (*posDelta) += ((lambda_i + lambda_j + sCorr) * gradient);
+    float offset    = (0.3f * h);
+    float4 deltaQ   = p_i->posStar + (float4)(offset, offset, offset, 1.0f);
+    float d         = poly6(deltaQ, h);
+    float nd        = fabs(d) <= EPSILON ? 0.0f : n / d;
+    
+    // Finally, compute the correction pressure:
+
+    float s_corr = -parameters->artificialPressureK * pow(nd, parameters->artificialPressureN);
+
+    (*posDelta) += ((lambda_i + lambda_j + s_corr) * gradient);
 }
 
 /**
@@ -1652,7 +1643,9 @@ kernel void updatePosition(const global Parameters* parameters
                     ,callback_XPSHViscosity_i
                     ,(void*)&v_i_sum);
     
-    p->vel += (parameters->viscosityCoeff * v_i_sum);
+    
+    
+    p->vel = p->vel + (parameters->viscosityCoeff * v_i_sum);
     
     // ==== Update position x_i <- x*_i ========================================
 

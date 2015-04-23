@@ -49,9 +49,13 @@ Simulation::Simulation(msa::OpenCL& _openCL
     parameters(_parameters),
     frameNumber(0),
     animFrameNumber(0),
-    flagAnimateBounds(false),
-    flagDrawGrid(false),
-    flagVisualDebugging(false)
+    animBounds(false),
+    animType(SINE_WAVE),
+    animPeriod(1.0f),
+    animAmp(10.0f),
+    animBothSides(false),
+    doDrawGrid(false),
+    doVisualDebugging(false)
 {
     this->initialize();
 }
@@ -81,9 +85,13 @@ Simulation::Simulation(msa::OpenCL& _openCL
     parameters(_parameters),
     frameNumber(0),
     animFrameNumber(0),
-    flagAnimateBounds(false),
-    flagDrawGrid(false),
-    flagVisualDebugging(false)
+    animBounds(false),
+    animType(SINE_WAVE),
+    animPeriod(1.0f),
+    animAmp(10.0f),
+    animBothSides(false),
+    doDrawGrid(false),
+    doVisualDebugging(false)
 {
     this->initialize();
 }
@@ -173,7 +181,7 @@ void Simulation::initialize()
                      * static_cast<int>(this->cellsPerAxis.y)
                      * static_cast<int>(this->cellsPerAxis.z);
 
-    // Set up OpenGL VAOs, VBOs, and shader programs:
+    // Set up OpenGL VBOs and shader programs:
     
     this->initializeOpenGL();
 
@@ -235,9 +243,7 @@ void Simulation::initialize()
     // buffer:
     
     this->density.initBuffer(this->numParticles * sizeof(float));
-
     this->lambda.initBuffer(this->numParticles * sizeof(float));
-
     this->curl.initBuffer(this->numParticles * sizeof(float4));
     
     // For particle position correction in the solver:
@@ -506,33 +512,51 @@ void Simulation::resetBounds()
 
 /**
  * Steps the simulation's bounding box animation, if enabled, by one frame
- *
- * @param [in] type The animation type: SINE_WAVE, LINEAR_RAMP, EXP_RAMP
- * @param [in] period The animation wave period
- * @param [in] amp The animation wave amplitude
- * @param [in] bothSides If true, both sides of the bounding box will be animated
  */
-void Simulation::stepBoundsAnimation(AnimationType type, float period, float amp, bool bothSides)
+void Simulation::stepBoundsAnimation()
 {
-    float value = 0.0f;
-    float pi    = static_cast<float>(M_PI);
-    float t     = static_cast<float>(this->animFrameNumber);
+    float value     = 0.0f;
+    float pi        = static_cast<float>(M_PI);
+    float t         = static_cast<float>(this->animFrameNumber);
+    float origMinX  = this->originalBounds.getMinExtent().x;
+    float origMaxX  = this->originalBounds.getMaxExtent().x;
+    float width     = origMaxX - origMinX;
+    float limit     = width * 0.66;
+    float halfLimit = limit * 0.5f;
+    float limitMinX = origMinX + halfLimit;
+    float limitMaxX = origMaxX - halfLimit;
     
-    if (type == SINE_WAVE) {
+    if (this->animType == SINE_WAVE) {
         
         float theta = ofDegToRad(static_cast<float>(this->animFrameNumber % 720));
-        value = amp * sin(period * pi * theta);
-        
-    } else if (type == LINEAR_RAMP) {
-        
-        float tPeriod = (t / period) * this->dt;
-        value = 2.0f * amp * (tPeriod - floor(0.5f + tPeriod));
-    }
+        value   = this->animAmp * sin(this->animPeriod * pi * theta);
 
-    this->bounds.getMaxExtent().x = this->originalBounds.getMaxExtent().x - value;
+        this->bounds.getMaxExtent().x = origMaxX - value;
+        
+        if (this->animBothSides) {
+            this->bounds.getMinExtent().x = origMinX + value;
+        }
+        
+    } else if (this->animType == LINEAR_RAMP) {
+        
+        float tPeriod = (t / this->animPeriod) * this->dt;
+        value = 2.0f * this->animAmp * (tPeriod - floor(0.5f + tPeriod));
+    
+        this->bounds.getMaxExtent().x = origMaxX - value;
+        
+        if (this->animBothSides) {
+            this->bounds.getMinExtent().x = origMinX + value;
+        }
+        
+    } else if (this->animType == COMPRESS) {
 
-    if  (bothSides) {
-        this->bounds.getMinExtent().x = this->originalBounds.getMinExtent().x + value;
+        if (this->bounds.getMaxExtent().x >= limitMaxX) {
+            this->bounds.getMaxExtent().x -= 0.2f;
+        }
+
+        if (this->animBothSides && this->bounds.getMinExtent().x <= limitMinX) {
+            this->bounds.getMinExtent().x += 0.2f;
+        }
     }
     
     this->animFrameNumber++;
@@ -576,9 +600,9 @@ void Simulation::step()
 
         this->calculateDensity(); // See (9) - (12)
 
-        this->calculatePositionDelta(); // See (1) - (4)
+        this->calculatePositionDelta(); // See (13)
 
-        //this->handleCollisions();
+        //this->handleCollisions(); // See (14)
         
         this->updatePositionDelta(); // See (17)
     }
@@ -608,8 +632,8 @@ void Simulation::step()
 
     // Animate the bounds of the simulation to generate waves in the particles:
 
-    if (this->flagAnimateBounds) {
-        this->stepBoundsAnimation(SINE_WAVE, 1.0f, 10.0f, true);
+    if (this->animBounds) {
+        this->stepBoundsAnimation();
     }
     
     // Finally, bump up the frame counter:
@@ -690,7 +714,8 @@ void Simulation::drawBounds(const ofCamera& camera)
  */
 void Simulation::drawParticles(const ofCamera& camera)
 {
-    auto cp = camera.getPosition();
+    auto cp              = camera.getPosition();
+    float particleRadius = this->getParameters().particleRadius ;
     
 #if DRAW_PARTICLES_AS_SPHERES
 
@@ -708,7 +733,7 @@ void Simulation::drawParticles(const ofCamera& camera)
 #else
     
     this->shader.begin();
-        this->shader.setUniform1f("particleRadius", Constants::OPENGL_POINT_PARTICLE_RADIUS);
+        this->shader.setUniform1f("particleRadius", particleRadius * 50.0f);
         this->shader.setUniform3f("cameraPosition", cp.x, cp.y, cp.z);
         this->particleVertices.draw(GL_POINTS, 0, this->numParticles);
     this->shader.end();
@@ -771,6 +796,8 @@ void Simulation::findNeighboringParticles()
 
 /**
  * Resets various particle quantities, like density, etc.
+ *
+ * @see kernels/Simulation.cl (resetParticleQuantities, resetCellQuantities) for details
  */
 void Simulation::resetQuantities()
 {
@@ -880,7 +907,7 @@ void Simulation::handleCollisions()
  * Updates the actual, final position of the particles in the current
  * simulation step
  *
- * @see kernels/Simulation.cl (updatePosition) for details
+ * @see kernels/Simulation.cl (computeCurl, updatePosition) for details
  */
 void Simulation::updatePosition()
 {

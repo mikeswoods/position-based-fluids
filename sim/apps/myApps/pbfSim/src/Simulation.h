@@ -87,27 +87,40 @@ class Simulation
         {
             SINE_WAVE
            ,LINEAR_RAMP
+           ,COMPRESS
         };
     
     private:
         // Count of the current frame number
         unsigned int frameNumber;
     
-        // Counter used for the current bounds-modifying animation operation
-        unsigned int animFrameNumber;
-    
         // Total number of cells in the system
         int numCells;
     
         // Flag to draw the spatial grid
-        bool flagDrawGrid;
+        bool doDrawGrid;
     
         // Flag for visual debugging
-        bool flagVisualDebugging;
+        bool doVisualDebugging;
     
         // Flag to indicate that the bounds of the simulation should be
         // animated, e.g. moving in some periodic fashion
-        bool flagAnimateBounds;
+        bool animBounds;
+
+        // Counter used for the current bounds-modifying animation operation
+        unsigned int animFrameNumber;
+    
+        // The animation type for animating the bounds of the simulation
+        AnimationType animType;
+    
+        // Bounds animation period
+        float animPeriod;
+    
+        // Bounds animation amplitude
+        float animAmp;
+    
+        // Flag to toggle bounds animation on both sides of the simulation area
+        bool animBothSides;
     
         // Given a particle count, particle radius and world bounds,
         // find the "ideal" cell count per axis
@@ -219,7 +232,7 @@ class Simulation
         void drawGrid(const ofCamera& camera);
         void drawParticles(const ofCamera& camera);
 
-        void stepBoundsAnimation(AnimationType type, float period = 2.0, float amp = 2.0, bool bothSides = false);
+        void stepBoundsAnimation();
     
     public:
         Simulation(msa::OpenCL& openCL
@@ -250,14 +263,21 @@ class Simulation
         const Parameters& getParameters() const;
         void setParameters(const Parameters& parameters);
     
-        const bool drawGridEnabled() const { return this->flagDrawGrid; }
-        void toggleDrawGrid() { this->flagDrawGrid = !this->flagDrawGrid; }
+        const bool drawGridEnabled() const { return this->doDrawGrid; }
+        void toggleDrawGrid()              { this->doDrawGrid = !this->doDrawGrid; }
     
-        const bool isVisualDebuggingEnabled() const { return this->flagVisualDebugging; }
-        void toggleVisualDebugging() { this->flagVisualDebugging = !this->flagVisualDebugging; }
+        const bool isVisualDebuggingEnabled() const { return this->doVisualDebugging; }
+        void toggleVisualDebugging()                { this->doVisualDebugging = !this->doVisualDebugging; }
 
-        const bool boundsAnimationEnabled() const { return this->flagAnimateBounds; }
-        void toggleBoundsAnimation() { this->flagAnimateBounds = !this->flagAnimateBounds; }
+        void enableBoundsAnimation()     { this->animBounds = true; }
+        void disableBoundsAnimation()    { this->animBounds = false; }
+
+        void enableBothSidesAnimation()  { this->animBothSides = true; }
+        void disableBothSidesAnimation() { this->animBothSides = false; }
+    
+        void setAnimationType(AnimationType animType) { this->animType = animType; }
+        void setAnimationPeriod(float period)         { this->animPeriod = period; }
+        void setAnimationAmp(float amp)               { this->animAmp = amp; }
     
         void step();
         void resetBounds();
