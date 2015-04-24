@@ -230,6 +230,7 @@ global void forAllNeighbors(const global Parameters* parameters
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
+                           ,float searchRadius
                            ,void* dataArray
                            ,void (*callback)(const global Parameters*
                                             ,int
@@ -457,8 +458,9 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  * returning it
  *
  * @param [in]  Parameters* parameters The runtime parameters of the simulation
- * @param [in]  Particle* particles
- * @param [in]  ParticlePosition* sortedParticleToCell
+ * @param [in]  Particle* particles Particles in the simulation
+ * @param [in]  ParticlePosition* sortedParticleToCell A mapping of particles
+ *              to cells. sortedParticleToCell
  * @param [in]  GridCellOffset* gridCellOffsets
  * @param [in]  int numParticles The total number of particles in the simulation
  * @param [in]  int cellsX The number of cells in the x axis of the spatial
@@ -475,6 +477,9 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  *              neighbors of. This value corresponds to the position of the 
  *              particle in the array particles, and must be in the range
  *              [0 .. numParticles - 1]
+ * @param [in]  float searchRadius The search radius
+ * param  [in]  void* dataArray A read-only auxiliary data array to pass to
+ *              invoked callback functions
  * @param [in]  (*callback)(int, const global Particle*, int, const global Particle*, void* accum)
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
@@ -490,6 +495,7 @@ global void forAllNeighbors(const global Parameters* parameters
                            ,float3 minExtent
                            ,float3 maxExtent
                            ,int particleId
+                           ,float searchRadius
                            ,void* dataArray
                            ,void (*callback)(const global Parameters*
                                             ,int
@@ -506,45 +512,6 @@ global void forAllNeighbors(const global Parameters* parameters
     }
 
     const global Particle *p_i = &particles[particleId];
-    
-    // Neighbor radius threshold:
-    
-    float R2 = 2.0f * parameters->particleRadius;
-    
-    // Keep track of the number of neighbors seen so far. If/when this
-    // number exceeds CHECK_MAX_NEIGHBORS, we can bail out of the neighbor
-    // search loop
-
-    int neighborsSeen = 0;
-    
-#ifdef USE_BRUTE_FORCE_SEARCH
-
-    // Exhaustively search the space for neighbors by computing the distance
-    // between p_i and for all j in [0 .. numParticles - 1], p_j:
-
-    for (int j = 0; j < numParticles; j++) {
-
-        // Skip instances in which we'd be comparing a particle to itself:
-        if (j == particleId) {
-            continue;
-        }
-
-        const global Particle* p_j = &particles[j];
-        float d = distance(p_i->posStar, p_j->posStar);
-
-        if (R2 >= d) {
-            
-            if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
-                return;
-            }
-            
-            callback(parameters, particleId, p_i, j, p_j, dataArray, initialAccum);
-
-            neighborsSeen++;
-        }
-    }
-
-#else // Use fixed-radius neighbor search:
 
     // Given a particle, find the cell it's in based on its position:
 
@@ -561,7 +528,7 @@ global void forAllNeighbors(const global Parameters* parameters
                                                ,cellSubscript
                                                ,neighborCells);
     
-    // For all neighbors found for the given cell at grid subscript (i,j, k):
+    // For all neighbors found for the given cell at grid subscript (i,j,k):
 
     for (int j = 0; j < neighborCellCount; j++) {
         
@@ -569,60 +536,56 @@ global void forAllNeighbors(const global Parameters* parameters
         // the corresponding entries in gridCellOffsets (if neighbors[j]
         // is valid):
         
-        if (neighborCells[j] != -1) {
+        if (neighborCells[j] == -1) {
+            continue;
+        }
             
-            const global GridCellOffset* g = &gridCellOffsets[neighborCells[j]];
+        const global GridCellOffset* g = &gridCellOffsets[neighborCells[j]];
             
-            // If the start index of the grid-cell is valid, we iterate over
-            // every particle we find in the cell:
+        // If the start index of the grid-cell is valid, we iterate over
+        // every particle we find in the cell:
             
-            if (g->start != -1) {
+        if (g->start == -1) {
+            continue;
+        }
                 
-                int start = g->start;
-                int end   = start + g->length;
-                
-                for (int k = start; k < end; k++) {
-                    
-                    int J = sortedParticleToCell[k].particleIndex;
-                    
-                    // Skip instances in which we'd be comparing a particle to itself:
-                    
-                    if (particleId == J) {
-                        continue;
-                    }
-                    
-                    // The current potentially neighboring particle to check
-                    // the distance of:
-                    
-                    const global Particle* p_j = &particles[J];
-                    
-                    // To determine if p_j is actually a neighbor of p_i, we
-                    // test if the position delta is less then the sum of the
-                    // radii of both particles. If p_j is a neighbor of p_i,
-                    // we invoke the specified callback and accumulate the
-                    // result:
+        int start = g->start;
+        int end   = start + g->length;
+        
+        for (int k = start; k < end; k++) {
+            
+            int J = sortedParticleToCell[k].particleIndex;
+            
+            // Skip instances in which we'd be comparing a particle to itself:
+            
+            if (particleId == J) {
+                continue;
+            }
+            
+            // The current potentially neighboring particle to check
+            // the distance of:
+            
+            const global Particle* p_j = &particles[J];
+            
+            // To determine if p_j is actually a neighbor of p_i, we
+            // test if the position delta is less then the sum of the
+            // radii of both particles. If p_j is a neighbor of p_i,
+            // we invoke the specified callback and accumulate the
+            // result:
 
-                    float d = distance(p_i->posStar, p_j->posStar);
+            float d = distance(p_i->posStar, p_j->posStar);
+            float R = parameters->particleRadius + searchRadius;
+            
+            if ((d - R) <= 0.0f) {
 
-                    if (R2 >= d) {
-                        
-                        if (neighborsSeen >= CHECK_MAX_NEIGHBORS) {
-                            return;
-                        }
+                // Invoke the callback function to the particle pair
+                // (p_i, p_j), along with their respective indices,
+                // and accumulate the result into accum:
 
-                        // Invoke the callback function to the particle pair
-                        // (p_i, p_j), along with their respective indices,
-                        // and accumulate the result into accum:
-
-                        callback(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
-                    
-                        neighborsSeen++;
-                    }
-                }
+                callback(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
             }
         }
     }
-#endif
 }
 
 /*******************************************************************************
@@ -642,19 +605,13 @@ float poly6(float4 r, float h)
 {
     float rBar = length(r);
 
-    if (rBar < EPSILON) {
+    if (rBar < EPSILON || rBar > h) {
         return 0.0f;
     }
-    
-    /*
-    if (rBar > h) {
-        return 0.0f;
-    }
-    */
     
     // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
     float h9 = (h * h * h * h * h * h * h * h * h);
-    if (h9 == 0.0) {
+    if (h9 < EPSILON) {
         return 0.0f;
     }
     float A  = 1.566681471061f / h9;
@@ -676,19 +633,13 @@ float4 spiky(float4 r, float h)
 {
     float rBar = length(r);
 
-    if (rBar < EPSILON) {
+    if (rBar < EPSILON || rBar > h) {
         return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     }
-    
-    /*
-    if (rBar > h) {
-        return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    }
-    */
 
     // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
     float h6   = (h * h * h * h * h * h);
-    if (h6 == 0.0f) {
+    if (h6 < EPSILON) {
         return (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     }
     float A    = 14.323944878271f / h6;
@@ -824,7 +775,7 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // For the point delta Q, we use p_j->posStar as a starting point, and
     // add an offset value:
 
-    float offset    = (0.3f * h);
+    float offset    = (0.1f * h);
     float4 deltaQ   = p_i->posStar + (float4)(offset, offset, offset, 1.0f);
     float d         = poly6(deltaQ, h);
     float nd        = fabs(d) <= EPSILON ? 0.0f : n / d;
@@ -1193,6 +1144,7 @@ void kernel estimateDensity(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,parameters->particleRadius
                    ,(void*)particles
                    ,callback_SPHDensityEstimator_i
                    ,(void*)&estDensity);
@@ -1276,6 +1228,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,parameters->particleRadius
                    ,(void*)particles
                    ,callback_SPHGradient_i
                    ,(void*)&gv_i);
@@ -1299,6 +1252,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,parameters->particleRadius * 2.0f
                    ,(void*)particles
                    ,callback_SquaredSPHGradientLength_j
                    ,(void*)&gv_sLengths);
@@ -1370,6 +1324,7 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
+                   ,parameters->particleRadius * 3.0f
                    ,(void*)lambda
                    ,callback_PositionDelta_i
                    ,(void*)&posDelta_i);
@@ -1473,6 +1428,7 @@ kernel void computeCurl(const global Parameters* parameters
                     ,minExtent
                     ,maxExtent
                     ,id
+                    ,parameters->particleRadius * 2.0f
                     ,(void*)particles
                     ,callback_Curl_i
                     ,(void*)&omega_i);
@@ -1539,19 +1495,20 @@ kernel void updatePosition(const global Parameters* parameters
     float4 omegaGradient = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     
     forAllNeighbors(parameters
-                    ,particles
-                    ,sortedParticleToCell
-                    ,gridCellOffsets
-                    ,numParticles
-                    ,cellsX
-                    ,cellsY
-                    ,cellsZ
-                    ,minExtent
-                    ,maxExtent
-                    ,id
-                    ,(void*)curl
-                    ,callback_Vorticity_i
-                    ,(void*)&omegaGradient);
+                   ,particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,numParticles
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,minExtent
+                   ,maxExtent
+                   ,id
+                   ,parameters->particleRadius * 2.0f
+                   ,(void*)curl
+                   ,callback_Vorticity_i
+                   ,(void*)&omegaGradient);
     
     float n = length(omegaGradient);
     float4 N = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1569,22 +1526,21 @@ kernel void updatePosition(const global Parameters* parameters
     float4 v_i_sum = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
     
     forAllNeighbors(parameters
-                    ,particles
-                    ,sortedParticleToCell
-                    ,gridCellOffsets
-                    ,numParticles
-                    ,cellsX
-                    ,cellsY
-                    ,cellsZ
-                    ,minExtent
-                    ,maxExtent
-                    ,id
-                    ,(void*)particles
-                    ,callback_XPSHViscosity_i
-                    ,(void*)&v_i_sum);
-    
-    
-    
+                   ,particles
+                   ,sortedParticleToCell
+                   ,gridCellOffsets
+                   ,numParticles
+                   ,cellsX
+                   ,cellsY
+                   ,cellsZ
+                   ,minExtent
+                   ,maxExtent
+                   ,id
+                   ,parameters->particleRadius
+                   ,(void*)particles
+                   ,callback_XPSHViscosity_i
+                   ,(void*)&v_i_sum);
+
     p->vel = p->vel + (parameters->viscosityCoeff * v_i_sum);
     
     // ==== Update position x_i <- x*_i ========================================

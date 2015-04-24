@@ -28,7 +28,7 @@ void ofApp::setup()
     ofSetLogLevel(OF_LOG_VERBOSE);
 #endif
 
-    ofSetVerticalSync(false);
+    ofSetVerticalSync(true);
     
     // disable alpha blending, since we won't need it:
 
@@ -77,7 +77,7 @@ void ofApp::setup()
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
     int numParticles      = 207;
-    Parameters parameters = Constants::FOR_RADIUS_0_5;
+    Parameters parameters = Constants::DEFAULT_PARAMS;
 
     this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
                                                             ,bounds
@@ -90,14 +90,8 @@ void ofApp::setup()
 
     AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
     int numParticles      = 10000;
-    Parameters parameters = Constants::FOR_RADIUS_0_5;
+    Parameters parameters = Constants::DEFAULT_PARAMS;
 
-    /*
-    AABB bounds(ofVec3f(-10.0f, -10.0f, -5.0f), ofVec3f(10.0f, 10.0f, 5.0f));
-    int numParticles      = 2500;
-    Parameters parameters = Constants::FOR_RADIUS_0_25;
-    */
-    
     this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
                                                             ,bounds
                                                             ,numParticles
