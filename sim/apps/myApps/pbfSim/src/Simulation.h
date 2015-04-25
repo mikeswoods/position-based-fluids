@@ -121,7 +121,7 @@ class Simulation
     
         // Flag to toggle bounds animation on both sides of the simulation area
         bool animBothSides;
-    
+
         // Given a particle count, particle radius and world bounds,
         // find the "ideal" cell count per axis
         ofVec3f findIdealParticleCount();
@@ -131,6 +131,10 @@ class Simulation
     
         // Writes data from the host to buffers on the GPU (device)
         void writeToGPU();
+    
+        // Utility function to compute the next largest multiple of greater
+        // than N with the given base
+        size_t getNextMultipleOf(size_t N, size_t base);
     
     protected:
         // Particle mesh sphere
@@ -211,14 +215,17 @@ class Simulation
         // Final render position for OpenCL <-> OpenGL instanced rendering
         msa::OpenCLBufferManagedT<float4> renderPos;
     
+        // Finds the OpenCL workgroup size
+        size_t findWorkGroupSize(cl_kernel kernel);
+    
         // Initialization-related functions:
         void initialize();
         void initializeKernels();
         void initializeOpenGL();
 
         // Particle sorting functions:
-        void computeCellHistogram();
         void discretizeParticlePositions();
+        void computePrefixSums();
         void sortParticlesByCell();
     
         // Simulation state-related functions:

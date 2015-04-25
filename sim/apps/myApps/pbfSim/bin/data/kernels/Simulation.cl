@@ -877,6 +877,18 @@ void callback_XPSHViscosity_i(const global Parameters* parameters
  ******************************************************************************/
 
 /**
+ * A simple debugging kernel
+ */
+kernel void _debug(global ParticlePosition* p2c
+                  ,global int* cellHistogram
+                  ,int numParticles)
+{
+    for (int i = 0; i < numParticles; i++) {
+        printf("[%d] => key: %d\n", i, p2c[i].key);
+    }
+}
+
+/**
  * For all particles p_i in particles, this kernel resets all associated
  * quantities, like density, etc.
  */
@@ -1027,17 +1039,6 @@ kernel void sort(global ParticlePosition* in, global ParticlePosition* out)
     }
 
     out[pos] = *iData;
-}
-
-/**
- * sorting debug kernel
- */
-kernel void sortDebug(global ParticlePosition* p2c
-                     ,int numParticles)
-{
-    for (int i = 0; i < numParticles; i++) {
-        printf("[%d] => key: %d\n", i, p2c[i].key);
-    }
 }
 
 /**

@@ -23,6 +23,10 @@
 
 //#define DRAW_PARTICLES_AS_SPHERES 1
 
+#if defined(SIMPLE_SCENE) && !defined(DRAW_PARTICLES_AS_SPHERES)
+    #define DRAW_PARTICLES_AS_SPHERES 1
+#endif
+
 /******************************************************************************/
 
 namespace Constants {
@@ -30,7 +34,7 @@ namespace Constants {
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 4;
+const int SOLVER_ITERATIONS = 3;
    
 /**
  * Default number of particles in the simulation

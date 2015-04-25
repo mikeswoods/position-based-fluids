@@ -12,6 +12,7 @@
 		270E10041AE492F80035B686 /* CITATIONS.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10021AE492F70035B686 /* CITATIONS.md */; };
 		270E10051AE492F80035B686 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10031AE492F70035B686 /* README.md */; };
 		2712CA371AD76E760056EF01 /* Simulation.cl in Sources */ = {isa = PBXBuildFile; fileRef = 2712CA361AD76E760056EF01 /* Simulation.cl */; };
+		279329A31AEB58BD0083B898 /* Scan.cl in Sources */ = {isa = PBXBuildFile; fileRef = 279329A21AEB58BD0083B898 /* Scan.cl */; };
 		279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B26971AD62D9500B6B554 /* AABB.cpp */; };
 		279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B269A1AD62D9500B6B554 /* Simulation.cpp */; };
 		27A363041AE5A25700654DC8 /* Parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27A363031AE5A25700654DC8 /* Parameters.cpp */; };
@@ -108,6 +109,7 @@
 		270E10091AE494210035B686 /* SphereParticle.vert */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = SphereParticle.vert; path = bin/data/shaders/SphereParticle.vert; sourceTree = "<group>"; };
 		2712CA361AD76E760056EF01 /* Simulation.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Simulation.cl; path = bin/data/kernels/Simulation.cl; sourceTree = "<group>"; };
 		276C3E1E1ADEBF1C00492E07 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
+		279329A21AEB58BD0083B898 /* Scan.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Scan.cl; path = bin/data/kernels/Scan.cl; sourceTree = "<group>"; };
 		279B26971AD62D9500B6B554 /* AABB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AABB.cpp; sourceTree = "<group>"; };
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
 		279B269A1AD62D9500B6B554 /* Simulation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Simulation.cpp; sourceTree = "<group>"; };
@@ -240,6 +242,7 @@
 			isa = PBXGroup;
 			children = (
 				2712CA361AD76E760056EF01 /* Simulation.cl */,
+				279329A21AEB58BD0083B898 /* Scan.cl */,
 			);
 			name = kernels;
 			sourceTree = "<group>";
@@ -661,6 +664,7 @@
 				2712CA371AD76E760056EF01 /* Simulation.cl in Sources */,
 				270E10041AE492F80035B686 /* CITATIONS.md in Sources */,
 				27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */,
+				279329A31AEB58BD0083B898 /* Scan.cl in Sources */,
 				27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */,
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
 				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
