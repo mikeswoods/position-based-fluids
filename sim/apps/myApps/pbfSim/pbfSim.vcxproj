@@ -117,5 +117,14 @@
     <ClInclude Include="src\PrefixSum.h" />
     <ClInclude Include="src\Simulation.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="bin\data\kernels\Scan.cl" />
+    <None Include="bin\data\kernels\SelectionSort.cl" />
+    <None Include="bin\data\kernels\Simulation.cl" />
+    <None Include="bin\data\shaders\PointParticle.frag" />
+    <None Include="bin\data\shaders\PointParticle.vert" />
+    <None Include="bin\data\shaders\SphereParticle.frag" />
+    <None Include="bin\data\shaders\SphereParticle.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

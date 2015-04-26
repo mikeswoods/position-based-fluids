@@ -4,6 +4,12 @@
     <Filter Include="src">
       <UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{276b8d84-daf7-4941-b9ad-8762b0fd5319}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="kernels">
+      <UniqueIdentifier>{91620b98-cb6c-4dcb-8142-f731b9b8a1fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="icon.rc" />
@@ -47,5 +53,28 @@
     <ClInclude Include="src\PrefixSum.h">
       <Filter>src</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bin\data\shaders\PointParticle.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="bin\data\shaders\PointParticle.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="bin\data\shaders\SphereParticle.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="bin\data\shaders\SphereParticle.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="bin\data\kernels\Scan.cl">
+      <Filter>kernels</Filter>
+    </None>
+    <None Include="bin\data\kernels\SelectionSort.cl">
+      <Filter>kernels</Filter>
+    </None>
+    <None Include="bin\data\kernels\Simulation.cl">
+      <Filter>kernels</Filter>
+    </None>
   </ItemGroup>
 </Project>
