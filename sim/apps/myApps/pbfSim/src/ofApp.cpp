@@ -28,7 +28,8 @@ void ofApp::setup()
     ofSetLogLevel(OF_LOG_VERBOSE);
 #endif
 
-    ofSetVerticalSync(true);
+    //ofSetVerticalSync(true);
+    ofSetVerticalSync(false);
     
     // disable alpha blending, since we won't need it:
 
