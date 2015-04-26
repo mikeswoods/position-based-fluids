@@ -8,7 +8,12 @@
  
  ******************************************************************************/
 
+#include <algorithm>
 #include "PrefixSum.h"
+
+/******************************************************************************/
+
+using namespace std;
 
 /******************************************************************************/
 //
@@ -109,7 +114,7 @@ int PrefixSum::CreatePartialSumBuffers(unsigned int count)
     
     int level = 0;
     do {
-        unsigned int group_count = (int)fmax(1, (int)ceil((float)element_count / (2.0f * group_size)));
+        unsigned int group_count = (int)std::max(1, (int)ceil((float)element_count / (2.0f * group_size)));
 
         if (group_count > 1) {
             level++;
@@ -129,7 +134,7 @@ int PrefixSum::CreatePartialSumBuffers(unsigned int count)
     level = 0;
     
     do {
-        unsigned int group_count = (int)fmax(1, (int)ceil((float)element_count / (2.0f * group_size)));
+        unsigned int group_count = (int)std::max(1, (int)ceil((float)element_count / (2.0f * group_size)));
        
         if (group_count > 1) {
             ScanPartialSums[level++]->initBuffer(group_count * sizeof(float));
@@ -294,7 +299,7 @@ int PrefixSum::PreScanBufferRecursive(msa::OpenCLBuffer& output_data
                                      ,int level)
 {
     unsigned int group_size = max_group_size;
-    unsigned int group_count = (int)fmax(1.0f, (int)ceil((float)element_count / (2.0f * group_size)));
+    unsigned int group_count = (int)std::max(1, (int)ceil((float)element_count / (2.0f * group_size)));
     unsigned int work_item_count = 0;
     
     if (group_count > 1) {
@@ -309,7 +314,7 @@ int PrefixSum::PreScanBufferRecursive(msa::OpenCLBuffer& output_data
     
     unsigned int element_count_per_group = work_item_count * 2;
     unsigned int last_group_element_count = element_count - (group_count-1) * element_count_per_group;
-    unsigned int remaining_work_item_count = (int)fmax(1.0f, last_group_element_count / 2);
+    unsigned int remaining_work_item_count = static_cast<unsigned int>(std::max(static_cast<unsigned int>(1), last_group_element_count / 2));
     remaining_work_item_count = (remaining_work_item_count > max_work_item_count) ? max_work_item_count : remaining_work_item_count;
     unsigned int remainder = 0;
     size_t last_shared = 0;
@@ -328,7 +333,7 @@ int PrefixSum::PreScanBufferRecursive(msa::OpenCLBuffer& output_data
     }
     
     remaining_work_item_count = (remaining_work_item_count > max_work_item_count) ? max_work_item_count : remaining_work_item_count;
-    size_t global[] = { (int)fmax(1, group_count - remainder) * work_item_count, 1 };
+    size_t global[] = { (int)std::max(static_cast<unsigned int>(1), group_count - remainder) * work_item_count, 1 };
     size_t local[]  = { work_item_count, 1 };
     
     unsigned int padding = element_count_per_group / NUM_BANKS;

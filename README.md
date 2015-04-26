@@ -37,9 +37,11 @@ we are unable to test for compatibility on older versions of OSX.
   the graphics card/devices:
 
   - For __Intel__ cards and chipsets:
-    1. Download the latest [drivers](https://software.intel.com/en-us/articles/opencl-drivers)
+    1. Download the latest Intel graphics [drivers](https://software.intel.com/en-us/articles/opencl-drivers)
     2. Download the free edition of [OpenCL™ Code Builder with Intel® INDE](https://software.intel.com/en-us/intel-opencl) 
-       (formerly Intel® SDK for OpenCL™ Applications)
+       (formerly Intel® SDK for OpenCL™ Applications). This is needed for `OpenCL.lib` for Visual Studio to link against.
+       If it is installed correctly, you should see the environment variable __`INTELOCLSDKROOT`__ defined under
+       `System > Advanced System Settings > Environment Variable > System variables`
 
   - For __Nvidia__ cards and chipsets: 
     1. *TODO*

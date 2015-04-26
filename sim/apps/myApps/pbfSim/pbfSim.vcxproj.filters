@@ -24,6 +24,9 @@
     <ClCompile Include="src\Simulation.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\PrefixSum.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\AABB.h">
@@ -39,6 +42,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Simulation.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PrefixSum.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

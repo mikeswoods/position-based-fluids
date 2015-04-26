@@ -62,13 +62,31 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>..\..\..\openFrameworks;..\..\..\openFrameworks\graphics;..\..\..\openFrameworks\app;..\..\..\openFrameworks\sound;..\..\..\openFrameworks\utils;..\..\..\openFrameworks\communication;..\..\..\openFrameworks\video;..\..\..\openFrameworks\types;..\..\..\openFrameworks\math;..\..\..\openFrameworks\3d;..\..\..\openFrameworks\gl;..\..\..\openFrameworks\events;..\..\..\glut\include;..\..\..\rtAudio\include;..\..\..\quicktime\include;..\..\..\freetype\include;..\..\..\freetype\include\freetype2;..\..\..\freeImage\include;..\..\..\fmodex\include;..\..\..\videoInput\include;..\..\..\glew\include\;..\..\..\glu\include;..\..\..\tess2\include;..\..\..\cairo\include\cairo;..\..\..\poco\include;..\..\..\glfw\include;..\..\..\openssl\include;..\..\..\addons;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\opencl\include;..\..\..\openFrameworks;..\..\..\openFrameworks\graphics;..\..\..\openFrameworks\app;..\..\..\openFrameworks\sound;..\..\..\openFrameworks\utils;..\..\..\openFrameworks\communication;..\..\..\openFrameworks\video;..\..\..\openFrameworks\types;..\..\..\openFrameworks\math;..\..\..\openFrameworks\3d;..\..\..\openFrameworks\gl;..\..\..\openFrameworks\events;..\..\..\glut\include;..\..\..\rtAudio\include;..\..\..\quicktime\include;..\..\..\freetype\include;..\..\..\freetype\include\freetype2;..\..\..\freeImage\include;..\..\..\fmodex\include;..\..\..\videoInput\include;..\..\..\glew\include\;..\..\..\glu\include;..\..\..\tess2\include;..\..\..\cairo\include\cairo;..\..\..\poco\include;..\..\..\glfw\include;..\..\..\openssl\include;..\..\..\addons;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;POCO_STATIC;CAIRO_WIN32_STATIC_BUILD;DISABLE_SOME_FLOATING_POINT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxBaseGui.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxButton.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxGui.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxGuiGroup.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxLabel.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxPanel.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxSlider.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxSliderGroup.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxToggle.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCL.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBuffer.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBufferManagedT.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImage.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImagePingPong.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLKernel.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLMemoryObject.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLProgram.h" />
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLTypes.h" />
     <ClInclude Include="..\..\..\openFrameworks\3d\of3dPrimitives.h" />
     <ClInclude Include="..\..\..\openFrameworks\3d\of3dUtils.h" />
     <ClInclude Include="..\..\..\openFrameworks\3d\ofCamera.h" />
@@ -146,6 +164,20 @@
     <ClInclude Include="..\..\..\openFrameworks\events\ofEventUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxBaseGui.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxButton.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxGuiGroup.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxLabel.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxPanel.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxSlider.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxSliderGroup.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxToggle.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCL.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBuffer.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImage.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLKernel.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLMemoryObject.cpp" />
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLProgram.cpp" />
     <ClCompile Include="..\..\..\openFrameworks\3d\of3dPrimitives.cpp" />
     <ClCompile Include="..\..\..\openFrameworks\3d\of3dUtils.cpp" />
     <ClCompile Include="..\..\..\openFrameworks\3d\ofCamera.cpp" />

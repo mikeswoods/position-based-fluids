@@ -40,6 +40,12 @@
     <Filter Include="libs\openFrameworks\utils">
       <UniqueIdentifier>{e769ef16-c02a-402a-8eff-5d109f5a3a86}</UniqueIdentifier>
     </Filter>
+    <Filter Include="libs\ofxGui">
+      <UniqueIdentifier>{69b70cc3-5154-4c4e-9eaa-de3a2a47e591}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs\ofxMSAOpenCL">
+      <UniqueIdentifier>{ac6ca9d8-519b-4384-b388-a8948549832e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\openFrameworks\ofMain.h">
@@ -267,6 +273,60 @@
     <ClInclude Include="..\..\..\openFrameworks\utils\ofXml.h">
       <Filter>libs\openFrameworks\utils</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxBaseGui.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxButton.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxGui.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxGuiGroup.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxLabel.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxPanel.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxSlider.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxSliderGroup.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxGui\src\ofxToggle.h">
+      <Filter>libs\ofxGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCL.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBuffer.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBufferManagedT.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImage.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImagePingPong.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLKernel.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLMemoryObject.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLProgram.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLTypes.h">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\openFrameworks\app\ofAppGlutWindow.cpp">
@@ -457,6 +517,48 @@
     </ClCompile>
     <ClCompile Include="..\..\..\openFrameworks\utils\ofXml.cpp">
       <Filter>libs\openFrameworks\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxBaseGui.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxButton.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxGuiGroup.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxLabel.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxPanel.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxSlider.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxSliderGroup.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxGui\src\ofxToggle.cpp">
+      <Filter>libs\ofxGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCL.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLBuffer.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLImage.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLKernel.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLMemoryObject.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\addons\ofxMSAOpenCL\src\MSAOpenCLProgram.cpp">
+      <Filter>libs\ofxMSAOpenCL</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
