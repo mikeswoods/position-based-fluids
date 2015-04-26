@@ -388,7 +388,7 @@ void Simulation::initializeKernels()
     // === Simulation.cl : the basis for the PBF simulation ====================
     
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
-    
+
     // KERNEL :: debugHistogram
     
     this->openCL.loadKernel("debugHistogram");
@@ -445,7 +445,7 @@ void Simulation::initializeKernels()
     this->openCL.kernel("countSortParticlesByCell")->setArg(0, this->particleToCell);
     this->openCL.kernel("countSortParticlesByCell")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("countSortParticlesByCell")->setArg(2, this->cellPrefixSums);
-     this->openCL.kernel("countSortParticlesByCell")->setArg(3, this->numParticles);
+    this->openCL.kernel("countSortParticlesByCell")->setArg(3, this->numParticles);
     
     // KERNEL :: findParticleBins
     
@@ -904,16 +904,20 @@ void Simulation::discretizeParticlePositions()
 void Simulation::sortParticlesByCell()
 {
     // First, compute the prefix sums of the entries of the cell histogram:
+    
     this->prefixSum->scan(this->cellPrefixSums, this->cellHistogram, this->numCells);
     
     // next, use the prefix sums to determine the sorted position of the
     // particles:
     
     this->openCL.kernel("countSortParticlesByCell")->run1D(this->numParticles);
-    //this->openCL.kernel("countSortParticlesByCell")->run1D(1);
 
-    this->openCL.kernel("debugHistogram")->run1D(1);
-    this->openCL.kernel("debugSorting")->run1D(1);
+    //this->openCL.kernel("debugHistogram")->run1D(1);
+    //this->openCL.kernel("debugSorting")->run1D(1);
+    
+    // Finally, compute the bins/cells that each particle is in and store
+    // the (start,length) tuples for each grid cell span in an array, which we
+    // will use for lookup later:
     
     this->openCL.kernel("findParticleBins")->run1D(this->numParticles);
 }

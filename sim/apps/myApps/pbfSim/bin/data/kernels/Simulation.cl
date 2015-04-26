@@ -1039,7 +1039,8 @@ kernel void discretizeParticlePositions(const global Particle* particles
  */
 kernel void countSortParticlesByCell(global ParticlePosition* particleToCell
                                     ,global ParticlePosition* sortedParticleToCell
-                                    ,global int* cellPrefixSums)
+                                    ,global int* cellPrefixSums
+                                    ,int numParticles)
 {
     int id = get_global_id(0);
     global ParticlePosition* p2c = &particleToCell[id];
