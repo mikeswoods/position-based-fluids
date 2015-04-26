@@ -154,14 +154,6 @@ void Simulation::writeToGPU()
 }
 
 /**
- * Computes the next multiple greater than N of the given base
- */
-size_t Simulation::getNextMultipleOf(size_t N, size_t base)
-{
-    return ceil(static_cast<float>(N) / static_cast<float>(base) * base);
-}
-
-/**
  * Returns the current simulation parameters
  */
 const Parameters& Simulation::getParameters() const
@@ -272,11 +264,10 @@ void Simulation::initialize()
     // z = i + (j * GRIDWIDTH) + (k * GRIDWIDTH * GRIDHEIGHT)
 
     this->cellHistogram.initBuffer(this->numCells * sizeof(int));
-    
-    // Additional data buffers used by parallel counting sort:
-    
-    this->aux.initBuffer(this->numParticles * sizeof(ParticlePosition));
-    
+
+    // TODO
+    this->cellPrefixSums.initBuffer(this->numCells * sizeof(int));
+
     // The density/lambda/vorticity curl force values associated with each
     // particle. The i-th density corresponds to the i-th quantitity in each
     // buffer:
@@ -398,13 +389,20 @@ void Simulation::initializeKernels()
     
     this->openCL.loadProgramFromFile("kernels/Simulation.cl");
     
-    // KERNEL :: debug
+    // KERNEL :: debugHistogram
     
-    this->openCL.loadKernel("_debug");
-    this->openCL.kernel("_debug")->setArg(0, this->sortedParticleToCell);
-    this->openCL.kernel("_debug")->setArg(1, this->cellHistogram);
-    this->openCL.kernel("_debug")->setArg(2, this->numParticles);
+    this->openCL.loadKernel("debugHistogram");
+    this->openCL.kernel("debugHistogram")->setArg(0, this->cellHistogram);
+    this->openCL.kernel("debugHistogram")->setArg(1, this->cellPrefixSums);
+    this->openCL.kernel("debugHistogram")->setArg(2, this->numCells);
     
+    // KERNEL :: debugSorting
+
+    this->openCL.loadKernel("debugSorting");
+    this->openCL.kernel("debugSorting")->setArg(0, this->particleToCell);
+    this->openCL.kernel("debugSorting")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("debugSorting")->setArg(2, this->numParticles);
+
     // KERNEL :: resetParticleQuantities
 
     this->openCL.loadKernel("resetParticleQuantities");
@@ -419,7 +417,8 @@ void Simulation::initializeKernels()
 
     this->openCL.loadKernel("resetCellQuantities");
     this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
-    this->openCL.kernel("resetCellQuantities")->setArg(1, this->gridCellOffsets);
+    this->openCL.kernel("resetCellQuantities")->setArg(1, this->cellPrefixSums);
+    this->openCL.kernel("resetCellQuantities")->setArg(2, this->gridCellOffsets);
 
     // KERNEL :: predictPosition
 
@@ -440,13 +439,14 @@ void Simulation::initializeKernels()
     this->openCL.kernel("discretizeParticlePositions")->setArg(6, minExt);
     this->openCL.kernel("discretizeParticlePositions")->setArg(7, maxExt);
 
-    // KERNEL :: parallel sort
+    // KERNEL :: countSortParticlesByCell
     
-    this->openCL.loadKernel("sort");
-    this->openCL.kernel("sort")->setArg(0, this->particleToCell);
-    this->openCL.kernel("sort")->setArg(1, this->sortedParticleToCell);
-    //this->openCL.kernel("sort")->setArg(2, this->aux);
-
+    this->openCL.loadKernel("countSortParticlesByCell");
+    this->openCL.kernel("countSortParticlesByCell")->setArg(0, this->particleToCell);
+    this->openCL.kernel("countSortParticlesByCell")->setArg(1, this->sortedParticleToCell);
+    this->openCL.kernel("countSortParticlesByCell")->setArg(2, this->cellPrefixSums);
+     this->openCL.kernel("countSortParticlesByCell")->setArg(3, this->numParticles);
+    
     // KERNEL :: findParticleBins
     
     this->openCL.loadKernel("findParticleBins");
@@ -547,13 +547,18 @@ void Simulation::initializeKernels()
     this->openCL.kernel("updatePosition")->setArg(11, maxExt);
     this->openCL.kernel("updatePosition")->setArg(12, this->renderPos);
     
-    // === Scan.cl : parallel prefix-summation =================================
+    // Set up the kernels for computing a prefix sum ("scan") in parallel:
+    this->prefixSum = shared_ptr<PrefixSum>(new PrefixSum(this->openCL));
     
-    this->openCL.loadProgramFromFile("kernels/Scan.cl");
     
-    // KERNEL :: prefix_scan
-
-    this->openCL.loadKernel("prefixScan");
+    // KERNEL :: parallel sort
+    /*
+    this->openCL.loadProgramFromFile("kernels/SelectionSort.cl");
+    
+    this->openCL.loadKernel("selectionSort");
+    this->openCL.kernel("selectionSort")->setArg(0, this->particleToCell);
+    this->openCL.kernel("selectionSort")->setArg(1, this->sortedParticleToCell);
+    */
 }
 
 /******************************************************************************/
@@ -848,7 +853,6 @@ void Simulation::draw(const ofCamera& camera)
 void Simulation::findNeighboringParticles()
 {
     this->discretizeParticlePositions();
-    //this->computePrefixSums();
     this->sortParticlesByCell();
 }
 
@@ -889,42 +893,6 @@ void Simulation::discretizeParticlePositions()
 }
 
 /**
- * Computes the prefix sum of the cell histogram, a necessary step of the 
- * counting sort for fast nearest neighbor search later
- *
- * Code adapted from "clpp: OpenCL Data Parallel Primitives Library"
- * https://code.google.com/p/clpp/
- *
- * @see kernels/Simulation.cl (prefixScan) for details
- */
-void Simulation::computePrefixSums()
-{
-    //    this->openCL.kernel("_debug")->run1D(1);
-    
-    auto prefixScan      = this->openCL.kernel("prefixScan");
-    size_t workGroupSize = this->findWorkGroupSize(prefixScan->getCLKernel());
-    int blockSize        = this->numParticles / workGroupSize;
-    int B                = blockSize * workGroupSize;
-
-    if ((this->numParticles % workGroupSize) > 0) {
-        blockSize++;
-    };
-    
-    size_t localWorkSize  = workGroupSize;
-    size_t globalWorkSize = this->getNextMultipleOf(this->numParticles / blockSize, workGroupSize);
-
-    this->openCL.kernel("prefixScan")->setArg(0, NULL, workGroupSize * sizeof(int));
-    this->openCL.kernel("prefixScan")->setArg(1, this->cellHistogram);
-    this->openCL.kernel("prefixScan")->setArg(2, B);
-    this->openCL.kernel("prefixScan")->setArg(3, this->numParticles);
-    this->openCL.kernel("prefixScan")->setArg(4, blockSize);
-
-    //this->openCL.kernel("prefixScan")->run1D(globalWorkSize, localWorkSize);
-    
-    //    this->openCL.kernel("_debug")->run1D(1);
-}
-
-/**
  * Sorts the particles by the assigned grid cell. Following the run of this
  * function, sortedParticleToCell (on the GPU) will contain a
  * listing of ParticlePosition, that are sorted by linearized cell indices, e.g.
@@ -935,7 +903,18 @@ void Simulation::computePrefixSums()
  */
 void Simulation::sortParticlesByCell()
 {
-    this->openCL.kernel("sort")->run1D(this->numParticles);
+    // First, compute the prefix sums of the entries of the cell histogram:
+    this->prefixSum->scan(this->cellPrefixSums, this->cellHistogram, this->numCells);
+    
+    // next, use the prefix sums to determine the sorted position of the
+    // particles:
+    
+    this->openCL.kernel("countSortParticlesByCell")->run1D(this->numParticles);
+    //this->openCL.kernel("countSortParticlesByCell")->run1D(1);
+
+    this->openCL.kernel("debugHistogram")->run1D(1);
+    this->openCL.kernel("debugSorting")->run1D(1);
+    
     this->openCL.kernel("findParticleBins")->run1D(this->numParticles);
 }
 

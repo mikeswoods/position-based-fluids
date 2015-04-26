@@ -4,13 +4,15 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
-#ifndef SIMULATION_H
-#define SIMULATION_H
+#ifndef PBF_SIM_SIMULATION_H
+#define PBF_SIM_SIMULATION_H
 
 #include <iostream>
+#include <memory>
 #include "Parameters.h"
 #include "Constants.h"
 #include "AABB.h"
+#include "PrefixSum.h"
 #include "MSAOpenCL.h"
 
 /******************************************************************************/
@@ -131,11 +133,7 @@ class Simulation
     
         // Writes data from the host to buffers on the GPU (device)
         void writeToGPU();
-    
-        // Utility function to compute the next largest multiple of greater
-        // than N with the given base
-        size_t getNextMultipleOf(size_t N, size_t base);
-    
+
     protected:
         // Particle mesh sphere
         ofMesh particleMesh;
@@ -145,6 +143,11 @@ class Simulation
     
         // OpenCL manager
         msa::OpenCL& openCL;
+    
+        // Used to compute the prefix sum of the cell histogram array. This
+        // is needed in order to sort the particles by grid cell so fast,
+        // fixed-radius particle neighbor lookup is possible
+        std::shared_ptr<PrefixSum> prefixSum;
     
         // Basic shader
         ofShader shader;
@@ -164,7 +167,7 @@ class Simulation
 
         // Simulation parameters to pass to the kernels
         Parameters parameters;
-    
+ 
         // And the buffer to hold the parameters on the GPU:
         msa::OpenCLBuffer parameterBuffer;
     
@@ -179,10 +182,10 @@ class Simulation
         // - Buffer of ints
         msa::OpenCLBuffer cellHistogram;
     
-        // Used by counting sort as an auxiliary sort buffer
+        // Prefix sums computed from the cell histogram array
         // - Buffer of ints
-        msa::OpenCLBuffer aux;
-    
+        msa::OpenCLBuffer cellPrefixSums;
+
         // A sorted version of particleToCell, used to search for a given
         // particle's neighbors
         // - Buffer of ParticlePosition
@@ -225,7 +228,6 @@ class Simulation
 
         // Particle sorting functions:
         void discretizeParticlePositions();
-        void computePrefixSums();
         void sortParticlesByCell();
     
         // Simulation state-related functions:

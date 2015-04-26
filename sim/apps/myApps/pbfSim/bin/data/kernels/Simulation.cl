@@ -879,12 +879,25 @@ void callback_XPSHViscosity_i(const global Parameters* parameters
 /**
  * A simple debugging kernel
  */
-kernel void _debug(global ParticlePosition* p2c
-                  ,global int* cellHistogram
-                  ,int numParticles)
+kernel void debugHistogram(global int* cellHistogram
+                          ,global int* prefixSums
+                          ,int numCells)
+{
+    for (int i = 0; i < numCells; i++) {
+        printf("HISTOGRAM [%d] => %d, PREFIX-SUM[%d] => %d\n", i, cellHistogram[i], i, prefixSums[i]);
+    }
+}
+
+/**
+ * A simple debugging kernel
+ */
+kernel void debugSorting(global ParticlePosition* P2C
+                        ,global ParticlePosition* sortedP2C
+                        ,int numParticles)
 {
     for (int i = 0; i < numParticles; i++) {
-        printf("[%d] => key: %d\n", i, p2c[i].key);
+        printf("[%d] <particle=%d, key = %d>, SORTED: <particle=%d, key = %d>\n",
+               i, P2C[i].particleIndex, P2C[i].key, sortedP2C[i].particleIndex, sortedP2C[i].key);
     }
 }
 
@@ -919,11 +932,12 @@ kernel void resetParticleQuantities(global Particle* particles
  * quantities
  */
 kernel void resetCellQuantities(global int* cellHistogram
+                               ,global int* cellPrefixSums
                                ,global GridCellOffset* gridCellOffsets)
 {
     int id = get_global_id(0);
 
-    cellHistogram[id] = 0;
+    cellHistogram[id] = cellPrefixSums[id] = 0;
 
     gridCellOffsets[id].start  = -1;
     gridCellOffsets[id].length = -1;
@@ -1010,35 +1024,34 @@ kernel void discretizeParticlePositions(const global Particle* particles
     p2c->cellK = subscript.z;
     p2c->key   = key;
 
-    // This is needed; "cellHistogram[z] += 1" won't work here as multiple
-    // threads are modifying cellHistogram simultaneously:
+    // Next, we increment the count of particles contained in a given cell
+    // in the spatial grid. Since multiple threads are modifying cellHistogram
+    // simultaneously, need to ensure that we increment the count associated
+    // with each cell is done atomically, hence we use the OpenCL atomic_add
+    // primitive to increment the count.
 
     atomic_add(&cellHistogram[key], 1);
 }
 
 /**
- * Parallel sort
- * Eric Bainville - June 2011
+ * Using the prefix sums generated from the cell histogram, we can sort the
+ * particles by grid cell using a simple, easily parallelizable counting sort
  */
-kernel void sort(global ParticlePosition* in, global ParticlePosition* out)
+kernel void countSortParticlesByCell(global ParticlePosition* particleToCell
+                                    ,global ParticlePosition* sortedParticleToCell
+                                    ,global int* cellPrefixSums)
 {
-    int i = get_global_id(0); // current thread
-    int n = get_global_size(0); // input size
-    global ParticlePosition* iData = &in[i];
+    int id = get_global_id(0);
+    global ParticlePosition* p2c = &particleToCell[id];
 
-    int iKey = iData->key;
+    // Again, due to the way OpenCL manages thread level parallelism, we need
+    // to atomic_add and operate on the "old" index.
+    // See http://stackoverflow.com/questions/18366359/opencl-kernel-incrementing-index-of-array
+    // for details, specifically http://stackoverflow.com/a/18392827
 
-    // Compute position of in[i] in output
+    int next = atomic_add(&cellPrefixSums[p2c->key], 1);
 
-    int pos = 0;
-
-    for (int j=0; j<n; j++) {
-        int jKey     = in[j].key; // broadcasted
-        bool smaller = (jKey < iKey) || (jKey == iKey && j < i);  // in[j] < in[i] ?
-        pos += (smaller) ? 1 : 0;
-    }
-
-    out[pos] = *iData;
+    sortedParticleToCell[next] = *p2c;
 }
 
 /**
@@ -1561,3 +1574,4 @@ kernel void updatePosition(const global Parameters* parameters
     
     renderPos[id].w = 1.0f;
 }
+

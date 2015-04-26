@@ -1,5 +1,5 @@
 /*******************************************************************************
- * ofApp
+ * ofApp.cpp
  * - The OpenFrameworks application entry point
  *
  * CIS563: Physically Based Animation final project
@@ -76,7 +76,7 @@ void ofApp::setup()
 #ifdef SIMPLE_SCENE
 
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles      = 10;
+    int numParticles      = 47;
     Parameters parameters = Constants::DEFAULT_PARAMS;
 
     this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL

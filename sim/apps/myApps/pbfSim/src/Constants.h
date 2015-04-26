@@ -4,8 +4,8 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
-#ifndef CONSTANTS_H
-#define CONSTANTS_H
+#ifndef PBF_SIM_CONSTANTS_H
+#define PBF_SIM_CONSTANTS_H
 
 #include "Parameters.h"
 
@@ -16,7 +16,7 @@
 //#define ENABLE_LOGGING 1
 
 // If defined, a simple test scene will be used for rendering
-//#define SIMPLE_SCENE 1
+#define SIMPLE_SCENE 1
 
 // If defined, mesh spheres will be drawn for the particles, otherwise
 // faster OpenGL points will be used:

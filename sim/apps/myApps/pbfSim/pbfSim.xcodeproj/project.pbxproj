@@ -12,16 +12,18 @@
 		270E10041AE492F80035B686 /* CITATIONS.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10021AE492F70035B686 /* CITATIONS.md */; };
 		270E10051AE492F80035B686 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10031AE492F70035B686 /* README.md */; };
 		2712CA371AD76E760056EF01 /* Simulation.cl in Sources */ = {isa = PBXBuildFile; fileRef = 2712CA361AD76E760056EF01 /* Simulation.cl */; };
-		279329A31AEB58BD0083B898 /* Scan.cl in Sources */ = {isa = PBXBuildFile; fileRef = 279329A21AEB58BD0083B898 /* Scan.cl */; };
+		275FAB621AEC655200B7EFF0 /* Scan.cl in Sources */ = {isa = PBXBuildFile; fileRef = 275FAB611AEC655200B7EFF0 /* Scan.cl */; };
 		279B269C1AD62D9500B6B554 /* AABB.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B26971AD62D9500B6B554 /* AABB.cpp */; };
 		279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 279B269A1AD62D9500B6B554 /* Simulation.cpp */; };
 		27A363041AE5A25700654DC8 /* Parameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27A363031AE5A25700654DC8 /* Parameters.cpp */; };
+		27A55FEA1AEC3F1800831EE7 /* PrefixSum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27A55FE81AEC3F1800831EE7 /* PrefixSum.cpp */; };
 		27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */; };
 		27BB07281AD7148E009F3377 /* MSAOpenCLBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */; };
 		27BB07291AD7148E009F3377 /* MSAOpenCLImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB07181AD7148E009F3377 /* MSAOpenCLImage.cpp */; };
 		27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071B1AD7148E009F3377 /* MSAOpenCLKernel.cpp */; };
 		27BB072B1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071D1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp */; };
 		27BB072C1AD7148E009F3377 /* MSAOpenCLProgram.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 27BB071F1AD7148E009F3377 /* MSAOpenCLProgram.cpp */; };
+		27D10C791AECA2E5004138D5 /* SelectionSort.cl in Sources */ = {isa = PBXBuildFile; fileRef = 27D10C781AECA2E5004138D5 /* SelectionSort.cl */; };
 		3B8120368B4FCCD80883BAF3 /* ofxAssimpAnimation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36068D6C1D6D412786A5C4C1 /* ofxAssimpAnimation.cpp */; };
 		483908258D00B98B4BE69F07 /* ofxLabel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 78D67A00EB899FAC09430597 /* ofxLabel.cpp */; };
 		483FA4F6D5FA6422C559B1F5 /* ofxAssimpMeshHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F67FE68E327BEFBD4B777571 /* ofxAssimpMeshHelper.cpp */; };
@@ -108,14 +110,16 @@
 		270E10081AE494210035B686 /* SphereParticle.frag */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = SphereParticle.frag; path = bin/data/shaders/SphereParticle.frag; sourceTree = "<group>"; };
 		270E10091AE494210035B686 /* SphereParticle.vert */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = SphereParticle.vert; path = bin/data/shaders/SphereParticle.vert; sourceTree = "<group>"; };
 		2712CA361AD76E760056EF01 /* Simulation.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Simulation.cl; path = bin/data/kernels/Simulation.cl; sourceTree = "<group>"; };
+		275FAB611AEC655200B7EFF0 /* Scan.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Scan.cl; path = bin/data/kernels/Scan.cl; sourceTree = "<group>"; };
 		276C3E1E1ADEBF1C00492E07 /* Constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Constants.h; sourceTree = "<group>"; };
-		279329A21AEB58BD0083B898 /* Scan.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = Scan.cl; path = bin/data/kernels/Scan.cl; sourceTree = "<group>"; };
 		279B26971AD62D9500B6B554 /* AABB.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AABB.cpp; sourceTree = "<group>"; };
 		279B26981AD62D9500B6B554 /* AABB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AABB.h; sourceTree = "<group>"; };
 		279B269A1AD62D9500B6B554 /* Simulation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Simulation.cpp; sourceTree = "<group>"; };
 		279B269B1AD62D9500B6B554 /* Simulation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Simulation.h; sourceTree = "<group>"; };
 		27A363021AE5A10900654DC8 /* Parameters.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parameters.h; sourceTree = "<group>"; };
 		27A363031AE5A25700654DC8 /* Parameters.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Parameters.cpp; sourceTree = "<group>"; };
+		27A55FE81AEC3F1800831EE7 /* PrefixSum.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PrefixSum.cpp; sourceTree = "<group>"; };
+		27A55FE91AEC3F1800831EE7 /* PrefixSum.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PrefixSum.h; sourceTree = "<group>"; };
 		27BB07131AD7148E009F3377 /* MSAOpenCL.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCL.cpp; sourceTree = "<group>"; };
 		27BB07141AD7148E009F3377 /* MSAOpenCL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCL.h; sourceTree = "<group>"; };
 		27BB07151AD7148E009F3377 /* MSAOpenCLBuffer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = MSAOpenCLBuffer.cpp; sourceTree = "<group>"; };
@@ -132,6 +136,7 @@
 		27BB07201AD7148E009F3377 /* MSAOpenCLProgram.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLProgram.h; sourceTree = "<group>"; };
 		27BB07211AD7148E009F3377 /* MSAOpenCLTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MSAOpenCLTypes.h; sourceTree = "<group>"; };
 		27BB07261AD7148E009F3377 /* nvidia-cuda-opencl-include.props */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "nvidia-cuda-opencl-include.props"; sourceTree = "<group>"; };
+		27D10C781AECA2E5004138D5 /* SelectionSort.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = SelectionSort.cl; path = bin/data/kernels/SelectionSort.cl; sourceTree = "<group>"; };
 		2834D88A62CD23F3DE2C47D1 /* ofxButton.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxButton.h; path = ../../../addons/ofxGui/src/ofxButton.h; sourceTree = SOURCE_ROOT; };
 		28904A3F685CCE2D22B588E9 /* aiVector2D.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = aiVector2D.h; path = ../../../addons/ofxAssimpModelLoader/libs/assimp/include/aiVector2D.h; sourceTree = SOURCE_ROOT; };
 		36068D6C1D6D412786A5C4C1 /* ofxAssimpAnimation.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxAssimpAnimation.cpp; path = ../../../addons/ofxAssimpModelLoader/src/ofxAssimpAnimation.cpp; sourceTree = SOURCE_ROOT; };
@@ -242,7 +247,8 @@
 			isa = PBXGroup;
 			children = (
 				2712CA361AD76E760056EF01 /* Simulation.cl */,
-				279329A21AEB58BD0083B898 /* Scan.cl */,
+				275FAB611AEC655200B7EFF0 /* Scan.cl */,
+				27D10C781AECA2E5004138D5 /* SelectionSort.cl */,
 			);
 			name = kernels;
 			sourceTree = "<group>";
@@ -501,6 +507,8 @@
 				276C3E1E1ADEBF1C00492E07 /* Constants.h */,
 				27A363021AE5A10900654DC8 /* Parameters.h */,
 				27A363031AE5A25700654DC8 /* Parameters.cpp */,
+				27A55FE81AEC3F1800831EE7 /* PrefixSum.cpp */,
+				27A55FE91AEC3F1800831EE7 /* PrefixSum.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -662,14 +670,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				2712CA371AD76E760056EF01 /* Simulation.cl in Sources */,
+				27A55FEA1AEC3F1800831EE7 /* PrefixSum.cpp in Sources */,
 				270E10041AE492F80035B686 /* CITATIONS.md in Sources */,
 				27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */,
-				279329A31AEB58BD0083B898 /* Scan.cl in Sources */,
 				27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */,
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
 				E4B69E210A3A1BDC003C02F2 /* ofApp.cpp in Sources */,
 				27BB072B1AD7148E009F3377 /* MSAOpenCLMemoryObject.cpp in Sources */,
 				4E322024174AFB49A3BEA152 /* model3DS.cpp in Sources */,
+				275FAB621AEC655200B7EFF0 /* Scan.cl in Sources */,
 				279B269D1AD62D9500B6B554 /* Simulation.cpp in Sources */,
 				27A363041AE5A25700654DC8 /* Parameters.cpp in Sources */,
 				C2B7714E50909A7BCAE5A51C /* texture3DS.cpp in Sources */,
@@ -687,6 +696,7 @@
 				483908258D00B98B4BE69F07 /* ofxLabel.cpp in Sources */,
 				27BB072C1AD7148E009F3377 /* MSAOpenCLProgram.cpp in Sources */,
 				F285EB3169F1566CA3D93C20 /* ofxPanel.cpp in Sources */,
+				27D10C791AECA2E5004138D5 /* SelectionSort.cl in Sources */,
 				27BB07291AD7148E009F3377 /* MSAOpenCLImage.cpp in Sources */,
 				837220E80EB56CD44AD27F2A /* ofxSlider.cpp in Sources */,
 				B56FE57CC35806596D38118C /* ofxSliderGroup.cpp in Sources */,

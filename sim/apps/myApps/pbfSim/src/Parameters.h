@@ -4,8 +4,8 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
-#ifndef PARAMETERS_H
-#define PARAMETERS_H
+#ifndef PBF_SIM_PARAMETERS_H
+#define PBF_SIM_PARAMETERS_H
 
 #include <iostream>
 

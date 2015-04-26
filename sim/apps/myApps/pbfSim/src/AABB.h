@@ -6,8 +6,8 @@
  * Created by Michael Woods & Michael O'Meara
  ******************************************************************************/
 
-#ifndef AABB_H
-#define AABB_H
+#ifndef PBF_SIM_AABB_H
+#define PBF_SIM_AABB_H
 
 #include <iostream>
 #include "MSAOpenCL.h"
