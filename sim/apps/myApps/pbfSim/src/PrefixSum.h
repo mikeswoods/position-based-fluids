@@ -11,7 +11,6 @@
 #include <cmath>
 #include <vector>
 #include "MSAOpenCL.h"
-#include <OpenCL/opencl.h>
 
 /******************************************************************************/
 

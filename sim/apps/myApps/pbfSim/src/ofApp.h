@@ -12,8 +12,6 @@
 class ofApp : public ofBaseApp
 {
     private:
-        bool cameraSet = false;
-    
         void setSineAnim();
         void setRampAnim();
         void setCompressAnim();

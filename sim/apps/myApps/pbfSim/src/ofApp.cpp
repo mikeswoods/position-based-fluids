@@ -62,10 +62,7 @@ void ofApp::setup()
     
     // set the camera's distance from the object:
 
-    if (!this->cameraSet) {
-        this->camera.setDistance(50);
-        this->cameraSet = true;
-    }
+    this->camera.setDistance(50);
 
     // Initialize from GL world:
 
