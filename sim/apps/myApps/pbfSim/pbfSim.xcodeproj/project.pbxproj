@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		1CD33E884D9E3358252E82A1 /* ofxToggle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 907C5B5E104864A2D3A25745 /* ofxToggle.cpp */; };
 		270A4D9E1AD7370900E21F51 /* OpenCL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 270A4D9D1AD7370900E21F51 /* OpenCL.framework */; };
-		270E10041AE492F80035B686 /* CITATIONS.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10021AE492F70035B686 /* CITATIONS.md */; };
 		270E10051AE492F80035B686 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 270E10031AE492F70035B686 /* README.md */; };
 		2712CA371AD76E760056EF01 /* Simulation.cl in Sources */ = {isa = PBXBuildFile; fileRef = 2712CA361AD76E760056EF01 /* Simulation.cl */; };
 		275FAB621AEC655200B7EFF0 /* Scan.cl in Sources */ = {isa = PBXBuildFile; fileRef = 275FAB611AEC655200B7EFF0 /* Scan.cl */; };
@@ -103,7 +102,6 @@
 		1EAED5CFFEF5186B86807891 /* aiAssert.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = aiAssert.h; path = ../../../addons/ofxAssimpModelLoader/libs/assimp/include/aiAssert.h; sourceTree = SOURCE_ROOT; };
 		1F75A6D2A65723A63E2341DB /* Vector3DS.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = Vector3DS.h; path = ../../../addons/ofx3DModelLoader/src/3DS/Vector3DS.h; sourceTree = SOURCE_ROOT; };
 		270A4D9D1AD7370900E21F51 /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
-		270E10021AE492F70035B686 /* CITATIONS.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = CITATIONS.md; path = ../../../../CITATIONS.md; sourceTree = "<group>"; };
 		270E10031AE492F70035B686 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../../../../README.md; sourceTree = "<group>"; };
 		270E10061AE494210035B686 /* PointParticle.frag */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = PointParticle.frag; path = bin/data/shaders/PointParticle.frag; sourceTree = "<group>"; };
 		270E10071AE494210035B686 /* PointParticle.vert */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = PointParticle.vert; path = bin/data/shaders/PointParticle.vert; sourceTree = "<group>"; };
@@ -480,7 +478,6 @@
 		E4B69B4A0A3A1720003C02F2 = {
 			isa = PBXGroup;
 			children = (
-				270E10021AE492F70035B686 /* CITATIONS.md */,
 				270E10031AE492F70035B686 /* README.md */,
 				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
 				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
@@ -671,7 +668,6 @@
 			files = (
 				2712CA371AD76E760056EF01 /* Simulation.cl in Sources */,
 				27A55FEA1AEC3F1800831EE7 /* PrefixSum.cpp in Sources */,
-				270E10041AE492F80035B686 /* CITATIONS.md in Sources */,
 				27BB07271AD7148E009F3377 /* MSAOpenCL.cpp in Sources */,
 				27BB072A1AD7148E009F3377 /* MSAOpenCLKernel.cpp in Sources */,
 				E4B69E200A3A1BDC003C02F2 /* main.cpp in Sources */,
