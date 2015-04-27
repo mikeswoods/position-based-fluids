@@ -13,7 +13,10 @@
  * Preprocessor directives
  ******************************************************************************/
 
-//#define USE_BRUTE_FORCE_SEARCH 1
+#define NEIGHBOR_SEARCH_RADIUS 3
+//#define NEIGHBOR_SEARCH_RADIUS 4
+//#define NEIGHBOR_SEARCH_RADIUS 5
+#define TOTAL_NEIGHBORS ((NEIGHBOR_SEARCH_RADIUS)*(NEIGHBOR_SEARCH_RADIUS)*(NEIGHBOR_SEARCH_RADIUS))
 
 /*******************************************************************************
  * Constants
@@ -23,11 +26,6 @@
  * A small epislon value
  */
 const constant float EPSILON = 1.0e-4f;
-
-/**
- * The maximum number of neighbors to examine for a given particle:
- */
-const constant int CHECK_MAX_NEIGHBORS = 8;
 
 /**
  * Acceleration force due to gravity: 9.8 m/s
@@ -126,25 +124,25 @@ typedef struct {
  * Forward declarations
  ******************************************************************************/
 
-global float rescale(float x, float a0, float a1, float b0, float b1);
+float rescale(float x, float a0, float a1, float b0, float b1);
 
-global int sub2ind(int i, int j, int k, int w, int h);
+int sub2ind(int i, int j, int k, int w, int h);
 
-global int3 ind2sub(int x, int w, int h);
+int3 ind2sub(int x, int w, int h);
 
-global int getKey(const global Particle* p
+int getKey(const global Particle* p
+          ,int cellsX
+          ,int cellsY
+          ,int cellsZ
+          ,float3 minExtent
+          ,float3 maxExtent);
+
+int3 getSubscript(const global Particle* p
                  ,int cellsX
                  ,int cellsY
                  ,int cellsZ
                  ,float3 minExtent
                  ,float3 maxExtent);
-
-global int3 getSubscript(const global Particle* p
-                        ,int cellsX
-                        ,int cellsY
-                        ,int cellsZ
-                        ,float3 minExtent
-                        ,float3 maxExtent);
 
 void clampToBounds(const global Parameters* parameters
                   ,global Particle* p
@@ -163,21 +161,21 @@ void callback_SPHDensityEstimator_i(const global Parameters* parameters
                                    ,void* dataArray
                                    ,void* accum);
 
- void callback_SPHGradient_i(const global Parameters* parameters
-                            ,int i
-                            ,const global Particle* p_i
-                            ,int j
-                            ,const global Particle* p_j
-                            ,void* dataArray
-                            ,void* accum);
+void callback_SPHGradient_i(const global Parameters* parameters
+                           ,int i
+                           ,const global Particle* p_i
+                           ,int j
+                           ,const global Particle* p_j
+                           ,void* dataArray
+                           ,void* accum);
 
- void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
-                                         ,int i
-                                         ,const global Particle* p_i
-                                         ,int j
-                                         ,const global Particle* p_j
-                                         ,void* dataArray
-                                         ,void* accum);
+void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
+                                        ,int i
+                                        ,const global Particle* p_i
+                                        ,int j
+                                        ,const global Particle* p_j
+                                        ,void* dataArray
+                                        ,void* accum);
 
  void callback_PositionDelta_i(const global Parameters* parameters
                               ,int i
@@ -211,35 +209,35 @@ void callback_XPSHViscosity_i(const global Parameters* parameters
                              ,void* dataArray
                              ,void* accum);
 
-global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
-                              ,const global GridCellOffset* gridCellOffsets
-                              ,int cellsX
-                              ,int cellsY
-                              ,int cellsZ
-                              ,int3 cellSubscript
-                              ,int* neighborCells);
+int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
+                       ,const global GridCellOffset* gridCellOffsets
+                       ,int cellsX
+                       ,int cellsY
+                       ,int cellsZ
+                       ,int3 cellSubscript
+                       ,int* neighborCells);
 
-global void forAllNeighbors(const global Parameters* parameters
-                           ,const global Particle* particles
-                           ,const global ParticlePosition* sortedParticleToCell
-                           ,const global GridCellOffset* gridCellOffsets
-                           ,int numParticles
-                           ,int cellsX
-                           ,int cellsY
-                           ,int cellsZ
-                           ,float3 minExtent
-                           ,float3 maxExtent
-                           ,int particleId
-                           ,float searchRadius
-                           ,void* dataArray
-                           ,void (*callback)(const global Parameters*
-                                            ,int
-                                            ,const global Particle*
-                                            ,int
-                                            ,const global Particle*
-                                            ,void* dataArray
-                                            ,void* currentAccum)
-                           ,void* initialAccum);
+void forAllNeighbors(const global Parameters* parameters
+                    ,const global Particle* particles
+                    ,const global ParticlePosition* sortedParticleToCell
+                    ,const global GridCellOffset* gridCellOffsets
+                    ,int numParticles
+                    ,int cellsX
+                    ,int cellsY
+                    ,int cellsZ
+                    ,float3 minExtent
+                    ,float3 maxExtent
+                    ,int particleId
+                    ,float searchRadius
+                    ,void* dataArray
+                    ,void (*callback)(const global Parameters*
+                                     ,int
+                                     ,const global Particle*
+                                     ,int
+                                     ,const global Particle*
+                                     ,void* dataArray
+                                     ,void* currentAccum)
+                    ,void* initialAccum);
 
 /*******************************************************************************
  * Utility functions
@@ -249,7 +247,7 @@ global void forAllNeighbors(const global Parameters* parameters
  * A helper function that scales a value x in the range [a0,a1] to a new
  * range [b0,b1]
  */
-global float rescale(float x, float a0, float a1, float b0, float b1)
+float rescale(float x, float a0, float a1, float b0, float b1)
 {
     return ((x - a0) / (a1 - a0)) * (b1 - b0) + b0;
 }
@@ -263,7 +261,7 @@ global float rescale(float x, float a0, float a1, float b0, float b1)
  * @param [in] int w grid width
  * @param [in] int h grid height
  */
-global int sub2ind(int i, int j, int k, int w, int h)
+int sub2ind(int i, int j, int k, int w, int h)
 {
     return i + (j * w) + k * (w * h);
 }
@@ -275,7 +273,7 @@ global int sub2ind(int i, int j, int k, int w, int h)
  * @param [in] int w grid width
  * @param [in] int h grid height
  */
-global int3 ind2sub(int x, int w, int h)
+int3 ind2sub(int x, int w, int h)
 {
     return (int3)(x % w, (x / w) % h, x / (w * h));
 }
@@ -298,7 +296,7 @@ global int3 ind2sub(int x, int w, int h)
  * @returns int3 The 3D subscript (i,j,k) of the cell the particle is
  *               contained in
  */
-global int3 getSubscript(const global Particle* p
+int3 getSubscript(const global Particle* p
                        ,int cellsX
                        ,int cellsY
                        ,int cellsZ
@@ -331,7 +329,7 @@ global int3 getSubscript(const global Particle* p
  *             bounding box in world space
  * @returns int The 1D key of the cell the particle is contained in
  */
-global int getKey(const global Particle* p
+int getKey(const global Particle* p
                  ,int cellsX
                  ,int cellsY
                  ,int cellsZ
@@ -375,11 +373,11 @@ void clampToBounds(const global Parameters* parameters
 /**
  * Given the subscript (i,j,k) as an int3 of a cell to search the vicinity of,
  * this function will return a count of valid neighboring cells (including
- * itself) in the range [1,27], e.g. between 1 and 27 neighboring cells are
- * valid and need to be searched for neighbors. The indices from 
- * [0 .. neighborCount-1] will be populated with the indices of neighboring 
- * cells in gridCellOffsets, such that for each neighboring grid cell
- * (i', j', k'), 0 <= i' < cellX, 0 <= j' < cellY, 0 <= k' < cellZ, and the
+ * itself) in the range [1,TOTAL_NEIGHBORS], e.g. between 1 and TOTAL_NEIGHBORS 
+ * neighboring cells are valid and need to be searched for neighbors. 
+ * The indices from [0 .. TOTAL_NEIGHBORS-1] will be populated with the indices 
+ * of neighboring cells in gridCellOffsets, such that for each neighboring grid 
+ * cell (i', j', k'), 0 <= i' < cellX, 0 <= j' < cellY, 0 <= k' < cellZ, and the
  * corresponding entry for cell (i',j',k') in gridCellOffsets has a cell 
  * start index != -1.
  *
@@ -394,19 +392,19 @@ void clampToBounds(const global Parameters* parameters
  * @param [in]  int3 cellSubscript
  * @param [out] int* neighborCells
  */
-global int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
-                              ,const global GridCellOffset* gridCellOffsets
-                              ,int cellsX
-                              ,int cellsY
-                              ,int cellsZ
-                              ,int3 cellSubscript
-                              ,int* neighborCells)
+int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
+                       ,const global GridCellOffset* gridCellOffsets
+                       ,int cellsX
+                       ,int cellsY
+                       ,int cellsZ
+                       ,int3 cellSubscript
+                       ,int* neighborCells)
 {
     // Count of valid neighbors:
 
     int neighborCellCount = 0;
 
-    // We need to search the following potential 27 cells about (i,j,k):
+    // We need to search the following potential TOTAL_NEIGHBORS cells about (i,j,k):
     // (i + [-1,0,1], j + [-1,0,1], k + [-1,0,1]):
 
     int offsets[3] = { -1, 0, 1 };
@@ -414,21 +412,21 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
     
     // -1 indicates an invalid/non-existent neighbor:
 
-    for (int i = 0; i < 27; i++) {
+    for (int i = 0; i < TOTAL_NEIGHBORS; i++) {
         neighborCells[i] = -1;
     }
 
     I = J = K = -1;
     
-    for (int u = 0; u < 3; u++) {
+    for (int u = 0; u < NEIGHBOR_SEARCH_RADIUS; u++) {
 
         I = cellSubscript.x + offsets[u]; // I = i-1, i, i+1
 
-        for (int v = 0; v < 3; v++) {
+        for (int v = 0; v < NEIGHBOR_SEARCH_RADIUS; v++) {
         
             J = cellSubscript.y + offsets[v]; // J = j-1, j, j+1
 
-            for (int w = 0; w < 3; w++) {
+            for (int w = 0; w < NEIGHBOR_SEARCH_RADIUS; w++) {
             
                 K = cellSubscript.z + offsets[w]; // K = k-1, k, k+1
                 
@@ -484,27 +482,27 @@ global int getNeighboringCells(const global ParticlePosition* sortedParticleToCe
  * @param [out] void* accum The accumulated result, passed to and update by apply
  *              for every neighbor pair of particles
  */
-global void forAllNeighbors(const global Parameters* parameters
-                           ,const global Particle* particles
-                           ,const global ParticlePosition* sortedParticleToCell
-                           ,const global GridCellOffset* gridCellOffsets
-                           ,int numParticles
-                           ,int cellsX
-                           ,int cellsY
-                           ,int cellsZ
-                           ,float3 minExtent
-                           ,float3 maxExtent
-                           ,int particleId
-                           ,float searchRadius
-                           ,void* dataArray
-                           ,void (*callback)(const global Parameters*
-                                            ,int
-                                            ,const global Particle*
-                                            ,int
-                                            ,const global Particle*
-                                            ,void* dataArray
-                                            ,void* currentAccum)
-                           ,void* initialAccum)
+void forAllNeighbors(const global Parameters* parameters
+                    ,const global Particle* particles
+                    ,const global ParticlePosition* sortedParticleToCell
+                    ,const global GridCellOffset* gridCellOffsets
+                    ,int numParticles
+                    ,int cellsX
+                    ,int cellsY
+                    ,int cellsZ
+                    ,float3 minExtent
+                    ,float3 maxExtent
+                    ,int particleId
+                    ,float searchRadius
+                    ,void* dataArray
+                    ,void (*callback)(const global Parameters*
+                                     ,int
+                                     ,const global Particle*
+                                     ,int
+                                     ,const global Particle*
+                                     ,void* dataArray
+                                     ,void* currentAccum)
+                    ,void* initialAccum)
 {
     // Sanity check:
     if (particleId < 0 || particleId >= numParticles) {
@@ -517,9 +515,9 @@ global void forAllNeighbors(const global Parameters* parameters
 
     int3 cellSubscript = getSubscript(p_i, cellsX, cellsY, cellsZ, minExtent, maxExtent);
 
-    // 27 (3x3x3) possible neighbors to search:
+    // TOTAL_NEIGHBORS = NEIGHBOR_SEARCH_RADIUS^3 possible neighbors to search:
 
-    int neighborCells[27];
+    int neighborCells[TOTAL_NEIGHBORS];
     int neighborCellCount = getNeighboringCells(sortedParticleToCell
                                                ,gridCellOffsets
                                                ,cellsX
@@ -775,7 +773,7 @@ void callback_SquaredSPHGradientLength_j(const global Parameters* parameters
     // For the point delta Q, we use p_j->posStar as a starting point, and
     // add an offset value:
 
-    float offset    = (0.1f * h);
+    float offset    = (0.3f * h);
     float4 deltaQ   = p_i->posStar + (float4)(offset, offset, offset, 1.0f);
     float d         = poly6(deltaQ, h);
     float nd        = fabs(d) <= EPSILON ? 0.0f : n / d;
@@ -1267,7 +1265,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
-                   ,parameters->particleRadius * 2.0f
+                   ,parameters->particleRadius
                    ,(void*)particles
                    ,callback_SquaredSPHGradientLength_j
                    ,(void*)&gv_sLengths);
@@ -1339,7 +1337,7 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
-                   ,parameters->particleRadius * 3.0f
+                   ,parameters->particleRadius
                    ,(void*)lambda
                    ,callback_PositionDelta_i
                    ,(void*)&posDelta_i);
@@ -1443,7 +1441,7 @@ kernel void computeCurl(const global Parameters* parameters
                     ,minExtent
                     ,maxExtent
                     ,id
-                    ,parameters->particleRadius * 2.0f
+                    ,parameters->particleRadius
                     ,(void*)particles
                     ,callback_Curl_i
                     ,(void*)&omega_i);
@@ -1520,7 +1518,7 @@ kernel void updatePosition(const global Parameters* parameters
                    ,minExtent
                    ,maxExtent
                    ,id
-                   ,parameters->particleRadius * 2.0f
+                   ,parameters->particleRadius
                    ,(void*)curl
                    ,callback_Vorticity_i
                    ,(void*)&omegaGradient);
