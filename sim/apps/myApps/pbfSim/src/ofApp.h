@@ -38,12 +38,14 @@ class ofApp : public ofBaseApp
         // Simulation, etc.
         ofEasyCam camera;
         msa::OpenCL openCL;
-        std::shared_ptr<Simulation> simulation;
+        Simulation* simulation;
     
+        void initializeSimulation();
         void drawHeadsUpDisplay(ofEasyCam& camera);
     
 	public:
 		void setup();
+        void reset();
 		void update();
 		void draw();
     

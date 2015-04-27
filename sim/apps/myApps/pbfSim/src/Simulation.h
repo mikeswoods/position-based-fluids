@@ -217,13 +217,11 @@ class Simulation
 
         // Final render position for OpenCL <-> OpenGL instanced rendering
         msa::OpenCLBufferManagedT<float4> renderPos;
-    
-        // Finds the OpenCL workgroup size
-        size_t findWorkGroupSize(cl_kernel kernel);
-    
+
         // Initialization-related functions:
         void initialize();
-        void initializeKernels();
+        void initializeBuffers();
+        void setupKernels(bool load);
         void initializeOpenGL();
 
         // Particle sorting functions:
@@ -292,6 +290,7 @@ class Simulation
         void setAnimationPeriod(float period)         { this->animPeriod = period; }
         void setAnimationAmp(float amp)               { this->animAmp = amp; }
     
+        void reset();
         void step();
         void resetBounds();
         void draw(const ofCamera& camera);

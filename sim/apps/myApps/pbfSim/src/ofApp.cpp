@@ -22,8 +22,50 @@ using namespace std;
  * Simulation state
  ******************************************************************************/
 
+void ofApp::initializeSimulation()
+{
+    this->advanceStep = false;
+
+    // Set the scene parameters:
+    
+#ifdef SIMPLE_SCENE
+    
+    AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
+    int numParticles      = 47;
+    Parameters parameters = Constants::DEFAULT_PARAMS;
+    
+    this->simulation = new Simulation(this->openCL
+                                     ,bounds
+                                     ,numParticles
+                                     ,Constants::DEFAULT_DT
+                                     ,ofVec3f(2,2,2)
+                                     ,parameters);
+    
+#else
+    
+    AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
+    int numParticles      = 10000;
+    Parameters parameters = Constants::DEFAULT_PARAMS;
+    
+    this->simulation = new Simulation(this->openCL
+                                     ,bounds
+                                     ,numParticles
+                                     ,parameters);
+#endif
+}
+
+void ofApp::reset()
+{
+    this->advanceStep = false;
+    this->simulation->reset();
+}
+
 void ofApp::setup()
 {
+    // Initialize from GL world:
+    
+    this->openCL.setupFromOpenGL();
+    
 #ifdef ENABLE_LOGGING
     ofSetLogLevel(OF_LOG_VERBOSE);
 #endif
@@ -45,8 +87,8 @@ void ofApp::setup()
     this->gui.add(this->selectSineAnim.setup("~ Sine wave"));
     this->gui.add(this->selectRampAnim.setup("~ Linear ramp"));
     this->gui.add(this->selectCompressAnim.setup("~ Compress"));
-    this->gui.add(this->periodAnimSlider.setup("Period", 1.0f, 0.01f, 2.0f));
-    this->gui.add(this->ampAnimSlider.setup("Amplitude", 1.0f, 1.0f, 15.0f));
+    this->gui.add(this->periodAnimSlider.setup("Period", 0.5f, 0.01f, 1.5f));
+    this->gui.add(this->ampAnimSlider.setup("Amplitude", 1.0f, 1.0f, 25.0f));
     this->gui.add(this->resetBounds.setup("Reset Bounds"));
 
     this->selectSineAnim.addListener(this, &ofApp::setSineAnim);
@@ -58,43 +100,15 @@ void ofApp::setup()
     
     // and the flag initial values:
     
-    this->paused      = true;
-    this->advanceStep = false;
+    this->paused = true;
     
     // set the camera's distance from the object:
 
     this->camera.setDistance(50);
-
-    // Initialize from GL world:
-
-    this->openCL.setupFromOpenGL();
-
-    // Set the scene parameters:
     
-#ifdef SIMPLE_SCENE
-
-    AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles      = 47;
-    Parameters parameters = Constants::DEFAULT_PARAMS;
-
-    this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
-                                                            ,bounds
-                                                            ,numParticles
-                                                            ,Constants::DEFAULT_DT
-                                                            ,ofVec3f(2,2,2)
-                                                            ,parameters));
+    // Set up the simulation:
     
-#else
-
-    AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
-    int numParticles      = 10000;
-    Parameters parameters = Constants::DEFAULT_PARAMS;
-
-    this->simulation = shared_ptr<Simulation>(new Simulation(this->openCL
-                                                            ,bounds
-                                                            ,numParticles
-                                                            ,parameters));
-#endif
+    this->initializeSimulation();
 }
 
 /**
@@ -147,6 +161,9 @@ void ofApp::setCompressAnim()
 
 void ofApp::doResetBounds()
 {
+    this->toggleAnimateBounds    = false;
+    this->toggleAnimateBothSides = false;
+
     this->simulation->disableBoundsAnimation();
     this->simulation->resetBounds();
 }
@@ -312,7 +329,7 @@ void ofApp::keyPressed(int key)
         // Reset
         case 'r':
             {
-                this->setup();
+                this->reset();
             }
             break;
         // Toggle visual debugging:

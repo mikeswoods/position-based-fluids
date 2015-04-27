@@ -175,28 +175,10 @@ void Simulation::setParameters(const Parameters& parameters)
 /******************************************************************************/
 
 /**
- * Finds the workgroup size for the given OpenCL kernel
- *
- * @param [in] kernel The OpenCL kernel to find the workgroup size of
+ * Allocates the neceddary OpenCL buffers used in the simulation and sets the
+ * state accordingly
  */
-size_t Simulation::findWorkGroupSize(cl_kernel kernel)
-{
-    size_t workGroupSize = 0;
-    
-    clGetKernelWorkGroupInfo(kernel
-                            ,this->openCL.getDevice()
-                            ,CL_KERNEL_WORK_GROUP_SIZE
-                            ,sizeof(size_t)
-                            ,&workGroupSize
-                            ,0);
-    
-    return workGroupSize;
-}
-
-/**
- * Initializes the simulation
- */
-void Simulation::initialize()
+void Simulation::initializeBuffers()
 {
     auto p1 = this->bounds.getMinExtent();
     auto p2 = this->bounds.getMaxExtent();
@@ -208,15 +190,11 @@ void Simulation::initialize()
                      * static_cast<int>(this->cellsPerAxis.y)
                      * static_cast<int>(this->cellsPerAxis.z);
 
-    // Set up OpenGL VBOs and shader programs:
-    
-    this->initializeOpenGL();
-
     // Dimension the OpenCL buffer to hold the given number of particles and
     // the render positions
-
+    
     this->particles.initBuffer(this->numParticles);
-
+    
 #ifdef DRAW_PARTICLES_AS_SPHERES
     this->renderPos.initBuffer(this->numParticles);
 #else
@@ -224,7 +202,7 @@ void Simulation::initialize()
 #endif
     
     // Accumulated forces acting on the i-th particles
-
+    
     this->extForces.initBuffer(this->numParticles * sizeof(float4));
     
     // particleToCell contains [0 .. this->numParticles - 1] entries, where
@@ -234,9 +212,9 @@ void Simulation::initialize()
     // where 0 <= ParticlePosition#cellI < cellsPerAxis.x,
     // 0 <= ParticlePosition#cellJ < cellsPerAxis.y, and
     // 0 <= ParticlePosition#cellK < cellsPerAxis.z
-
+    
     this->particleToCell.initBuffer(this->numParticles * sizeof(ParticlePosition));
-
+    
     // Where the sorted version of the above will be sorted per simulation
     // step. The ParticlePosition indices will be sorted in ascending order
     // according to the linearized index computed from
@@ -246,7 +224,7 @@ void Simulation::initialize()
     // details
     
     this->sortedParticleToCell.initBuffer(this->numParticles * sizeof(ParticlePosition));
-
+    
     // An array containing [0 .. this->numCells - 1] entries, where the
     // i-th entry contains the offset information about the start of a
     // particular grid cell in sortedParticleToCell. gridCellOffsets entries
@@ -257,17 +235,17 @@ void Simulation::initialize()
     // i are in the range sortedParticleToCell[g_i.start .. (g_i.start + g_i.length)]
     
     this->gridCellOffsets.initBuffer(this->numCells * sizeof(GridCellOffset));
-
+    
     // A histogram (count table), where the i-th entry contains the number of
     // particles occupying that linearized grid cell. For a linear grid cell
     // z, z can be computed from subscripts (i, j, k) by way of
     // z = i + (j * GRIDWIDTH) + (k * GRIDWIDTH * GRIDHEIGHT)
-
+    
     this->cellHistogram.initBuffer(this->numCells * sizeof(int));
-
+    
     // TODO
     this->cellPrefixSums.initBuffer(this->numCells * sizeof(int));
-
+    
     // The density/lambda/vorticity curl force values associated with each
     // particle. The i-th density corresponds to the i-th quantitity in each
     // buffer:
@@ -277,7 +255,7 @@ void Simulation::initialize()
     this->curl.initBuffer(this->numParticles * sizeof(float4));
     
     // For particle position correction in the solver:
-
+    
     this->posDelta.initBuffer(this->numParticles * sizeof(float4));
     
     // Set up initial positions and velocities for the particles:
@@ -285,9 +263,9 @@ void Simulation::initialize()
     float radius = this->parameters.particleRadius;
     
     for (int i = 0; i < this->numParticles; i++) {
-
+        
         Particle &p = this->particles[i];
-
+        
         // Random position in the bounding box:
         p.pos.x = ofRandom(p1.x + radius, p2.x - radius);
         p.pos.y = ofRandom(p1.y + radius, 0.25f * (p2.y - radius));
@@ -296,14 +274,30 @@ void Simulation::initialize()
         
         // No predicted position:
         p.posStar.x = p.posStar.y = p.posStar.z = 0.0f;
-
+        
         // and no initial velocity:
         p.vel.x = p.vel.y = p.vel.z = 0.0f;
     }
+}
 
-    // Load the kernels:
+/**
+ * Initializes the simulation state and loads the requisite OpenCL kernels
+ */
+void Simulation::initialize()
+{
+    // Set up OpenGL VBOs and shader programs:
+    
+    this->initializeOpenGL();
+    
+    // Allocate OpenCL buffers and set the initial state values:
+    
+    this->initializeBuffers();
+    
+    // Setup the kernels. If true is given, the kernels will be loaded in
+    // addition to arguments being bound. If false, only arguments will be
+    // bound:
 
-    this->initializeKernels();
+    this->setupKernels(true);
 
     // Finally, dump the initial quantities assigned to the particles to the
     // GPU, so we can use them in GPU-land/OpenCL
@@ -373,8 +367,10 @@ void Simulation::initializeOpenGL()
 
 /**
  * Loads all of the OpenCL kernels that will be used for during the simulation
+ * If true is given for load, the kernels will be loaded in addition to 
+ * arguments being bound. If false, only arguments will be bound
  */
-void Simulation::initializeKernels()
+void Simulation::setupKernels(bool load)
 {
     auto minExt = this->bounds.getMinExtent();
     auto maxExt = this->bounds.getMaxExtent();
@@ -387,25 +383,33 @@ void Simulation::initializeKernels()
 
     // === Simulation.cl : the basis for the PBF simulation ====================
     
-    this->openCL.loadProgramFromFile("kernels/Simulation.cl");
+    if (load) {
+        this->openCL.loadProgramFromFile("kernels/Simulation.cl");
+    }
 
     // KERNEL :: debugHistogram
     
-    this->openCL.loadKernel("debugHistogram");
+    if (load) {
+        this->openCL.loadKernel("debugHistogram");
+    }
     this->openCL.kernel("debugHistogram")->setArg(0, this->cellHistogram);
     this->openCL.kernel("debugHistogram")->setArg(1, this->cellPrefixSums);
     this->openCL.kernel("debugHistogram")->setArg(2, this->numCells);
     
     // KERNEL :: debugSorting
 
-    this->openCL.loadKernel("debugSorting");
+    if (load) {
+        this->openCL.loadKernel("debugSorting");
+    }
     this->openCL.kernel("debugSorting")->setArg(0, this->particleToCell);
     this->openCL.kernel("debugSorting")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("debugSorting")->setArg(2, this->numParticles);
 
     // KERNEL :: resetParticleQuantities
 
-    this->openCL.loadKernel("resetParticleQuantities");
+    if (load) {
+        this->openCL.loadKernel("resetParticleQuantities");
+    }
     this->openCL.kernel("resetParticleQuantities")->setArg(0, this->particles);
     this->openCL.kernel("resetParticleQuantities")->setArg(1, this->particleToCell);
     this->openCL.kernel("resetParticleQuantities")->setArg(2, this->sortedParticleToCell);
@@ -415,21 +419,27 @@ void Simulation::initializeKernels()
     
     // KERNEL :: resetCellQuantities
 
-    this->openCL.loadKernel("resetCellQuantities");
+    if (load) {
+        this->openCL.loadKernel("resetCellQuantities");
+    }
     this->openCL.kernel("resetCellQuantities")->setArg(0, this->cellHistogram);
     this->openCL.kernel("resetCellQuantities")->setArg(1, this->cellPrefixSums);
     this->openCL.kernel("resetCellQuantities")->setArg(2, this->gridCellOffsets);
 
     // KERNEL :: predictPosition
 
-    this->openCL.loadKernel("predictPosition");
+    if (load) {
+        this->openCL.loadKernel("predictPosition");
+    }
     this->openCL.kernel("predictPosition")->setArg(0, this->particles);
     this->openCL.kernel("predictPosition")->setArg(1, this->extForces);
     this->openCL.kernel("predictPosition")->setArg(2, this->dt);
     
     // KERNEL :: discretizeParticlePositions
 
-    this->openCL.loadKernel("discretizeParticlePositions");
+    if (load) {
+        this->openCL.loadKernel("discretizeParticlePositions");
+    }
     this->openCL.kernel("discretizeParticlePositions")->setArg(0, this->particles);
     this->openCL.kernel("discretizeParticlePositions")->setArg(1, this->particleToCell);
     this->openCL.kernel("discretizeParticlePositions")->setArg(2, this->cellHistogram);
@@ -441,7 +451,9 @@ void Simulation::initializeKernels()
 
     // KERNEL :: countSortParticlesByCell
     
-    this->openCL.loadKernel("countSortParticlesByCell");
+    if (load) {
+        this->openCL.loadKernel("countSortParticlesByCell");
+    }
     this->openCL.kernel("countSortParticlesByCell")->setArg(0, this->particleToCell);
     this->openCL.kernel("countSortParticlesByCell")->setArg(1, this->sortedParticleToCell);
     this->openCL.kernel("countSortParticlesByCell")->setArg(2, this->cellPrefixSums);
@@ -449,14 +461,18 @@ void Simulation::initializeKernels()
     
     // KERNEL :: findParticleBins
     
-    this->openCL.loadKernel("findParticleBins");
+    if (load) {
+        this->openCL.loadKernel("findParticleBins");
+    }
     this->openCL.kernel("findParticleBins")->setArg(0, this->sortedParticleToCell);
     this->openCL.kernel("findParticleBins")->setArg(1, this->gridCellOffsets);
     this->openCL.kernel("findParticleBins")->setArg(2, this->numParticles);
     
     // KERNEL :: estimateDensity
 
-    this->openCL.loadKernel("estimateDensity");
+    if (load) {
+        this->openCL.loadKernel("estimateDensity");
+    }
     this->openCL.kernel("estimateDensity")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("estimateDensity")->setArg(1, this->particles);
     this->openCL.kernel("estimateDensity")->setArg(2, this->sortedParticleToCell);
@@ -471,7 +487,9 @@ void Simulation::initializeKernels()
     
     // KERNEL :: computeLambda
 
-    this->openCL.loadKernel("computeLambda");
+    if (load) {
+        this->openCL.loadKernel("computeLambda");
+    }
     this->openCL.kernel("computeLambda")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("computeLambda")->setArg(1, this->particles);
     this->openCL.kernel("computeLambda")->setArg(2, this->sortedParticleToCell);
@@ -487,7 +505,9 @@ void Simulation::initializeKernels()
     
     // KERNEL :: computePositionDelta
 
-    this->openCL.loadKernel("computePositionDelta");
+    if (load) {
+        this->openCL.loadKernel("computePositionDelta");
+    }
     this->openCL.kernel("computePositionDelta")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("computePositionDelta")->setArg(1, this->particles);
     this->openCL.kernel("computePositionDelta")->setArg(2, this->sortedParticleToCell);
@@ -503,13 +523,17 @@ void Simulation::initializeKernels()
     
     // KERNEL :: updatePositionDelta
 
-    this->openCL.loadKernel("updatePositionDelta");
+    if (load) {
+        this->openCL.loadKernel("updatePositionDelta");
+    }
     this->openCL.kernel("updatePositionDelta")->setArg(0, this->posDelta);
     this->openCL.kernel("updatePositionDelta")->setArg(1, this->particles);
 
     // KERNEL :: resolveCollisions
 
-    this->openCL.loadKernel("resolveCollisions");
+    if (load) {
+        this->openCL.loadKernel("resolveCollisions");
+    }
     this->openCL.kernel("resolveCollisions")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("resolveCollisions")->setArg(1, this->particles);
     this->openCL.kernel("resolveCollisions")->setArg(2, minExt);
@@ -517,7 +541,9 @@ void Simulation::initializeKernels()
 
     // KERNEL :: computeCurl
 
-    this->openCL.loadKernel("computeCurl");
+    if (load) {
+        this->openCL.loadKernel("computeCurl");
+    }
     this->openCL.kernel("computeCurl")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("computeCurl")->setArg(1, this->particles);
     this->openCL.kernel("computeCurl")->setArg(2, this->sortedParticleToCell);
@@ -532,7 +558,9 @@ void Simulation::initializeKernels()
     
     // KERNEL ::  updatePosition
     
-    this->openCL.loadKernel("updatePosition");
+    if (load) {
+        this->openCL.loadKernel("updatePosition");
+    }
     this->openCL.kernel("updatePosition")->setArg(0, this->parameterBuffer);
     this->openCL.kernel("updatePosition")->setArg(1, this->dt);
     this->openCL.kernel("updatePosition")->setArg(2, this->particles);
@@ -549,16 +577,6 @@ void Simulation::initializeKernels()
     
     // Set up the kernels for computing a prefix sum ("scan") in parallel:
     this->prefixSum = shared_ptr<PrefixSum>(new PrefixSum(this->openCL));
-    
-    
-    // KERNEL :: parallel sort
-    /*
-    this->openCL.loadProgramFromFile("kernels/SelectionSort.cl");
-    
-    this->openCL.loadKernel("selectionSort");
-    this->openCL.kernel("selectionSort")->setArg(0, this->particleToCell);
-    this->openCL.kernel("selectionSort")->setArg(1, this->sortedParticleToCell);
-    */
 }
 
 /******************************************************************************/
@@ -570,7 +588,19 @@ void Simulation::initializeKernels()
 void Simulation::resetBounds()
 {
     this->animFrameNumber = 0;
-    this->bounds          = this->originalBounds;
+    this->bounds = this->originalBounds;
+}
+
+/**
+ * Resets the state of the simulation
+ */
+void Simulation::reset()
+{
+    this->frameNumber = 0;
+    this->initializeBuffers();
+    this->setupKernels(false);
+    this->resetBounds();
+    this->writeToGPU();
 }
 
 /**
