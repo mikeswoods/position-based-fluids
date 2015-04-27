@@ -31,7 +31,7 @@ void ofApp::initializeSimulation()
 #ifdef SIMPLE_SCENE
     
     AABB bounds(ofVec3f(-2.0f, 0.0f, -2.0f), ofVec3f(2.0f, 10.0f, 2.0f));
-    int numParticles      = 47;
+    int numParticles      = 50;
     Parameters parameters = Constants::DEFAULT_PARAMS;
     
     this->simulation = new Simulation(this->openCL
@@ -44,7 +44,7 @@ void ofApp::initializeSimulation()
 #else
     
     AABB bounds(ofVec3f(-30.0f, -10.0f, -10.0f), ofVec3f(30.0f, 80.0f, 10.0f));
-    int numParticles      = 10000;
+    int numParticles      = Constants::DEFAULT_NUM_PARTICLES;
     Parameters parameters = Constants::DEFAULT_PARAMS;
     
     this->simulation = new Simulation(this->openCL

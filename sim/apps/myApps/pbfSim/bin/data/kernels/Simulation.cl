@@ -14,9 +14,17 @@
  ******************************************************************************/
 
 #define NEIGHBOR_SEARCH_RADIUS 3
-//#define NEIGHBOR_SEARCH_RADIUS 4
 //#define NEIGHBOR_SEARCH_RADIUS 5
+
 #define TOTAL_NEIGHBORS ((NEIGHBOR_SEARCH_RADIUS)*(NEIGHBOR_SEARCH_RADIUS)*(NEIGHBOR_SEARCH_RADIUS))
+
+#if NEIGHBOR_SEARCH_RADIUS == 3
+    const constant int searchOffsets[NEIGHBOR_SEARCH_RADIUS] = { -1, 0, 1 };
+#elif NEIGHBOR_SEARCH_RADIUS == 5
+    const constant int searchOffsets[NEIGHBOR_SEARCH_RADIUS] = { -2, -1, 0, 1, 2 };
+#else
+    #error "Neighbor search radius must be 3 or 5!"
+#endif
 
 /*******************************************************************************
  * Constants
@@ -404,10 +412,6 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
 
     int neighborCellCount = 0;
 
-    // We need to search the following potential TOTAL_NEIGHBORS cells about (i,j,k):
-    // (i + [-1,0,1], j + [-1,0,1], k + [-1,0,1]):
-
-    int offsets[3] = { -1, 0, 1 };
     int I, J, K;
     
     // -1 indicates an invalid/non-existent neighbor:
@@ -418,17 +422,20 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
 
     I = J = K = -1;
     
+    // We need to search the following potential TOTAL_NEIGHBORS cells about
+    // the position (i,j,k):
+    
     for (int u = 0; u < NEIGHBOR_SEARCH_RADIUS; u++) {
 
-        I = cellSubscript.x + offsets[u]; // I = i-1, i, i+1
+        I = cellSubscript.x + searchOffsets[u]; // I = i-1, i, i+1
 
         for (int v = 0; v < NEIGHBOR_SEARCH_RADIUS; v++) {
         
-            J = cellSubscript.y + offsets[v]; // J = j-1, j, j+1
+            J = cellSubscript.y + searchOffsets[v]; // J = j-1, j, j+1
 
             for (int w = 0; w < NEIGHBOR_SEARCH_RADIUS; w++) {
             
-                K = cellSubscript.z + offsets[w]; // K = k-1, k, k+1
+                K = cellSubscript.z + searchOffsets[w]; // K = k-1, k, k+1
                 
                 if (   (I >= 0 && I < cellsX)
                     && (J >= 0 && J < cellsY)
@@ -1044,13 +1051,14 @@ kernel void countSortParticlesByCell(global ParticlePosition* particleToCell
     global ParticlePosition* p2c = &particleToCell[id];
 
     // Again, due to the way OpenCL manages thread level parallelism, we need
-    // to atomic_add and operate on the "old" index.
+    // to atomic_add and operate on the old, previous index value before the
+    // increment op.
     // See http://stackoverflow.com/questions/18366359/opencl-kernel-incrementing-index-of-array
     // for details, specifically http://stackoverflow.com/a/18392827
 
-    int next = atomic_add(&cellPrefixSums[p2c->key], 1);
+    int prev = atomic_add(&cellPrefixSums[p2c->key], 1);
 
-    sortedParticleToCell[next] = *p2c;
+    sortedParticleToCell[prev] = *p2c;
 }
 
 /**
@@ -1071,8 +1079,8 @@ kernel void findParticleBins(global ParticlePosition* sortedParticleToCell
                             ,global GridCellOffset* gridCellOffsets
                             ,int numParticles)
 {
-    int id    = get_global_id(0);
-    int key   = sortedParticleToCell[id].key;
+    int id  = get_global_id(0);
+    int key = sortedParticleToCell[id].key;
     
     if (gridCellOffsets[key].start == -1) {
 

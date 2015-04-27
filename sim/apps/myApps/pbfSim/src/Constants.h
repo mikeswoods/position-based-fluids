@@ -27,6 +27,11 @@
     #define DRAW_PARTICLES_AS_SPHERES 1
 #endif
 
+// If defined, the simulation will produce better results at the expense of
+// speed
+
+#define MORE_ACCURATE 1
+
 /******************************************************************************/
 
 namespace Constants {
@@ -39,33 +44,47 @@ const int SOLVER_ITERATIONS = 3;
 /**
  * Default number of particles in the simulation
  */
-const int DEFAULT_NUM_PARTICLES = 5000;
+const int DEFAULT_NUM_PARTICLES = 10000;
 
 /**
- * Default time step = 1/30 of a second
+ * Default time step
  */
-//const float DEFAULT_DT = 0.04166; // 1/24 s
+
+#ifdef MORE_ACCURATE
+const float DEFAULT_DT = 0.025f; // 1/40 s
+#else
 const float DEFAULT_DT = 0.033f; // 1/30 s
-//const float DEFAULT_DT = 0.025f; // 1/40 s
-//const float DEFAULT_DT = 0.0166f; // 1/60 s
+#endif
 
 /**
  * Desired number of particles per cell in X. This value is used to 
  * compute the optimal number of cells in the spatial grid per axis
  */
+#ifdef MORE_ACCURATE
+const int PARTICLES_PER_CELL_X = 3;
+#else
 const int PARTICLES_PER_CELL_X = 2;
+#endif
 
 /**
  * Desired number of particles per cell in Y This value is used to
  * compute the optimal number of cells in the spatial grid per axis
  */
+#ifdef MORE_ACCURATE
+const int PARTICLES_PER_CELL_Y = 3;
+#else
 const int PARTICLES_PER_CELL_Y = 2;
+#endif
 
 /**
  * Desired number of particles per cell in Z This value is used to
  * compute the optimal number of cells in the spatial grid per axis
  */
+#ifdef MORE_ACCURATE
+const int PARTICLES_PER_CELL_Z = 3;
+#else
 const int PARTICLES_PER_CELL_Z = 2;
+#endif
 
 /******************************************************************************/
 
@@ -73,11 +92,11 @@ const int PARTICLES_PER_CELL_Z = 2;
  * Parameters for a simulation with particles of radius 0.5 units
  */
 const Parameters DEFAULT_PARAMS = Parameters(0.5f    // Particle radius
-                                            ,1.2f   // Smoothing radius
+                                            ,1.15f   // Smoothing radius
                                             ,0.0033f // Relaxation
-                                            ,0.01f    // Artifical Pressure K
-                                            ,4.0f    // Artifical Pressure N
-                                            ,0.6f    // Vorticity epsilon
+                                            ,0.1f    // Artifical Pressure K
+                                            ,5.0f    // Artifical Pressure N
+                                            ,0.1f    // Vorticity epsilon
                                             ,0.01f); // Viscosity coefficient
 
 }

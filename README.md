@@ -35,14 +35,19 @@ Enhancements
   and one-shot compression. This allows us to create a number of novel fluid
   motion effects like crashing waves, etc. with ease on-the-fly
 
-Tooling, third Party libraries, and frameworks
+Tooling, third party libraries, and frameworks
 ----------------------------------------------
 
+- Xcode 6.1 (tested under OSX 10.9.5 on model "MacBookPro11,1")
 - [openFrameworks](http://www.openframeworks.cc/), community [contributed](http://www.openframeworks.cc/list-info)
   * A great, generalized C++ framework for creative coding and experimentation
 - [ofxMSAOpenCL](https://github.com/memo/ofxMSAOpenCL), Memo Akten
   * A openFrameworks addon wrapper that removes much of the boilerplate code 
     associated with OpenCL
+
+Results
+-------
+[Demo video](https://vimeo.com/126096018)
 
 References
 ----------
@@ -75,7 +80,7 @@ A graphics card that supports OpenCL v1.1+ and OpenGL 3+ (a.k.a. "modern OpenGL"
 
 ##### OSX
 
-- XCode 6.x
+- Xcode 6.x
 
 - OSX 10.9 and higher, although it might compile on older versions. Unfortunately,
 we are unable to test for compatibility on older versions of OSX.
