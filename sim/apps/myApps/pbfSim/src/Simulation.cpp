@@ -321,7 +321,8 @@ void Simulation::initializeOpenGL()
 #ifdef DRAW_PARTICLES_AS_SPHERES
     shaderType = "SphereParticle";
 #else
-    shaderType = "PointParticle";
+    //shaderType = "PointParticleDiffuse";
+    shaderType = "PointParticleFlat";
 #endif
     
     bool loadStatus = this->shader.load("shaders/" + shaderType + ".vert"

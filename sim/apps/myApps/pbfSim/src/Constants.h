@@ -39,7 +39,7 @@ namespace Constants {
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 5;
+const int SOLVER_ITERATIONS = 4;
    
 /**
  * Default number of particles in the simulation
