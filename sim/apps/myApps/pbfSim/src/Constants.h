@@ -39,7 +39,7 @@ namespace Constants {
 /**
  * Number of iterations the Jacobi solver will run for
  */
-const int SOLVER_ITERATIONS = 3;
+const int SOLVER_ITERATIONS = 5;
    
 /**
  * Default number of particles in the simulation
@@ -49,12 +49,7 @@ const int DEFAULT_NUM_PARTICLES = 10000;
 /**
  * Default time step
  */
-
-#ifdef MORE_ACCURATE
-const float DEFAULT_DT = 0.025f; // 1/40 s
-#else
 const float DEFAULT_DT = 0.033f; // 1/30 s
-#endif
 
 /**
  * Desired number of particles per cell in X. This value is used to 
