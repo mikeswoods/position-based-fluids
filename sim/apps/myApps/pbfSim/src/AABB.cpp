@@ -25,15 +25,15 @@ ostream& operator<<(ostream& os, AABB& aabb)
 /******************************************************************************/
 
 AABB::AABB():
-    minV(ofVec3f(0.0f, 0.0f, 0.0f)),
-    maxV(ofVec3f(0.0f, 0.0f, 0.0f))
+    minV(ofVec4f(0.0f, 0.0f, 0.0f, 1.0f)),
+    maxV(ofVec4f(0.0f, 0.0f, 0.0f, 1.0f))
 {
     
 }
 
-AABB::AABB(float3 _p, float3 _q) :
-    minV(float3(std::min(_p.x, _q.x), std::min(_p.y, _q.y), std::min(_p.z, _q.z))),
-    maxV(float3(std::max(_p.x, _q.x), std::max(_p.y, _q.y), std::max(_p.z, _q.z)))
+AABB::AABB(ofVec3f _p, ofVec3f _q) :
+    minV(ofVec4f(std::min(_p.x, _q.x), std::min(_p.y, _q.y), std::min(_p.z, _q.z), 1.0f)),
+    maxV(ofVec4f(std::max(_p.x, _q.x), std::max(_p.y, _q.y), std::max(_p.z, _q.z), 1.0f))
 {
     
 }
@@ -45,12 +45,12 @@ AABB::AABB(const AABB& other) :
     
 }
 
-ofVec3f& AABB::getMinExtent()
+ofVec4f& AABB::getMinExtent()
 {
     return this->minV;
 }
 
-ofVec3f& AABB::getMaxExtent()
+ofVec4f& AABB::getMaxExtent()
 {
     return this->maxV;
 }

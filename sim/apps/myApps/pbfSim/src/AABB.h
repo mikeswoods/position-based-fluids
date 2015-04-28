@@ -17,15 +17,15 @@
 class AABB
 {
     protected:
-        ofVec3f minV, maxV;
+        ofVec4f minV, maxV;
 
     public:
         AABB();
-        AABB(float3 p, ofVec3f q);
+        AABB(ofVec3f p, ofVec3f q);
         AABB(const AABB& other);
     
-        ofVec3f& getMinExtent();
-        ofVec3f& getMaxExtent();
+        ofVec4f& getMinExtent();
+        ofVec4f& getMaxExtent();
     
         float width() const;
         float height() const;

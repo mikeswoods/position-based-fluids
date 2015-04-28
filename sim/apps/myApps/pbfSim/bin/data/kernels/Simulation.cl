@@ -50,6 +50,16 @@ const constant float INV_REST_DENSITY = 1.0f / REST_DENSITY;
  * Types
  ******************************************************************************/
 
+enum ComputeAction {
+     COMPUTE_SPHDensityEstimator_i
+    ,COMPUTE_SPHGradient_i
+    ,COMPUTE_SquaredSPHGradientLength_j
+    ,COMPUTE_PositionDelta_i
+    ,COMPUTE_Curl_i
+    ,COMPUTE_Vorticity_i
+    ,COMPUTE_XPSHViscosity
+};
+
 // Tuneable parameters for the simulation:
 
 typedef struct {
@@ -142,20 +152,20 @@ int getKey(const global Particle* p
           ,int cellsX
           ,int cellsY
           ,int cellsZ
-          ,float3 minExtent
-          ,float3 maxExtent);
+          ,float4 minExtent
+          ,float4 maxExtent);
 
 int3 getSubscript(const global Particle* p
                  ,int cellsX
                  ,int cellsY
                  ,int cellsZ
-                 ,float3 minExtent
-                 ,float3 maxExtent);
+                 ,float4 minExtent
+                 ,float4 maxExtent);
 
 void clampToBounds(const global Parameters* parameters
                   ,global Particle* p
-                  ,float3 minExtent
-                  ,float3 maxExtent);
+                  ,float4 minExtent
+                  ,float4 maxExtent);
 
 float poly6(float4 r, float h);
 
@@ -233,18 +243,12 @@ void forAllNeighbors(const global Parameters* parameters
                     ,int cellsX
                     ,int cellsY
                     ,int cellsZ
-                    ,float3 minExtent
-                    ,float3 maxExtent
+                    ,float4 minExtent
+                    ,float4 maxExtent
                     ,int particleId
                     ,float searchRadius
                     ,void* dataArray
-                    ,void (*callback)(const global Parameters*
-                                     ,int
-                                     ,const global Particle*
-                                     ,int
-                                     ,const global Particle*
-                                     ,void* dataArray
-                                     ,void* currentAccum)
+                    ,enum ComputeAction action
                     ,void* initialAccum);
 
 /*******************************************************************************
@@ -297,9 +301,9 @@ int3 ind2sub(int x, int w, int h)
  *             grid
  * @param [in] int cellsZ The number of cells in the z axis of the spatial
  *             grid
- * @param [in] float3 minExtent The minimum extent of the simulation's
+ * @param [in] float4 minExtent The minimum extent of the simulation's
  *             bounding box in world space
- * @param [in] float3 maxExtent The maximum extent of the simulation's
+ * @param [in] float4 maxExtent The maximum extent of the simulation's
  *             bounding box in world space
  * @returns int3 The 3D subscript (i,j,k) of the cell the particle is
  *               contained in
@@ -308,8 +312,8 @@ int3 getSubscript(const global Particle* p
                        ,int cellsX
                        ,int cellsY
                        ,int cellsZ
-                       ,float3 minExtent
-                       ,float3 maxExtent)
+                       ,float4 minExtent
+                       ,float4 maxExtent)
 {
     // Find the discretized cell the particle will be in according to its
     // predicted position:
@@ -331,9 +335,9 @@ int3 getSubscript(const global Particle* p
  *             grid
  * @param [in] int cellsZ The number of cells in the z axis of the spatial
  *             grid
- * @param [in] float3 minExtent The minimum extent of the simulation's
+ * @param [in] float4 minExtent The minimum extent of the simulation's
  *             bounding box in world space
- * @param [in] float3 maxExtent The maximum extent of the simulation's
+ * @param [in] float4 maxExtent The maximum extent of the simulation's
  *             bounding box in world space
  * @returns int The 1D key of the cell the particle is contained in
  */
@@ -341,8 +345,8 @@ int getKey(const global Particle* p
                  ,int cellsX
                  ,int cellsY
                  ,int cellsZ
-                 ,float3 minExtent
-                 ,float3 maxExtent)
+                 ,float4 minExtent
+                 ,float4 maxExtent)
 {
     int3 subscript = getSubscript(p, cellsX, cellsY, cellsZ, minExtent, maxExtent);
 
@@ -357,15 +361,15 @@ int getKey(const global Particle* p
  * @param [in]     Parameters* parameters The runtime parameters of the 
  *                 simulation
  * @param [in/out] Parameters* parameters The particle to clamp
- * @param [in]     float3 minExtent The minimum extent of the simulation's
+ * @param [in]     float4 minExtent The minimum extent of the simulation's
  *                 bounding box in world space
- * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ * @param [in]     float4 maxExtent The maximum extent of the simulation's
  *                 bounding box in world space
  */
 void clampToBounds(const global Parameters* parameters
                   ,global Particle* p
-                  ,float3 minExtent
-                  ,float3 maxExtent)
+                  ,float4 minExtent
+                  ,float4 maxExtent)
 {
     // Clamp predicted and actual positions:
     
@@ -474,9 +478,9 @@ int getNeighboringCells(const global ParticlePosition* sortedParticleToCell
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [in]  int particleId The ID (index) of the particle to find the n
  *              neighbors of. This value corresponds to the position of the 
@@ -497,18 +501,12 @@ void forAllNeighbors(const global Parameters* parameters
                     ,int cellsX
                     ,int cellsY
                     ,int cellsZ
-                    ,float3 minExtent
-                    ,float3 maxExtent
+                    ,float4 minExtent
+                    ,float4 maxExtent
                     ,int particleId
                     ,float searchRadius
                     ,void* dataArray
-                    ,void (*callback)(const global Parameters*
-                                     ,int
-                                     ,const global Particle*
-                                     ,int
-                                     ,const global Particle*
-                                     ,void* dataArray
-                                     ,void* currentAccum)
+                    ,enum ComputeAction action
                     ,void* initialAccum)
 {
     // Sanity check:
@@ -587,7 +585,40 @@ void forAllNeighbors(const global Parameters* parameters
                 // (p_i, p_j), along with their respective indices,
                 // and accumulate the result into accum:
 
-                callback(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                switch (action) {
+                    
+                    case COMPUTE_SPHDensityEstimator_i:
+                        callback_SPHDensityEstimator_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+                    
+                    case COMPUTE_SPHGradient_i:
+                        callback_SPHGradient_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+                    
+                    case COMPUTE_SquaredSPHGradientLength_j:
+                        callback_SquaredSPHGradientLength_j(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+                    
+                    case COMPUTE_PositionDelta_i:
+                        callback_PositionDelta_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+                    
+                    case COMPUTE_Curl_i:
+                        callback_Curl_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+                    
+                    case COMPUTE_Vorticity_i:
+                        callback_Vorticity_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+
+                    case COMPUTE_XPSHViscosity:
+                        callback_XPSHViscosity_i(parameters, particleId, p_i, J, p_j, dataArray, initialAccum);
+                        break;
+
+                    default:
+                        printf("Invalid value!\n");
+                        break;
+                }
             }
         }
     }
@@ -996,9 +1027,9 @@ kernel void predictPosition(global Particle* particles
  *             grid
  * @param [in] int cellsZ The number of cells in the z axis of the spatial
  *             grid
- * @param [in] float3 minExtent The minimum extent of the simulation's
+ * @param [in] float4 minExtent The minimum extent of the simulation's
  *             bounding box in world space
- * @param [in] float3 maxExtent The maximum extent of the simulation's
+ * @param [in] float4 maxExtent The maximum extent of the simulation's
  *             bounding box in world space
  */
 kernel void discretizeParticlePositions(const global Particle* particles
@@ -1007,8 +1038,8 @@ kernel void discretizeParticlePositions(const global Particle* particles
                                        ,int cellsX
                                        ,int cellsY
                                        ,int cellsZ
-                                       ,float3 minExtent
-                                       ,float3 maxExtent)
+                                       ,float4 minExtent
+                                       ,float4 maxExtent)
 {
     int id                       = get_global_id(0);
     const global Particle *p     = &particles[id];
@@ -1128,9 +1159,9 @@ kernel void findParticleBins(global ParticlePosition* sortedParticleToCell
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [out] float* density
  */
@@ -1142,8 +1173,8 @@ void kernel estimateDensity(const global Parameters* parameters
                            ,int cellsX
                            ,int cellsY
                            ,int cellsZ
-                           ,float3 minExtent
-                           ,float3 maxExtent
+                           ,float4 minExtent
+                           ,float4 maxExtent
                            ,global float* density)
 {
     int id = get_global_id(0);
@@ -1167,9 +1198,9 @@ void kernel estimateDensity(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)particles
-                   ,callback_SPHDensityEstimator_i
+                   ,COMPUTE_SPHDensityEstimator_i
                    ,(void*)&estDensity);
-
+    
     density[id] = estDensity;
 }
 
@@ -1206,9 +1237,9 @@ void kernel estimateDensity(const global Parameters* parameters
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [out] float* lambda The constraint lambda value
  */
@@ -1221,8 +1252,8 @@ kernel void computeLambda(const global Parameters* parameters
                          ,int cellsX
                          ,int cellsY
                          ,int cellsZ
-                         ,float3 minExtent
-                         ,float3 maxExtent
+                         ,float4 minExtent
+                         ,float4 maxExtent
                          ,global float* lambda)
 {
     int id = get_global_id(0);
@@ -1251,7 +1282,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)particles
-                   ,callback_SPHGradient_i
+                   ,COMPUTE_SPHGradient_i
                    ,(void*)&gv_i);
     
     float gv_iLength = length(INV_REST_DENSITY * gv_i);
@@ -1275,7 +1306,7 @@ kernel void computeLambda(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)particles
-                   ,callback_SquaredSPHGradientLength_j
+                   ,COMPUTE_SquaredSPHGradientLength_j
                    ,(void*)&gv_sLengths);
     
     gradientSum += gv_sLengths;
@@ -1308,9 +1339,9 @@ kernel void computeLambda(const global Parameters* parameters
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [out] float4* posDelta position changes
  */
@@ -1323,8 +1354,8 @@ kernel void computePositionDelta(const global Parameters* parameters
                                 ,int cellsX
                                 ,int cellsY
                                 ,int cellsZ
-                                ,float3 minExtent
-                                ,float3 maxExtent
+                                ,float4 minExtent
+                                ,float4 maxExtent
                                 ,global float4* posDelta)
 {
     int id = get_global_id(0);
@@ -1347,7 +1378,7 @@ kernel void computePositionDelta(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)lambda
-                   ,callback_PositionDelta_i
+                   ,COMPUTE_PositionDelta_i
                    ,(void*)&posDelta_i);
     
     posDelta[id] = INV_REST_DENSITY * posDelta_i;
@@ -1367,15 +1398,15 @@ kernel void computePositionDelta(const global Parameters* parameters
  *
  * @param [in]     Parameters* parameters Simulation parameters
  * @param [in/out] const Particle* particles The particles in the simulation
- * @param [in]     float3 minExtent The minimum extent of the simulation's
+ * @param [in]     float4 minExtent The minimum extent of the simulation's
  *                 bounding box in world space
- * @param [in]     float3 maxExtent The maximum extent of the simulation's
+ * @param [in]     float4 maxExtent The maximum extent of the simulation's
  *                 bounding box in world space
  */
 kernel void resolveCollisions(const global Parameters* parameters
                               ,global Particle* particles
-                              ,float3 minExtent
-                              ,float3 maxExtent)
+                              ,float4 minExtent
+                              ,float4 maxExtent)
 {
 
 }
@@ -1415,9 +1446,9 @@ kernel void updatePositionDelta(const global float4* posDelta
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [out] float4 curl The curl associated with each particle
  */
@@ -1429,8 +1460,8 @@ kernel void computeCurl(const global Parameters* parameters
                         ,int cellsX
                         ,int cellsY
                         ,int cellsZ
-                        ,float3 minExtent
-                        ,float3 maxExtent
+                        ,float4 minExtent
+                        ,float4 maxExtent
                         ,global float4* curl)
 {
     int id = get_global_id(0);
@@ -1451,7 +1482,7 @@ kernel void computeCurl(const global Parameters* parameters
                     ,id
                     ,parameters->particleRadius
                     ,(void*)particles
-                    ,callback_Curl_i
+                    ,COMPUTE_Curl_i
                     ,(void*)&omega_i);
     
     curl[id] = omega_i;
@@ -1482,9 +1513,9 @@ kernel void computeCurl(const global Parameters* parameters
  *              grid
  * @param [in]  int cellsZ The number of cells in the z axis of the spatial
  *              grid
- * @param [in]  float3 minExtent The minimum extent of the simulation's
+ * @param [in]  float4 minExtent The minimum extent of the simulation's
  *              bounding box in world space
- * @param [in]  float3 maxExtent The maximum extent of the simulation's
+ * @param [in]  float4 maxExtent The maximum extent of the simulation's
  *              bounding box in world space
  * @param [out] float4 curl The curl associated with each particle
  */
@@ -1498,8 +1529,8 @@ kernel void updatePosition(const global Parameters* parameters
                           ,int cellsX
                           ,int cellsY
                           ,int cellsZ
-                          ,float3 minExtent
-                          ,float3 maxExtent
+                          ,float4 minExtent
+                          ,float4 maxExtent
                           ,global float4* renderPos)
 {
     int id = get_global_id(0);
@@ -1514,7 +1545,7 @@ kernel void updatePosition(const global Parameters* parameters
 
     // Curl force for particle i:
     float4 omegaGradient = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    
+
     forAllNeighbors(parameters
                    ,particles
                    ,sortedParticleToCell
@@ -1528,7 +1559,7 @@ kernel void updatePosition(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)curl
-                   ,callback_Vorticity_i
+                   ,COMPUTE_Vorticity_i
                    ,(void*)&omegaGradient);
     
     float n = length(omegaGradient);
@@ -1559,7 +1590,7 @@ kernel void updatePosition(const global Parameters* parameters
                    ,id
                    ,parameters->particleRadius
                    ,(void*)particles
-                   ,callback_XPSHViscosity_i
+                   ,COMPUTE_XPSHViscosity
                    ,(void*)&v_i_sum);
 
     p->vel = p->vel + (parameters->viscosityCoeff * v_i_sum);
